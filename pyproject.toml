@@ -6,7 +6,6 @@ authors = ["Your Name <your.email@example.com>"]
 license = "MIT"
 readme = "README.md"
 packages = [{ include = "yase", from = "src" }]
-build = "src"
 include = [
     "src/yase/weights/**"
 ]

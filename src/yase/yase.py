@@ -1,10 +1,10 @@
 import torch
-from models.segmentation.sfnet_lite import SFNetLite
-from models.depth.midas import MiDaS
-from utils import preprocess, postprocess, optimization, onnx_export
+# from .models.segmentation.sfnet_lite import SFNetLite
+from .models.depth.monodepth2_estimator import Monodepth2Estimator
+from .utils import preprocessing, postprocessing, onnx_export
 
 class Yase:
-    def __init__(self, task="segmentation", model_name="SFNetLite", fp16=False, use_onnx=False, **kwargs):
+    def __init__(self, fp16=False, use_onnx=False, **kwargs):
         """
         Initialize the Yase class with the desired task and model.
         
@@ -17,15 +17,14 @@ class Yase:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.fp16 = fp16
         self.use_onnx = use_onnx
-        self.task = task
-        
+        self.model = {}
         # Initialize the model based on the task
-        self.model = self._initialize_model(model_name, **kwargs)
+        self._initialize_models(**kwargs)
 
         if self.use_onnx:
             self.model = onnx_export.export_model_to_onnx(self.model, self.device)
 
-    def _initialize_model(self, model_name, **kwargs):
+    def _initialize_models(self, *kwargs):
         """
         Internal method to initialize the appropriate model based on the task.
         
@@ -33,12 +32,14 @@ class Yase:
         :param kwargs: Additional arguments for model-specific settings.
         :return: Initialized model.
         """
-        if self.task == "segmentation" and model_name == "SFNetLite":
-            return SFNetLite(**kwargs).to(self.device)
-        elif self.task == "depth" and model_name == "MiDaS":
-            return MiDaS(**kwargs).to(self.device)
-        else:
-            raise ValueError(f"Unsupported task or model: {self.task} - {model_name}")
+        self.model["depth"] = Monodepth2Estimator()
+        # self.model['segmentation'] = 
+        # if self.task == "segmentation" and model_name == "SFNetLite":
+        #     return SFNetLite(**kwargs).to(self.device)
+        # elif self.task == "depth" and model_name == "MiDaS":
+        #     return MiDaS(**kwargs).to(self.device)
+        # else:
+        #     raise ValueError(f"Unsupported task or model: {self.task} - {model_name}")
 
     def run_inference(self, input_data):
         """
