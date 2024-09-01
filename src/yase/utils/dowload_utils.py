@@ -1,54 +1,45 @@
 import os
 import urllib.request
 import hashlib
-import requests
-from tqdm import tqdm
+import zipfile
 
-def download_file(url, dest_path, expected_sha256=None):
-    """
-    Downloads a file from the given URL and saves it to the specified destination path.
-    If the file already exists and its hash matches the expected SHA256, the download is skipped.
+from .common import create_folder_if_not_exist
 
-    Args:
-        url (str): URL to download the file from.
-        dest_path (str): Destination path to save the downloaded file.
-        expected_sha256 (str, optional): The expected SHA256 hash of the file for verification.
-    """
-    # Check if the file already exists
-    if os.path.exists(dest_path):
-        if expected_sha256 and not verify_sha256(dest_path, expected_sha256):
-            print(f"Existing file {dest_path} is corrupted, re-downloading...")
-        else:
-            print(f"File {dest_path} already exists and is verified. Skipping download.")
-            return
+def _check_file_matches_md5(checksum, fpath):
+    if not os.path.exists(fpath):
+        return False
+
+    with open(fpath, 'rb') as file:
+        current_md5checksum = hashlib.md5(file.read()).hexdigest()
+
+    print(f"Expected checksum: {checksum}, Calculated checksum: {current_md5checksum}")
+    return current_md5checksum == checksum
+
+def download_monodepth_weight(url, hash, dest_path, model_name='depth'):
+    create_folder_if_not_exist(dest_path)
+    model_path = os.path.abspath(os.path.join(dest_path, model_name))
+
+    if os.path.exists(os.path.join(model_path, "encoder.pth")):
+        print("encoder.pth exists, skipping download.")
     else:
-        print(f"Downloading file from {url} to {dest_path}...")
+        zip_file_path = f"{model_path}.zip"
+        print(f"Zip file path: {zip_file_path}")
 
-    # Download the file with progress bar
-    try:
-        response = requests.get(url, stream=True)
-        response.raise_for_status()  # Check for request errors
-        total_size = int(response.headers.get('content-length', 0))
-        with open(dest_path, 'wb') as file, tqdm(
-            desc=dest_path,
-            total=total_size,
-            unit='B',
-            unit_scale=True,
-            unit_divisor=1024,
-        ) as bar:
-            for data in response.iter_content(chunk_size=4096):
-                file.write(data)
-                bar.update(len(data))
+        if not _check_file_matches_md5(hash, zip_file_path):
+            print('Downloading file...')
+            urllib.request.urlretrieve(url, zip_file_path)
 
-        # Verify the downloaded file's SHA256 hash
-        if expected_sha256 and not verify_sha256(dest_path, expected_sha256):
-            raise ValueError("Downloaded file is corrupted (SHA256 mismatch).")
-        print("Download completed successfully.")
-    except requests.exceptions.RequestException as e:
-        print(f"Download failed: {e}")
-        if os.path.exists(dest_path):
-            os.remove(dest_path)
-        raise
+        if not _check_file_matches_md5(hash, zip_file_path):
+            raise ValueError("Failed to download a file which matches the checksum - quitting")
+
+        with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+            zip_ref.extractall(model_path)
+
+        try:
+            os.remove(zip_file_path)
+        except OSError as e:
+            raise ValueError(f"Error deleting zip file at {zip_file_path}: {e}")
+
 
 def verify_sha256(file_path, expected_sha256):
     """

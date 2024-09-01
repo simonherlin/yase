@@ -48,11 +48,11 @@ class Yase:
         :param input_data: Input data for the model (e.g., image).
         :return: Model output.
         """
-        preprocessed_input = preprocess(input_data, task=self.task)
+        preprocessed_input = preprocessing(input_data, task=self.task)
         with torch.no_grad():
             if self.fp16:
                 with torch.cuda.amp.autocast():
                     output = self.model(preprocessed_input)
             else:
                 output = self.model(preprocessed_input)
-        return postprocess(output, task=self.task)
+        return postprocessing(output, task=self.task)

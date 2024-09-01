@@ -2,11 +2,12 @@ import os
 import torch
 import torchvision.transforms as transforms
 from PIL import Image
-from ...utils.dowload_utils import download_file
+
+from ...utils.dowload_utils import download_monodepth_weight
 from .networks import (ResnetEncoder, DepthDecoder)
 
 class Monodepth2Estimator:
-    def __init__(self, encoder_path=None, decoder_path=None):
+    def __init__(self):
         """
         Initializes the Monodepth2Estimator. Downloads model weights if they are not present.
 
@@ -14,13 +15,7 @@ class Monodepth2Estimator:
             encoder_path (str): Path to the encoder model file.
             decoder_path (str): Path to the decoder model file.
         """
-        if encoder_path is None:
-            encoder_path = os.path.join(os.path.dirname(__file__), '../weights/mono+stereo_640x192/encoder.pth')
-        if decoder_path is None:
-            decoder_path = os.path.join(os.path.dirname(__file__), '../weights/mono+stereo_640x192/depth.pth')
-
-        self.encoder_path = encoder_path
-        self.decoder_path = decoder_path
+        self.weight_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'weights', 'depth', 'monodepth2'))
 
         # Ensure that model weights are downloaded
         self._ensure_weights_downloaded()
@@ -28,36 +23,38 @@ class Monodepth2Estimator:
         # Use GPU if available
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        # Load the models
-        self.encoder = ResnetEncoder(18, False)
-        self.encoder.load_state_dict(torch.load(self.encoder_path, map_location=self.device))
-        self.encoder.to(self.device)
+        # # Load the models
+        # self.encoder = ResnetEncoder(18, False)
+        # self.encoder.load_state_dict(torch.load(self.encoder_path, map_location=self.device))
+        # self.encoder.to(self.device)
         
-        self.depth_decoder = DepthDecoder(num_ch_enc=self.encoder.num_ch_enc, scales=range(4))
-        self.depth_decoder.load_state_dict(torch.load(self.decoder_path, map_location=self.device))
-        self.depth_decoder.to(self.device)
+        # self.depth_decoder = DepthDecoder(num_ch_enc=self.encoder.num_ch_enc, scales=range(4))
+        # self.depth_decoder.load_state_dict(torch.load(self.decoder_path, map_location=self.device))
+        # self.depth_decoder.to(self.device)
 
-        self.encoder.eval()
-        self.depth_decoder.eval()
+        # self.encoder.eval()
+        # self.depth_decoder.eval()
 
-        feed_width = 640
-        feed_height = 192
-        self.transform = transforms.Compose([
-            transforms.Resize((feed_height, feed_width)),
-            transforms.ToTensor(),
-            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-        ])
+        # feed_width = 640
+        # feed_height = 192
+        # self.transform = transforms.Compose([
+        #     transforms.Resize((feed_height, feed_width)),
+        #     transforms.ToTensor(),
+        #     transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+        # ])
 
     def _ensure_weights_downloaded(self):
         """
         Checks if the model weights are downloaded, and downloads them if necessary.
         """
-        encoder_url = "https://storage.googleapis.com/niantic-lon-static/research/monodepth2/models/mono+stereo_640x192/encoder.pth"
-        decoder_url = "https://storage.googleapis.com/niantic-lon-static/research/monodepth2/models/mono+stereo_640x192/depth.pth"
-
+        encoder_url = "https://storage.googleapis.com/niantic-lon-static/research/monodepth2/mono_640x192.zip"
+        required_md5checksum = "a964b8356e08a02d009609d9e3928f7c"
         # Download files if they do not exist
-        download_file(encoder_url, self.encoder_path)
-        download_file(decoder_url, self.decoder_path)
+        download_monodepth_weight(
+            url=encoder_url,
+            hash=required_md5checksum,
+            dest_path=self.weight_path
+        )
 
     def predict_depth(self, image_path):
         """
