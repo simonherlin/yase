@@ -2,6 +2,9 @@ import os
 import torch
 import torchvision.transforms as transforms
 from PIL import Image
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning, module="torchvision")
 
 from ...utils.dowload_utils import download_monodepth_weight
 from .networks import (ResnetEncoder, DepthDecoder)
@@ -10,10 +13,6 @@ class Monodepth2Estimator:
     def __init__(self):
         """
         Initializes the Monodepth2Estimator. Downloads model weights if they are not present.
-
-        Args:
-            encoder_path (str): Path to the encoder model file.
-            decoder_path (str): Path to the decoder model file.
         """
         self.weight_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'weights', 'depth', 'monodepth2'))
 
@@ -23,25 +22,30 @@ class Monodepth2Estimator:
         # Use GPU if available
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+        encoder_path = os.path.join(self.weight_path, 'encoder.pth')
+        depth_decoder_path = os.path.join(self.weight_path, 'depth.pth')
         # # Load the models
-        # self.encoder = ResnetEncoder(18, False)
-        # self.encoder.load_state_dict(torch.load(self.encoder_path, map_location=self.device))
-        # self.encoder.to(self.device)
-        
-        # self.depth_decoder = DepthDecoder(num_ch_enc=self.encoder.num_ch_enc, scales=range(4))
-        # self.depth_decoder.load_state_dict(torch.load(self.decoder_path, map_location=self.device))
-        # self.depth_decoder.to(self.device)
+        self.encoder = ResnetEncoder(18, False)
+        self.depth_decoder = DepthDecoder(num_ch_enc=self.encoder.num_ch_enc, scales=range(4))
 
-        # self.encoder.eval()
-        # self.depth_decoder.eval()
+        loaded_dict_enc = torch.load(encoder_path, map_location=self.device)
+        filtered_dict_enc = {k: v for k, v in loaded_dict_enc.items() if k in self.encoder.state_dict()}
+        self.encoder.load_state_dict(filtered_dict_enc)
 
-        # feed_width = 640
-        # feed_height = 192
-        # self.transform = transforms.Compose([
-        #     transforms.Resize((feed_height, feed_width)),
-        #     transforms.ToTensor(),
-        #     transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-        # ])
+
+        self.loaded_dict = torch.load(depth_decoder_path, map_location=self.device)
+        self.depth_decoder.load_state_dict(self.loaded_dict)
+
+        self.encoder.eval()
+        self.depth_decoder.eval()
+
+        feed_width = 640
+        feed_height = 192
+        self.transform = transforms.Compose([
+            transforms.Resize((feed_height, feed_width)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+        ])
 
     def _ensure_weights_downloaded(self):
         """

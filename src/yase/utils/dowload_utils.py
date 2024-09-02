@@ -15,9 +15,9 @@ def _check_file_matches_md5(checksum, fpath):
     print(f"Expected checksum: {checksum}, Calculated checksum: {current_md5checksum}")
     return current_md5checksum == checksum
 
-def download_monodepth_weight(url, hash, dest_path, model_name='depth'):
+def download_monodepth_weight(url, hash, dest_path):
     create_folder_if_not_exist(dest_path)
-    model_path = os.path.abspath(os.path.join(dest_path, model_name))
+    model_path = os.path.abspath(dest_path)
 
     if os.path.exists(os.path.join(model_path, "encoder.pth")):
         print("encoder.pth exists, skipping download.")
