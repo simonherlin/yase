@@ -124,15 +124,15 @@ def _normalise_output(
 class Yase:
     """Semantic extractor with an injectable backend.
 
-    extractor is useful for applications and tests. Without one, the
-    Monodepth2 backend is imported and initialized on the first extraction.
+    Pass an extractor for custom Python inference, or select the explicit
+    ``torchscript`` model adapter with a local model artifact.
     """
 
     def __init__(
         self,
         task: str = "depth",
         extractor: Optional[Any] = None,
-        model: str = "monodepth2",
+        model: str = "custom",
         color_order: str = "RGB",
         **backend_options: Any,
     ) -> None:

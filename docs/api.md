@@ -12,11 +12,21 @@
 Typed fields include optional depth, segmentation, detections, tags,
 embeddings, timestamp, and arbitrary metadata.
 
-## VideoStream
+## Backends
 
-VideoStream(source, extractor, stride=1, max_fps=None, max_frames=None)
-yields FrameResult. stats exposes read/processed/dropped counts, source and
-output FPS, elapsed time, and mean/max inference latency.
+CallableExtractor wraps a Python callable. TorchScriptExtractor loads a local
+TorchScript file with the torch extra. OnnxRuntimeExtractor loads a local ONNX
+file with the onnx extra, prepares NCHW float32 input, and supports depth,
+segmentation, or paired outputs. Inject a session object in tests to avoid the
+optional runtime dependency.
+
+## VideoStream and RealtimeVideoStream
+
+VideoStream(source, extractor, stride=1, max_fps=None, max_frames=None) yields
+FrameResult sequentially. RealtimeVideoStream uses a worker and one-item
+latest-frame buffer; drop_frames=True overwrites stale frames, while False
+applies backpressure. Both expose stats with read/processed/dropped counts,
+source/output FPS, elapsed time, and mean/max inference latency.
 
 Use error_policy=skip to discard failed frames, or pass
 on_error(exception, frame_index) to return a recovery SemanticResult.

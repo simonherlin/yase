@@ -219,3 +219,187 @@ def process_video(
 
 
 __all__ = ["FrameResult", "VideoStats", "VideoStream", "process_video"]
+
+
+class RealtimeVideoStream(VideoStream):
+    """Capture frames in a worker while inference consumes the latest frame.
+
+    With drop_frames=True (the default), the one-element buffer is overwritten
+    by the reader and stale frames are counted as dropped. With drop_frames=False
+    the reader waits for the consumer, applying backpressure instead. close()
+    is idempotent and joins the worker before releasing the capture.
+    """
+
+    def __init__(
+        self,
+        source: Union[str, int, Any],
+        extractor: Any,
+        queue_size: int = 1,
+        drop_frames: bool = True,
+        color_order: str = "BGR",
+        max_frames: Optional[int] = None,
+        on_error: Optional[Callable[[Exception, int], Optional[SemanticResult]]] = None,
+        error_policy: str = "raise",
+    ) -> None:
+        if queue_size != 1:
+            raise ValueError("latest-frame mode requires queue_size=1")
+        super().__init__(
+            source,
+            extractor,
+            stride=1,
+            max_fps=None,
+            drop_frames=drop_frames,
+            color_order=color_order,
+            max_frames=max_frames,
+            on_error=on_error,
+            error_policy=error_policy,
+        )
+        import threading
+
+        self._condition = threading.Condition()
+        self._stop_event = threading.Event()
+        self._worker = None
+        self._latest = None
+        self._reader_done = False
+        self._reader_error: Optional[BaseException] = None
+        self._read_count = 0
+        self._drop_count = 0
+
+    def _reader(self, capture: Any) -> None:
+        index = 0
+        try:
+            while not self._stop_event.is_set():
+                ok, frame = capture.read()
+                if not ok:
+                    break
+                timestamp = self._timestamp(capture, index)
+                with self._condition:
+                    while (
+                        not self.drop_frames
+                        and self._latest is not None
+                        and not self._stop_event.is_set()
+                    ):
+                        self._condition.wait(timeout=0.1)
+                    if self._stop_event.is_set():
+                        break
+                    if self._latest is not None:
+                        self._drop_count += 1
+                    self._latest = (index, timestamp, frame)
+                    self._read_count += 1
+                    index += 1
+                    self._condition.notify_all()
+        except BaseException as exc:
+            with self._condition:
+                self._reader_error = exc
+        finally:
+            with self._condition:
+                self._reader_done = True
+                self._condition.notify_all()
+
+    def __iter__(self) -> Iterator[FrameResult]:
+        capture = self._open()
+        import threading
+
+        self._stop_event.clear()
+        self._reader_done = False
+        self._reader_error = None
+        self._read_count = 0
+        self._drop_count = 0
+        self._latest = None
+        self._worker = threading.Thread(
+            target=self._reader, args=(capture,), name="yase-capture", daemon=True
+        )
+        self._worker.start()
+        started_at = time.perf_counter()
+        frames_processed = 0
+        latencies = []
+        try:
+            while self.max_frames is None or frames_processed < self.max_frames:
+                with self._condition:
+                    while (
+                        self._latest is None
+                        and not self._reader_done
+                        and self._reader_error is None
+                    ):
+                        self._condition.wait(timeout=0.1)
+                    if self._reader_error is not None:
+                        raise RuntimeError(
+                            "video capture worker failed"
+                        ) from self._reader_error
+                    if self._latest is None and self._reader_done:
+                        break
+                    item = self._latest
+                    self._latest = None
+                    self._condition.notify_all()
+                index, timestamp, frame = item
+                started = time.perf_counter()
+                try:
+                    image = load_image(frame, color_order=self.color_order)
+                    backend = self.extractor
+                    result = (
+                        backend.extract(image, timestamp=timestamp)
+                        if hasattr(backend, "extract")
+                        else backend(image)
+                    )
+                except Exception as exc:
+                    if self.on_error is not None:
+                        result = self.on_error(exc, index)
+                        if result is None:
+                            continue
+                    elif self.error_policy == "skip":
+                        continue
+                    else:
+                        raise
+                if not isinstance(result, SemanticResult):
+                    result = SemanticResult(depth=result, timestamp=timestamp)
+                elif result.timestamp is None:
+                    result = SemanticResult(
+                        depth=result.depth,
+                        segmentation=result.segmentation,
+                        detections=result.detections,
+                        tags=result.tags,
+                        embeddings=result.embeddings,
+                        timestamp=timestamp,
+                        metadata=result.metadata,
+                    )
+                latency = time.perf_counter() - started
+                latencies.append(latency)
+                frames_processed += 1
+                yield FrameResult(index, timestamp, result, latency)
+        finally:
+            self.close()
+            elapsed = time.perf_counter() - started_at
+            output_fps = frames_processed / elapsed if elapsed else 0.0
+            mean_latency = sum(latencies) / len(latencies) if latencies else 0.0
+            max_latency = max(latencies) if latencies else 0.0
+            self._stats = VideoStats(
+                self._read_count,
+                frames_processed,
+                self._drop_count,
+                elapsed,
+                self._fps,
+                output_fps,
+                mean_latency,
+                max_latency,
+            )
+
+    def close(self) -> None:
+        """Signal the reader and release resources; safe to call repeatedly."""
+        self._stop_event.set()
+        with self._condition:
+            self._condition.notify_all()
+        if self._worker is not None and self._worker.is_alive():
+            self._worker.join(timeout=2.0)
+        if self._capture is not None and hasattr(self._capture, "release"):
+            self._capture.release()
+        self._capture = None
+        self._worker = None
+
+
+__all__ = [
+    "FrameResult",
+    "RealtimeVideoStream",
+    "VideoStats",
+    "VideoStream",
+    "process_video",
+]

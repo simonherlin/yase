@@ -14,11 +14,24 @@ dependencies = [
 [project.optional-dependencies]
 video = ["opencv-python>=4.8"]
 torch = ["torch>=2.0", "torchvision>=0.15"]
-all = ["opencv-python>=4.8", "torch>=2.0", "torchvision>=0.15"]
+onnx = ["onnxruntime>=1.17"]
+all = ["opencv-python>=4.8", "onnxruntime>=1.17", "torch>=2.0", "torchvision>=0.15"]
 
 [build-system]
 requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build]
+exclude = [
+  "/src/yase/data_load.py",
+  "/src/yase/features.py",
+  "/src/yase/models/**",
+  "/src/yase/preprocess.py",
+  "/src/yase/tests/**",
+  "/src/yase/utils/**",
+  "/src/yase/visualize.py",
+  "/src/yase/weights/**",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/yase"]
@@ -42,6 +55,22 @@ target-version = "py39"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
 ignore = ["E501"]
+
+[tool.coverage.run]
+source = ["yase"]
+omit = [
+  "*/yase/data_load.py",
+  "*/yase/features.py",
+  "*/yase/models/*",
+  "*/yase/preprocess.py",
+  "*/yase/tests/*",
+  "*/yase/utils/*",
+  "*/yase/visualize.py",
+]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
 
 [tool.uv]
 default-groups = ["dev"]

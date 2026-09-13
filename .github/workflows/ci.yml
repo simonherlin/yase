@@ -18,12 +18,21 @@ jobs:
         with:
           version: "0.10.x"
           python-version: ${{ matrix.python-version }}
+      - run: uv lock --check
       - run: uv sync --dev
-      - run: uv run ruff check src tests examples
-      - run: uv run ruff format --check src tests examples
+      - run: uv run ruff check src tests examples benchmarks
+      - run: uv run ruff format --check src tests examples benchmarks
       - run: uv run pytest --cov=yase --cov-report=term-missing
       - run: uv build
       - run: |
           uv venv --python ${{ matrix.python-version }} .wheel-env
           uv pip install --python .wheel-env/bin/python dist/*.whl
-          .wheel-env/bin/python -c "import sys, yase; assert 'torch' not in sys.modules; assert 'cv2' not in sys.modules; print(yase.__version__)"
+          .wheel-env/bin/python - <<'PY'
+          import pathlib
+          import sys
+          import yase
+          assert 'torch' not in sys.modules
+          assert 'cv2' not in sys.modules
+          assert pathlib.Path(yase.__file__).with_name('py.typed').exists()
+          print(yase.__version__)
+          PY

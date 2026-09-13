@@ -1,7 +1,15 @@
 import numpy as np
 import pytest
 
-from yase import CallableExtractor, SemanticResult, VideoStats, Yase, load_image
+from yase import (
+    CallableExtractor,
+    OnnxRuntimeExtractor,
+    RealtimeVideoStream,
+    SemanticResult,
+    VideoStats,
+    Yase,
+    load_image,
+)
 from yase.video import VideoStream
 
 
@@ -205,3 +213,107 @@ def test_torchscript_backend_reports_optional_dependency():
 
     with pytest.raises(ImportError, match="torch"):
         TorchScriptExtractor("missing.pt")
+
+
+class FailingCapture(FakeCapture):
+    def read(self):
+        raise OSError("camera disconnected")
+
+
+def test_realtime_latest_frame_drops_backlog_and_closes():
+    capture = FakeCapture(30)
+
+    def slow_backend(image):
+        import time as _time
+
+        _time.sleep(0.001)
+        return np.zeros(image.shape[:2])
+
+    stream = RealtimeVideoStream(capture, slow_backend, max_frames=1)
+    frames = list(stream)
+    assert len(frames) == 1
+    assert stream.stats.frames_read >= 1
+    assert stream.stats.frames_dropped >= 0
+    assert not stream._worker
+    assert capture.released
+
+
+def test_realtime_backpressure_disables_drops():
+    capture = FakeCapture(3)
+    stream = RealtimeVideoStream(
+        capture, lambda image: np.zeros(image.shape[:2]), drop_frames=False
+    )
+    frames = list(stream)
+    assert len(frames) == 3
+    assert stream.stats.frames_dropped == 0
+
+
+def test_realtime_worker_exception_is_propagated_and_closed():
+    capture = FailingCapture(1)
+    stream = RealtimeVideoStream(capture, lambda image: image)
+    with pytest.raises(RuntimeError, match="worker"):
+        list(stream)
+    stream.close()
+    assert capture.released
+
+
+def test_realtime_queue_size_is_fixed_to_latest_frame():
+    with pytest.raises(ValueError, match="queue_size"):
+        RealtimeVideoStream(FakeCapture(1), lambda image: image, queue_size=2)
+
+
+class FakeOnnxIO:
+    def __init__(self, name):
+        self.name = name
+
+
+class FakeOnnxSession:
+    def __init__(self, outputs):
+        self.outputs = outputs
+        self.calls = []
+
+    def get_inputs(self):
+        return [FakeOnnxIO("pixels")]
+
+    def run(self, names, inputs):
+        self.calls.append((names, inputs))
+        return self.outputs
+
+
+def test_onnx_injected_session_prepares_nchw_and_depth():
+    session = FakeOnnxSession([np.ones((1, 1, 2, 3), dtype=np.float32)])
+    backend = OnnxRuntimeExtractor("unused.onnx", session=session, size=(3, 2))
+    result = backend.extract(np.zeros((4, 5, 3), dtype=np.uint8))
+    assert result.depth.shape == (1, 2, 3)
+    assert session.calls[0][0] is None
+    feed = session.calls[0][1]["pixels"]
+    assert feed.shape == (1, 3, 2, 3)
+    assert feed.dtype == np.float32
+
+
+def test_onnx_both_outputs_and_named_io():
+    session = FakeOnnxSession([np.ones((1, 2, 2)), np.zeros((1, 2, 2))])
+    backend = OnnxRuntimeExtractor(
+        "unused.onnx",
+        session=session,
+        task="both",
+        input_name="pixels",
+        output_names=["depth", "mask"],
+    )
+    result = backend.extract(np.zeros((2, 2, 3), dtype=np.uint8))
+    assert result.depth.shape == (2, 2)
+    assert result.segmentation.shape == (2, 2)
+    assert session.calls[0][0] == ["depth", "mask"]
+
+
+def test_onnx_validates_task_size_outputs_and_optional_dependency():
+    with pytest.raises(ValueError, match="task"):
+        OnnxRuntimeExtractor("x", session=FakeOnnxSession([]), task="bad")
+    with pytest.raises(ValueError, match="size"):
+        OnnxRuntimeExtractor("x", session=FakeOnnxSession([]), size=(0, 2))
+    with pytest.raises(ValueError, match="two"):
+        OnnxRuntimeExtractor(
+            "x", session=FakeOnnxSession([np.zeros((1, 1))]), task="both"
+        ).extract(np.zeros((2, 2, 3)))
+    with pytest.raises(ImportError, match="onnx"):
+        OnnxRuntimeExtractor("missing.onnx")

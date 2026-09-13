@@ -11,7 +11,7 @@ model backends are optional extras.
 uv sync --dev
 # Optional live video capture:
 uv sync --extra video
-# Optional Monodepth2 backend:
+# Optional local TorchScript backend:
 uv sync --extra torch
 ~~~
 
@@ -39,7 +39,7 @@ Yase accepts paths, Pillow images, and NumPy arrays. Arrays are treated as RGB
 by default; pass color_order="BGR" when adapting OpenCV frames.
 
 For a real model, use the local TorchScript adapter. It loads no weights from
- the network and is initialized only when explicitly supplied:
+the network and is initialized only when explicitly supplied:
 
 ~~~python
 from yase import Yase
@@ -47,9 +47,15 @@ model = Yase(model="torchscript", model_path="model.pt")
 depth = model.extract("photo.jpg").depth
 ~~~
 
-This backend requires the torch extra. The historical Monodepth2 source is
-retained only for provenance and is not part of the recommended API; its
-upstream Niantic non-commercial terms are described in NOTICE.md.
+This backend requires the `torch` extra and a model file supplied locally by
+the application. Yase never downloads weights implicitly. For ONNX Runtime,
+install the `onnx` extra and provide a local model (also without downloads):
+
+~~~python
+from yase import OnnxRuntimeExtractor
+backend = OnnxRuntimeExtractor("model.onnx", task="depth", size=(640, 192))
+result = backend.extract("photo.jpg")
+~~~
 
 ## Real-time video
 
@@ -58,14 +64,17 @@ processing duration, and SemanticResult. It supports frame stride, max output
 FPS, and bounded output count.
 
 ~~~python
-from yase import Yase, VideoStream
+from yase import RealtimeVideoStream, Yase
 
 extractor = Yase(extractor=MeanDepth())
-for item in VideoStream("input.mp4", extractor, stride=2, max_fps=15):
+for item in RealtimeVideoStream(0, extractor, drop_frames=True):
     print(item.frame_index, item.timestamp, item.result.depth.shape)
 ~~~
 OpenCV is imported only when a path or camera source is opened. A capture-like
 object implementing read() and release() can be supplied for custom pipelines.
+For file processing use VideoStream; for live cameras use RealtimeVideoStream,
+which runs capture in a worker and keeps a bounded latest-frame buffer. Set
+drop_frames=False to apply backpressure instead of discarding stale frames.
 
 ## Development
 
