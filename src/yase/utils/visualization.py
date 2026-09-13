@@ -8,6 +8,6 @@ def show_depth(depth):
     Args:
         depth (numpy.ndarray): Carte de profondeur à afficher.
     """
-    plt.imshow(depth, cmap='plasma')
+    plt.imshow(depth, cmap="plasma")
     plt.colorbar()
     plt.show()

@@ -1,6 +1,7 @@
-import torch
 import cv2
 import numpy as np
+import torch
+
 
 def postprocess(output, task="segmentation"):
     if task == "segmentation":

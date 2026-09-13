@@ -4,7 +4,7 @@ import os
 def create_folder_if_not_exist(path_folder: str, mode: int = 0o777) -> None:
     """Creates a folder if it does not already exist.
 
-    This function checks if a folder at the specified path exists, and if not, 
+    This function checks if a folder at the specified path exists, and if not,
     it creates the folder with the specified permissions (mode).
 
     Args:
@@ -23,8 +23,12 @@ def create_folder_if_not_exist(path_folder: str, mode: int = 0o777) -> None:
         if not os.path.exists(path_folder):
             os.makedirs(name=path_folder, mode=mode)
     except FileNotFoundError as exc:
-        raise FileNotFoundError(f"The specified path is invalid or inaccessible: {path_folder}") from exc
+        raise FileNotFoundError(
+            f"The specified path is invalid or inaccessible: {path_folder}"
+        ) from exc
     except PermissionError as exc:
-        raise PermissionError(f"Insufficient permissions to create folder at: {path_folder}") from exc
+        raise PermissionError(
+            f"Insufficient permissions to create folder at: {path_folder}"
+        ) from exc
     except Exception as exc:
         raise Exception(f"An unexpected error occurred: {exc}") from exc

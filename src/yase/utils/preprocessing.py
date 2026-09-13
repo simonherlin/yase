@@ -1,12 +1,13 @@
-import torch
 import cv2
+import torch
+
 
 def preprocess(input_data, task="segmentation", size=(224, 224)):
     if isinstance(input_data, str):
         image = cv2.imread(input_data)
     else:
         image = input_data
-    
+
     if task == "segmentation":
         image = cv2.resize(image, size)
     elif task == "depth":
