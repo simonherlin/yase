@@ -84,7 +84,6 @@ def test_video_max_frames_and_metadata():
     assert frames[0].result.timestamp is not None
 
 
-
 def test_generic_semantic_fields_are_preserved():
     result = Yase(
         task="depth",
@@ -120,3 +119,89 @@ def test_video_stats_count_skipped_frames():
     assert stream.stats.frames_processed == 3
     assert stream.stats.frames_dropped == 2
     assert stream.stats.output_fps >= 0
+
+
+def test_video_error_policy_skip_and_callback():
+    capture = FakeCapture(3)
+    calls = []
+
+    def failing(_image):
+        raise RuntimeError("bad frame")
+
+    frames = list(VideoStream(capture, failing, error_policy="skip"))
+    assert frames == []
+    assert capture.released
+    assert (
+        VideoStream(FakeCapture(1), failing, error_policy="skip").error_policy == "skip"
+    )
+
+    def recover(error, index):
+        calls.append((str(error), index))
+        return SemanticResult(depth=np.zeros((2, 3)))
+
+    frames = list(VideoStream(FakeCapture(2), failing, on_error=recover))
+    assert len(frames) == 2
+    assert calls == [("bad frame", 0), ("bad frame", 1)]
+
+
+def test_video_error_policy_validation():
+    with pytest.raises(ValueError, match="error_policy"):
+        VideoStream(FakeCapture(1), lambda image: image, error_policy="ignore")
+
+
+def test_image_path_and_pillow_inputs(tmp_path):
+    from PIL import Image
+
+    path = tmp_path / "image.png"
+    Image.fromarray(np.full((2, 3, 3), 7, dtype=np.uint8)).save(path)
+    backend = CallableExtractor(lambda image: image[..., 0])
+    assert backend.extract(path).depth.shape == (2, 3)
+    assert backend.extract(Image.open(path)).depth.shape == (2, 3)
+
+
+def test_load_image_rejects_invalid_shapes_and_order():
+    with pytest.raises(ValueError, match="dimensions"):
+        load_image(np.zeros((2, 2, 2, 1)))
+    with pytest.raises(ValueError, match="channels"):
+        load_image(np.zeros((2, 2, 2)))
+    with pytest.raises(ValueError, match="color_order"):
+        load_image(np.zeros((2, 2, 3)), color_order="XYZ")
+
+
+def test_normalise_tuple_and_result_timestamp():
+    both = Yase(
+        task="both",
+        extractor=lambda image: (np.ones((2, 2)), np.zeros((2, 2))),
+    ).extract(np.zeros((2, 2, 3)), timestamp=4.0)
+    assert both.timestamp == 4.0
+    assert both.segmentation.sum() == 0
+    original = SemanticResult(tags=["x"], timestamp=1)
+    result = Yase(extractor=lambda image: original).extract(
+        np.zeros((1, 1, 3)), timestamp=2
+    )
+    assert result.tags == ["x"] and result.timestamp == 2
+
+
+def test_default_backend_requires_explicit_configuration():
+    with pytest.raises(ValueError, match="backend"):
+        Yase().extract(np.zeros((2, 2, 3)))
+    with pytest.raises(ValueError, match="backend"):
+        Yase(model="unknown").extract(np.zeros((2, 2, 3)))
+
+
+def test_callable_backend_validation_and_segmentation():
+    with pytest.raises(TypeError, match="callable"):
+        CallableExtractor(None)
+    backend = CallableExtractor(
+        lambda image: np.ones(image.shape[:2]), task="segmentation"
+    )
+    assert backend.extract(np.zeros((2, 2, 3))).segmentation.shape == (2, 2)
+    with pytest.raises(TypeError, match="pair"):
+        CallableExtractor(lambda image: image, task="both").extract(np.zeros((2, 2, 3)))
+
+
+def test_torchscript_backend_reports_optional_dependency():
+    from yase.backends import TorchScriptExtractor
+
+    with pytest.raises(ImportError, match="torch"):
+        TorchScriptExtractor("missing.pt")

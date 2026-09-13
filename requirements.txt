@@ -1,9 +1,2 @@
-flake8
-pytest
-pytest-cov
-black
-pandas
-matplotlib
-seaborn
-pyyaml
-jupyterlab
+# Legacy compatibility shim: uv is the supported dependency manager.
+# Use `uv sync --dev` (or `uv sync --extra video`) instead.

@@ -1,0 +1,2 @@
+# Dependency management moved to pyproject.toml and uv.lock.
+# Use: uv sync --dev

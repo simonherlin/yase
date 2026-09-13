@@ -3,7 +3,7 @@
 import time
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 from .core import SemanticResult, load_image
 
@@ -28,6 +28,8 @@ class VideoStats:
     elapsed: float
     input_fps: float
     output_fps: float
+    mean_latency: float
+    max_latency: float
 
 
 class VideoStream:
@@ -49,6 +51,8 @@ class VideoStream:
         drop_frames: bool = True,
         color_order: str = "BGR",
         max_frames: Optional[int] = None,
+        on_error: Optional[Callable[[Exception, int], Optional[SemanticResult]]] = None,
+        error_policy: str = "raise",
     ) -> None:
         if stride < 1:
             raise ValueError("stride must be >= 1")
@@ -56,6 +60,8 @@ class VideoStream:
             raise ValueError("max_fps must be positive")
         if max_frames is not None and max_frames < 0:
             raise ValueError("max_frames must be >= 0")
+        if error_policy not in ("raise", "skip"):
+            raise ValueError("error_policy must be raise or skip")
         self.source = source
         self.extractor = extractor
         self.stride = stride
@@ -63,9 +69,11 @@ class VideoStream:
         self.drop_frames = drop_frames
         self.color_order = color_order
         self.max_frames = max_frames
+        self.on_error = on_error
+        self.error_policy = error_policy
         self._capture = None
         self._fps = 0.0
-        self._stats = VideoStats(0, 0, 0, 0.0, 0.0, 0.0)
+        self._stats = VideoStats(0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
     @property
     def fps(self) -> float:
@@ -119,6 +127,7 @@ class VideoStream:
         yielded = 0
         last_timestamp: Optional[float] = None
         index = 0
+        latencies = []
         try:
             while self.max_frames is None or yielded < self.max_frames:
                 ok, frame = capture.read()
@@ -139,12 +148,26 @@ class VideoStream:
                     index += 1
                     continue
                 started = time.perf_counter()
-                image = load_image(frame, color_order=self.color_order)
-                backend = self.extractor
-                if hasattr(backend, "extract"):
-                    result = backend.extract(image, timestamp=timestamp)
-                else:
-                    result = backend(image)
+                try:
+                    image = load_image(frame, color_order=self.color_order)
+                    backend = self.extractor
+                    if hasattr(backend, "extract"):
+                        result = backend.extract(image, timestamp=timestamp)
+                    else:
+                        result = backend(image)
+                except Exception as exc:
+                    if self.on_error is not None:
+                        result = self.on_error(exc, index)
+                        if result is None:
+                            frames_dropped += 1
+                            index += 1
+                            continue
+                    elif self.error_policy == "skip":
+                        frames_dropped += 1
+                        index += 1
+                        continue
+                    else:
+                        raise
                 if not isinstance(result, SemanticResult):
                     result = SemanticResult(depth=result, timestamp=timestamp)
                 elif result.timestamp is None:
@@ -157,9 +180,9 @@ class VideoStream:
                         timestamp=timestamp,
                         metadata=result.metadata,
                     )
-                yield FrameResult(
-                    index, timestamp, result, time.perf_counter() - started
-                )
+                latency = time.perf_counter() - started
+                latencies.append(latency)
+                yield FrameResult(index, timestamp, result, latency)
                 last_timestamp = timestamp
                 yielded += 1
                 frames_processed += 1
@@ -167,6 +190,8 @@ class VideoStream:
         finally:
             elapsed = time.perf_counter() - started_at
             output_fps = frames_processed / elapsed if elapsed else 0.0
+            mean_latency = sum(latencies) / len(latencies) if latencies else 0.0
+            max_latency = max(latencies) if latencies else 0.0
             self._stats = VideoStats(
                 frames_read,
                 frames_processed,
@@ -174,6 +199,8 @@ class VideoStream:
                 elapsed,
                 self._fps,
                 output_fps,
+                mean_latency,
+                max_latency,
             )
             if hasattr(capture, "release"):
                 capture.release()
