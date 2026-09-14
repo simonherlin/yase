@@ -7,6 +7,7 @@ from typing import Any, Callable, Optional, Union
 
 from .core import SemanticResult, load_image
 from .limits import InputLimits
+from .observability import RuntimeMetrics
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,7 @@ class VideoStream:
         sink: Optional[Any] = None,
         source_id: str = "default",
         input_limits: Optional[InputLimits] = None,
+        metrics: Optional[RuntimeMetrics] = None,
     ) -> None:
         if stride < 1:
             raise ValueError("stride must be >= 1")
@@ -88,6 +90,7 @@ class VideoStream:
         self.sink = sink
         self.source_id = str(source_id)
         self.input_limits = input_limits
+        self.metrics = metrics
         self._capture = None
         self._fps = 0.0
         self._stats = VideoStats(0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0)
@@ -288,6 +291,8 @@ class VideoStream:
                 mean_latency,
                 max_latency,
             )
+            if self.metrics is not None:
+                self.metrics.record_video(self._stats)
             if hasattr(capture, "release"):
                 capture.release()
 
@@ -334,6 +339,7 @@ class RealtimeVideoStream(VideoStream):
         sink: Optional[Any] = None,
         source_id: str = "default",
         input_limits: Optional[InputLimits] = None,
+        metrics: Optional[RuntimeMetrics] = None,
     ) -> None:
         if queue_size != 1:
             raise ValueError("latest-frame mode requires queue_size=1")
@@ -355,6 +361,7 @@ class RealtimeVideoStream(VideoStream):
             sink=sink,
             source_id=source_id,
             input_limits=input_limits,
+            metrics=metrics,
         )
         import threading
 
@@ -485,6 +492,8 @@ class RealtimeVideoStream(VideoStream):
                 mean_latency,
                 max_latency,
             )
+            if self.metrics is not None:
+                self.metrics.record_video(self._stats)
 
     def close(self) -> None:
         """Signal the reader and release resources; safe to call repeatedly."""

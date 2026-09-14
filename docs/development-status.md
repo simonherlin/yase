@@ -308,6 +308,15 @@ Result: version 0.21.0, 101 deterministic tests passing before final validation.
 
 Result: version 0.22.0, 102 deterministic tests passing before final validation.
 
+## Cycle 28 — video runtime observability
+
+- [x] Record processed and dropped frames from sequential and realtime streams.
+- [x] Export aggregate video latency summaries through `RuntimeMetrics`.
+- [x] Keep metrics dependency-free and bounded by process lifetime.
+- [x] Add stream integration and Prometheus exposition tests.
+
+Result: version 0.23.0, 103 deterministic tests passing before final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

@@ -48,6 +48,10 @@ class RuntimeMetrics:
         self._stage_counts: defaultdict[tuple[str, str], int] = defaultdict(int)
         self._stage_elapsed: defaultdict[str, float] = defaultdict(float)
         self._stage_observations: defaultdict[str, int] = defaultdict(int)
+        self._video_processed = 0
+        self._video_dropped = 0
+        self._video_latency_sum = 0.0
+        self._video_observations = 0
 
     def record_report(self, report: Any) -> None:
         """Record one scheduler-like report."""
@@ -62,6 +66,17 @@ class RuntimeMetrics:
                 self._stage_elapsed[name] += float(execution.duration_seconds)
                 self._stage_observations[name] += 1
 
+    def record_video(self, stats: Any) -> None:
+        """Record one completed sequential or realtime video iteration."""
+        with self._lock:
+            processed = int(getattr(stats, "frames_processed", 0))
+            self._video_processed += processed
+            self._video_dropped += int(getattr(stats, "frames_dropped", 0))
+            self._video_latency_sum += (
+                float(getattr(stats, "mean_latency", 0.0)) * processed
+            )
+            self._video_observations += processed
+
     def snapshot(self) -> dict[str, Any]:
         """Return a copy suitable for JSON logging or dashboards."""
         with self._lock:
@@ -75,6 +90,12 @@ class RuntimeMetrics:
                 },
                 "stage_elapsed_seconds": dict(self._stage_elapsed),
                 "stage_observations": dict(self._stage_observations),
+                "video": {
+                    "frames_processed": self._video_processed,
+                    "frames_dropped": self._video_dropped,
+                    "latency_seconds_sum": self._video_latency_sum,
+                    "latency_observations": self._video_observations,
+                },
             }
 
     def prometheus_text(self) -> str:
@@ -107,6 +128,19 @@ class RuntimeMetrics:
                     f"{prefix}_scheduler_stage_duration_seconds_count{labels} "
                     f"{self._stage_observations[name]}"
                 )
+            lines.extend(
+                [
+                    f"# TYPE {prefix}_video_frames_processed_total counter",
+                    f"{prefix}_video_frames_processed_total {self._video_processed}",
+                    f"# TYPE {prefix}_video_frames_dropped_total counter",
+                    f"{prefix}_video_frames_dropped_total {self._video_dropped}",
+                    f"# TYPE {prefix}_video_frame_latency_seconds summary",
+                    f"{prefix}_video_frame_latency_seconds_sum "
+                    f"{self._video_latency_sum:.9g}",
+                    f"{prefix}_video_frame_latency_seconds_count "
+                    f"{self._video_observations}",
+                ]
+            )
             return "\n".join(lines) + "\n"
 
 

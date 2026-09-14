@@ -91,7 +91,9 @@ completeness.
 `RuntimeMetrics` is a thread-safe, dependency-free collector. Pass
 `metrics=RuntimeMetrics()` to `ObservationScheduler` and expose
 `prometheus_text()` from the host service; it tracks run totals, cache hits,
-per-stage status counts, and duration summaries.
+per-stage status counts, duration summaries, processed video frames, dropped
+frames, and video latency summaries. Pass the same collector as `metrics=` to
+`VideoStream` or `RealtimeVideoStream` to record stream statistics.
 
 ## Backends
 

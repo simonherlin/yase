@@ -293,6 +293,21 @@ def test_video_stream_applies_input_limits_before_callable_backend():
     assert limited.stats.frames_dropped == 1
 
 
+def test_video_stream_records_metrics():
+    metrics = RuntimeMetrics(namespace="video_test")
+    stream = VideoStream(
+        FakeCapture(3),
+        lambda image: np.zeros(image.shape[:2]),
+        stride=2,
+        metrics=metrics,
+    )
+    list(stream)
+    snapshot = metrics.snapshot()["video"]
+    assert snapshot["frames_processed"] == 2
+    assert snapshot["frames_dropped"] == 1
+    assert "video_test_video_frames_processed_total 2" in metrics.prometheus_text()
+
+
 def test_image_path_and_pillow_inputs(tmp_path):
     from PIL import Image
 
