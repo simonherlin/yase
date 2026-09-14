@@ -74,6 +74,11 @@ frames or per-item external fields. `SchedulerReport.as_result()` is the
 canonical conversion back to `SemanticResult`, including a compact scheduler
 telemetry record in metadata.
 
+`SchedulerConfig(max_workers=N)` executes up to `N` dependency-free ready
+stages concurrently. Cache mutation, dependency promotion, stage callbacks,
+and report ordering remain deterministic; the default `N=1` preserves serial
+execution.
+
 `CallbackSink`, `MemorySink`, `JsonlObservationSink`, `FanoutSink`, and
 `QueueSink` consume `ObservationBundle` values. `QueueSink(on_full="block")`
 provides backpressure; `on_full="drop"` preserves the producer and increments

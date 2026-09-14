@@ -3,7 +3,7 @@ import json
 import sys
 from contextlib import contextmanager
 from io import StringIO
-from threading import Event
+from threading import Barrier, Event
 
 import numpy as np
 import pytest
@@ -1720,6 +1720,41 @@ def test_scheduler_supports_async_execution_and_callbacks():
     assert report.fields["tags"] == ["outdoor"]
     assert isinstance(events[0], StageExecution)
     assert events[0].status == "completed"
+
+
+def test_scheduler_runs_independent_stages_in_parallel_with_stable_report_order():
+    barrier = Barrier(2)
+
+    class ParallelBackend:
+        def __init__(self, name, field):
+            self.name = name
+            self.field = field
+
+        def run(self, image, context):
+            barrier.wait(timeout=2)
+            return {self.field: context.metadata["stage"]}
+
+    scheduler = ObservationScheduler(
+        [
+            PipelineStage(
+                "caption",
+                ParallelBackend("caption", "caption"),
+                spec=StageSpec("caption", provides=("caption",)),
+            ),
+            PipelineStage(
+                "tags",
+                ParallelBackend("tags", "tags"),
+                spec=StageSpec("tags", provides=("tags",)),
+            ),
+        ],
+        config=SchedulerConfig(cache_size=0, max_workers=2),
+    )
+    report = scheduler.run(np.zeros((1, 1, 3), dtype=np.uint8))
+    assert report.fields["caption"] == "caption"
+    assert report.fields["tags"] == "tags"
+    assert [stage.name for stage in report.stages] == ["caption", "tags"]
+    with pytest.raises(ValueError, match="positive integer"):
+        SchedulerConfig(max_workers=0)
 
 
 def test_scheduler_handles_optional_failures_and_cancellation():

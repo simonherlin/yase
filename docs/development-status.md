@@ -262,6 +262,16 @@ Result: version 0.17.0, 97 deterministic tests passing before final validation.
 
 Result: version 0.18.0, 98 deterministic tests passing before final validation.
 
+## Cycle 23 — bounded DAG parallelism
+
+- [x] Add `SchedulerConfig.max_workers` with strict positive-integer validation.
+- [x] Execute independent ready stages concurrently with a bounded thread pool.
+- [x] Preserve deterministic dependency promotion, cache writes, callbacks, and
+  report ordering.
+- [x] Cover fan-out execution with a synchronization-barrier regression test.
+
+Result: version 0.19.0, 99 deterministic tests passing before final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full
