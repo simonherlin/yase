@@ -4,6 +4,7 @@ The core package has no model weights or framework dependency. These adapters
 are initialized explicitly by applications and accept local model artifacts.
 """
 
+from collections.abc import Mapping, Sequence
 from typing import Any, Optional
 
 import numpy as np
@@ -159,8 +160,128 @@ class OnnxRuntimeExtractor:
         return SemanticResult(depth=values[0], segmentation=values[1])
 
 
+class CompositeExtractor:
+    """Combine independent backends into one SemanticResult.
+
+    backends maps an optional result field (for example depth or
+    segmentation) to an extractor. Backends may return SemanticResult or
+    mappings. Raw arrays require a field key. Conflicts use an explicit
+    error, first, or last policy; backend failures are wrapped with their
+    source name.
+    """
+
+    _FIELDS = (
+        "depth",
+        "segmentation",
+        "detections",
+        "tags",
+        "embeddings",
+    )
+
+    def __init__(self, backends: Any, conflict: str = "error") -> None:
+        if conflict not in ("error", "first", "last"):
+            raise ValueError("conflict must be error, first, or last")
+        if isinstance(backends, Mapping):
+            items = list(backends.items())
+        elif isinstance(backends, Sequence) and not isinstance(backends, (str, bytes)):
+            items = [(str(index), backend) for index, backend in enumerate(backends)]
+        else:
+            raise TypeError("backends must be a mapping or sequence")
+        if not items:
+            raise ValueError("at least one backend is required")
+        self.backends = items
+        self.conflict = conflict
+
+    @classmethod
+    def _coerce(cls, output: Any, default_field: str) -> SemanticResult:
+        if isinstance(output, SemanticResult):
+            return output
+        if isinstance(output, Mapping):
+            return SemanticResult(
+                depth=output.get("depth"),
+                segmentation=output.get("segmentation", output.get("mask")),
+                detections=output.get("detections"),
+                tags=output.get("tags"),
+                embeddings=output.get("embeddings"),
+                timestamp=output.get("timestamp"),
+                metadata={
+                    key: value
+                    for key, value in output.items()
+                    if key not in cls._FIELDS + ("mask", "timestamp")
+                },
+            )
+        if default_field not in cls._FIELDS:
+            raise TypeError(
+                "raw backend output requires a field key: "
+                "depth, segmentation, detections, tags, or embeddings"
+            )
+        return SemanticResult(**{default_field: output})
+
+    @staticmethod
+    def _invoke(backend: Any, image: Any) -> Any:
+        if hasattr(backend, "extract"):
+            return backend.extract(image)
+        if hasattr(backend, "predict"):
+            return backend.predict(image)
+        if callable(backend):
+            return backend(image)
+        raise TypeError("backend must be callable or expose extract/predict")
+
+    def _merge(self, merged: dict, field: str, value: Any, source: str) -> None:
+        if value is None:
+            return
+        if field in merged:
+            if self.conflict == "error":
+                raise ValueError(
+                    f"conflict for field '{field}' from backend '{source}'"
+                )
+            if self.conflict == "first":
+                return
+        merged[field] = value
+
+    def extract(self, image: Any) -> SemanticResult:
+        """Run each backend and merge outputs, preserving timestamps."""
+        merged = {}
+        metadata = {}
+        timestamp = None
+        for source, backend in self.backends:
+            try:
+                result = self._coerce(self._invoke(backend, image), source)
+            except Exception as exc:
+                raise RuntimeError(f"backend '{source}' failed: {exc}") from exc
+            for field in self._FIELDS:
+                self._merge(merged, field, getattr(result, field), str(source))
+            if result.timestamp is not None:
+                if timestamp is not None and result.timestamp != timestamp:
+                    if self.conflict == "error":
+                        raise ValueError(
+                            f"conflict for timestamp from backend '{source}'"
+                        )
+                    if self.conflict == "last":
+                        timestamp = result.timestamp
+                elif timestamp is None:
+                    timestamp = result.timestamp
+            for key, value in result.metadata.items():
+                if key in metadata and self.conflict == "error":
+                    raise ValueError(
+                        f"conflict for metadata '{key}' from backend '{source}'"
+                    )
+                if key not in metadata or self.conflict == "last":
+                    metadata[key] = value
+        return SemanticResult(
+            depth=merged.get("depth"),
+            segmentation=merged.get("segmentation"),
+            detections=merged.get("detections"),
+            tags=merged.get("tags"),
+            embeddings=merged.get("embeddings"),
+            timestamp=timestamp,
+            metadata=metadata,
+        )
+
+
 __all__ = [
     "CallableExtractor",
+    "CompositeExtractor",
     "OnnxRuntimeExtractor",
     "TorchScriptExtractor",
 ]

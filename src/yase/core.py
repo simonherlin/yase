@@ -4,10 +4,10 @@ Heavy model backends are loaded lazily so importing yase never downloads
 weights or requires PyTorch.
 """
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional, Protocol, Union
+from typing import Any, Callable, Optional, Protocol, Union
 
 import numpy as np
 
@@ -175,6 +175,61 @@ class Yase:
         else:
             raise TypeError("extractor must be callable or expose extract/predict")
         return _normalise_output(output, self.task, timestamp)
+
+    def extract_many(
+        self,
+        images: Iterable[ImageInput],
+        timestamps: Optional[Sequence[Optional[float]]] = None,
+        error_policy: str = "raise",
+        on_error: Optional[Callable[[Exception, int], Optional[SemanticResult]]] = None,
+    ) -> list[Optional[SemanticResult]]:
+        """Extract an ordered batch of images.
+
+        Backends exposing ``extract_batch`` receive one list of RGB arrays.
+        Other backends are called image by image. With ``error_policy='skip'``
+        failures are represented by ``None`` so output indices remain aligned
+        with inputs. ``on_error`` may provide a replacement result.
+        """
+        if error_policy not in ("raise", "skip"):
+            raise ValueError("error_policy must be raise or skip")
+        items = list(images)
+        stamps = [None] * len(items) if timestamps is None else list(timestamps)
+        if len(stamps) != len(items):
+            raise ValueError("timestamps must have the same length as images")
+
+        backend = self.extractor
+        if hasattr(backend, "extract_batch"):
+            arrays = [
+                load_image(image, color_order=self.color_order) for image in items
+            ]
+            try:
+                outputs = list(backend.extract_batch(arrays))
+                if len(outputs) != len(items):
+                    raise ValueError(
+                        "extract_batch must return one result per input image"
+                    )
+                return [
+                    _normalise_output(output, self.task, timestamp)
+                    for output, timestamp in zip(outputs, stamps)
+                ]
+            except Exception:
+                if error_policy == "raise":
+                    raise
+                if not hasattr(backend, "extract") and not callable(backend):
+                    return [None] * len(items)
+
+        results: list[Optional[SemanticResult]] = []
+        for index, (image, timestamp) in enumerate(zip(items, stamps)):
+            try:
+                results.append(self.extract(image, timestamp=timestamp))
+            except Exception as exc:
+                if on_error is not None:
+                    results.append(on_error(exc, index))
+                elif error_policy == "skip":
+                    results.append(None)
+                else:
+                    raise
+        return results
 
     def run_inference(
         self, input_data: ImageInput, timestamp: Optional[float] = None

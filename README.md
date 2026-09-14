@@ -57,6 +57,25 @@ backend = OnnxRuntimeExtractor("model.onnx", task="depth", size=(640, 192))
 result = backend.extract("photo.jpg")
 ~~~
 
+## Batch extraction
+
+`extract_many` preserves input order and timestamps. Backends that implement
+`extract_batch(images)` are called once for efficient vectorized inference;
+all other extractors use the same stable API with an image-by-image fallback.
+
+~~~python
+results = extractor.extract_many(
+    ["frame-001.jpg", "frame-002.jpg"],
+    error_policy="skip",
+)
+for result in results:
+    if result is not None:
+        print(result.depth.shape)
+~~~
+
+Use `CompositeExtractor` to merge depth, segmentation, detections, tags, and
+embeddings from independent model backends into one `SemanticResult`.
+
 ## Real-time video
 
 VideoStream yields typed FrameResult values with frame index, source timestamp,

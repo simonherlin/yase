@@ -3,6 +3,7 @@ import pytest
 
 from yase import (
     CallableExtractor,
+    CompositeExtractor,
     OnnxRuntimeExtractor,
     RealtimeVideoStream,
     SemanticResult,
@@ -317,3 +318,109 @@ def test_onnx_validates_task_size_outputs_and_optional_dependency():
         ).extract(np.zeros((2, 2, 3)))
     with pytest.raises(ImportError, match="onnx"):
         OnnxRuntimeExtractor("missing.onnx")
+
+
+def test_composite_merges_fields_and_preserves_timestamp():
+    composite = CompositeExtractor(
+        {
+            "depth": lambda image: SemanticResult(depth=np.ones((2, 2)), timestamp=3.0),
+            "segmentation": lambda image: {
+                "segmentation": np.zeros((2, 2)),
+                "detections": [{"label": "car"}],
+                "tags": ["street"],
+                "embeddings": [1.0, 2.0],
+                "metadata": "kept",
+            },
+        }
+    )
+    result = composite.extract(np.zeros((2, 2, 3), dtype=np.uint8))
+    assert result.depth.shape == (2, 2)
+    assert result.segmentation.shape == (2, 2)
+    assert result.detections == [{"label": "car"}]
+    assert result.tags == ["street"]
+    assert result.embeddings.shape == (2,)
+    assert result.timestamp == 3.0
+    assert result.metadata == {"metadata": "kept"}
+
+
+def test_composite_conflicts_support_explicit_policies():
+    backends = [
+        lambda image: SemanticResult(depth=np.ones((1, 1)), timestamp=1.0),
+        lambda image: SemanticResult(depth=np.zeros((1, 1)), timestamp=2.0),
+    ]
+    with pytest.raises(ValueError, match="conflict"):
+        CompositeExtractor(backends).extract(np.zeros((1, 1, 3)))
+    first = CompositeExtractor(backends, conflict="first").extract(np.zeros((1, 1, 3)))
+    last = CompositeExtractor(backends, conflict="last").extract(np.zeros((1, 1, 3)))
+    assert first.depth[0, 0] == 1 and first.timestamp == 1.0
+    assert last.depth[0, 0] == 0 and last.timestamp == 2.0
+
+
+def test_composite_contextualises_backend_errors_and_validates_inputs():
+    def fail(_image):
+        raise OSError("offline")
+
+    with pytest.raises(RuntimeError, match="backend 'camera'.*offline"):
+        CompositeExtractor({"camera": fail}).extract(np.zeros((1, 1, 3)))
+    with pytest.raises(ValueError, match="conflict"):
+        CompositeExtractor([], conflict="bad")
+    with pytest.raises(TypeError, match="mapping or sequence"):
+        CompositeExtractor("not a backend")
+    with pytest.raises(RuntimeError, match="raw backend output"):
+        CompositeExtractor({"unknown": lambda image: np.zeros((1, 1))}).extract(
+            np.zeros((1, 1, 3))
+        )
+
+
+class NativeBatchBackend:
+    def __init__(self):
+        self.calls = 0
+
+    def extract_batch(self, images):
+        self.calls += 1
+        return [{"depth": image[..., 0]} for image in images]
+
+
+def test_extract_many_uses_native_batch_and_preserves_order():
+    backend = NativeBatchBackend()
+    api = Yase(extractor=backend)
+    images = [np.full((2, 2, 3), value, dtype=np.uint8) for value in (1, 2, 3)]
+    results = api.extract_many(images, timestamps=[0.1, 0.2, 0.3])
+    assert backend.calls == 1
+    assert [result.depth[0, 0] for result in results] == [1, 2, 3]
+    assert [result.timestamp for result in results] == [0.1, 0.2, 0.3]
+
+
+def test_extract_many_validates_batch_contract():
+    api = Yase(extractor=NativeBatchBackend())
+    with pytest.raises(ValueError, match="same length"):
+        api.extract_many([np.zeros((1, 1, 3))], timestamps=[])
+    with pytest.raises(ValueError, match="error_policy"):
+        api.extract_many([], error_policy="ignore")
+
+
+def test_extract_many_fallback_skip_and_error_callback():
+    def sometimes_fails(image):
+        if image[0, 0, 0] == 2:
+            raise RuntimeError("bad image")
+        return image[..., 0]
+
+    api = Yase(extractor=sometimes_fails)
+    images = [np.full((1, 1, 3), value, dtype=np.uint8) for value in (1, 2, 3)]
+    skipped = api.extract_many(images, error_policy="skip")
+    assert skipped[0].depth[0, 0] == 1
+    assert skipped[1] is None
+    assert skipped[2].depth[0, 0] == 3
+
+    replacement = SemanticResult(tags=["invalid"])
+    recovered = api.extract_many(images, on_error=lambda error, index: replacement)
+    assert recovered[1] is replacement
+
+
+def test_extract_many_rejects_wrong_native_batch_size():
+    class BrokenBatch:
+        def extract_batch(self, images):
+            return []
+
+    with pytest.raises(ValueError, match="one result"):
+        Yase(extractor=BrokenBatch()).extract_many([np.zeros((1, 1, 3))])
