@@ -6,6 +6,7 @@ from dataclasses import dataclass, replace
 from typing import Any, Callable, Optional, Union
 
 from .core import SemanticResult, load_image
+from .limits import InputLimits
 
 
 @dataclass(frozen=True)
@@ -60,6 +61,7 @@ class VideoStream:
         event_engine: Optional[Any] = None,
         sink: Optional[Any] = None,
         source_id: str = "default",
+        input_limits: Optional[InputLimits] = None,
     ) -> None:
         if stride < 1:
             raise ValueError("stride must be >= 1")
@@ -85,6 +87,7 @@ class VideoStream:
         self.event_engine = event_engine
         self.sink = sink
         self.source_id = str(source_id)
+        self.input_limits = input_limits
         self._capture = None
         self._fps = 0.0
         self._stats = VideoStats(0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0)
@@ -188,7 +191,7 @@ class VideoStream:
 
         if not hasattr(self.sink, "emit"):
             raise TypeError("sink must expose emit(observation)")
-        array = load_image(image)
+        array = load_image(image, limits=self.input_limits)
         self.sink.emit(
             ObservationBundle.from_result(
                 result,
@@ -231,7 +234,11 @@ class VideoStream:
                     continue
                 started = time.perf_counter()
                 try:
-                    image = load_image(frame, color_order=self.color_order)
+                    image = load_image(
+                        frame,
+                        color_order=self.color_order,
+                        limits=self.input_limits,
+                    )
                     backend = self.extractor
                     if hasattr(backend, "extract"):
                         result = backend.extract(image, timestamp=timestamp)
@@ -326,6 +333,7 @@ class RealtimeVideoStream(VideoStream):
         event_engine: Optional[Any] = None,
         sink: Optional[Any] = None,
         source_id: str = "default",
+        input_limits: Optional[InputLimits] = None,
     ) -> None:
         if queue_size != 1:
             raise ValueError("latest-frame mode requires queue_size=1")
@@ -346,6 +354,7 @@ class RealtimeVideoStream(VideoStream):
             event_engine=event_engine,
             sink=sink,
             source_id=source_id,
+            input_limits=input_limits,
         )
         import threading
 
@@ -427,7 +436,11 @@ class RealtimeVideoStream(VideoStream):
                 index, timestamp, frame = item
                 started = time.perf_counter()
                 try:
-                    image = load_image(frame, color_order=self.color_order)
+                    image = load_image(
+                        frame,
+                        color_order=self.color_order,
+                        limits=self.input_limits,
+                    )
                     backend = self.extractor
                     result = (
                         backend.extract(image, timestamp=timestamp)

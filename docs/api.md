@@ -127,6 +127,8 @@ Both stream classes accept an optional `sink=` and `source_id=`. After tracking,
 memory, identity, and event enrichment, each processed frame is emitted as an
 `ObservationBundle`; the iterator still yields the backward-compatible
 `FrameResult`.
+Pass `input_limits=InputLimits(...)` to either stream class to enforce the
+same pixel, dimension, channel, and byte limits before a callable backend runs.
 
 Optional `tracker` and `memory` stages run before `event_engine`. The tracker
 adds stable IDs, while `SemanticTrackMemory` enriches detections with lifetime,

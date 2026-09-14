@@ -300,6 +300,14 @@ on the full test matrix.
 
 Result: version 0.21.0, 101 deterministic tests passing before final validation.
 
+## Cycle 27 — bounded direct video streams
+
+- [x] Apply `InputLimits` to sequential and realtime video streams.
+- [x] Protect callable/custom backends that do not instantiate `Yase`.
+- [x] Preserve frame error policies and add a skip-path regression test.
+
+Result: version 0.22.0, 102 deterministic tests passing before final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

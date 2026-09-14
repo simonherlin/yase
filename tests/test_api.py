@@ -282,6 +282,17 @@ def test_video_error_policy_validation():
         VideoStream(FakeCapture(1), lambda image: image, error_policy="ignore")
 
 
+def test_video_stream_applies_input_limits_before_callable_backend():
+    limited = VideoStream(
+        FakeCapture(1),
+        lambda image: np.zeros(image.shape[:2]),
+        input_limits=InputLimits(max_width=2),
+        error_policy="skip",
+    )
+    assert list(limited) == []
+    assert limited.stats.frames_dropped == 1
+
+
 def test_image_path_and_pillow_inputs(tmp_path):
     from PIL import Image
 
