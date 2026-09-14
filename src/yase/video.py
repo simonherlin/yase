@@ -2,7 +2,7 @@
 
 import time
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Callable, Optional, Union
 
 from .core import SemanticResult, load_image
@@ -53,6 +53,13 @@ class VideoStream:
         max_frames: Optional[int] = None,
         on_error: Optional[Callable[[Exception, int], Optional[SemanticResult]]] = None,
         error_policy: str = "raise",
+        tracker: Optional[Any] = None,
+        memory: Optional[Any] = None,
+        identity_store: Optional[Any] = None,
+        camera_id: str = "default",
+        event_engine: Optional[Any] = None,
+        sink: Optional[Any] = None,
+        source_id: str = "default",
     ) -> None:
         if stride < 1:
             raise ValueError("stride must be >= 1")
@@ -71,6 +78,13 @@ class VideoStream:
         self.max_frames = max_frames
         self.on_error = on_error
         self.error_policy = error_policy
+        self.tracker = tracker
+        self.memory = memory
+        self.identity_store = identity_store
+        self.camera_id = str(camera_id)
+        self.event_engine = event_engine
+        self.sink = sink
+        self.source_id = str(source_id)
         self._capture = None
         self._fps = 0.0
         self._stats = VideoStats(0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0)
@@ -119,6 +133,74 @@ class VideoStream:
         if self._fps > 0:
             return index / self._fps
         return time.monotonic()
+
+    def _track(self, result: SemanticResult, timestamp: float) -> SemanticResult:
+        if self.tracker is None or result.detections is None:
+            return result
+        if not hasattr(self.tracker, "update"):
+            raise TypeError("tracker must expose update(detections, timestamp=...)")
+        try:
+            detections = self.tracker.update(result.detections, timestamp=timestamp)
+        except TypeError:
+            detections = self.tracker.update(result.detections)
+        return replace(result, detections=detections)
+
+    def _events(self, result: SemanticResult, timestamp: float) -> SemanticResult:
+        if self.event_engine is None:
+            return result
+        if not hasattr(self.event_engine, "update"):
+            raise TypeError("event_engine must expose update(result, timestamp)")
+        emitted = self.event_engine.update(result, timestamp)
+        if not emitted:
+            return result
+        existing = list(result.events or ())
+        return replace(result, events=existing + list(emitted))
+
+    def _identity(self, result: SemanticResult, timestamp: float) -> SemanticResult:
+        if self.identity_store is None or result.detections is None:
+            return result
+        if not hasattr(self.identity_store, "update"):
+            raise TypeError("identity_store must expose update(detections, ...)")
+        try:
+            detections = self.identity_store.update(
+                result.detections, camera_id=self.camera_id, timestamp=timestamp
+            )
+        except TypeError:
+            detections = self.identity_store.update(result.detections)
+        return replace(result, detections=detections)
+
+    def _memory(self, result: SemanticResult, timestamp: float) -> SemanticResult:
+        if self.memory is None:
+            return result
+        if not hasattr(self.memory, "update"):
+            raise TypeError("memory must expose update(result, timestamp=...)")
+        try:
+            return self.memory.update(result, timestamp=timestamp)
+        except TypeError:
+            return self.memory.update(result)
+
+    def _emit_observation(
+        self, result: SemanticResult, frame_index: int, timestamp: float, image: Any
+    ) -> None:
+        if self.sink is None:
+            return
+        from .observation import FrameRef, ObservationBundle
+
+        if not hasattr(self.sink, "emit"):
+            raise TypeError("sink must expose emit(observation)")
+        array = load_image(image)
+        self.sink.emit(
+            ObservationBundle.from_result(
+                result,
+                frame=FrameRef(
+                    frame_id=frame_index,
+                    source_id=self.source_id,
+                    timestamp=timestamp,
+                    width=array.shape[1],
+                    height=array.shape[0],
+                ),
+            )
+        )
 
     def __iter__(self) -> Iterator[FrameResult]:
         capture = self._open()
@@ -170,16 +252,13 @@ class VideoStream:
                         raise
                 if not isinstance(result, SemanticResult):
                     result = SemanticResult(depth=result, timestamp=timestamp)
-                elif result.timestamp is None:
-                    result = SemanticResult(
-                        depth=result.depth,
-                        segmentation=result.segmentation,
-                        detections=result.detections,
-                        tags=result.tags,
-                        embeddings=result.embeddings,
-                        timestamp=timestamp,
-                        metadata=result.metadata,
-                    )
+                else:
+                    result = result.with_timestamp(timestamp)
+                result = self._track(result, timestamp)
+                result = self._memory(result, timestamp)
+                result = self._identity(result, timestamp)
+                result = self._events(result, timestamp)
+                self._emit_observation(result, index, timestamp, image)
                 latency = time.perf_counter() - started
                 latencies.append(latency)
                 yield FrameResult(index, timestamp, result, latency)
@@ -240,6 +319,13 @@ class RealtimeVideoStream(VideoStream):
         max_frames: Optional[int] = None,
         on_error: Optional[Callable[[Exception, int], Optional[SemanticResult]]] = None,
         error_policy: str = "raise",
+        tracker: Optional[Any] = None,
+        memory: Optional[Any] = None,
+        identity_store: Optional[Any] = None,
+        camera_id: str = "default",
+        event_engine: Optional[Any] = None,
+        sink: Optional[Any] = None,
+        source_id: str = "default",
     ) -> None:
         if queue_size != 1:
             raise ValueError("latest-frame mode requires queue_size=1")
@@ -253,6 +339,13 @@ class RealtimeVideoStream(VideoStream):
             max_frames=max_frames,
             on_error=on_error,
             error_policy=error_policy,
+            tracker=tracker,
+            memory=memory,
+            identity_store=identity_store,
+            camera_id=camera_id,
+            event_engine=event_engine,
+            sink=sink,
+            source_id=source_id,
         )
         import threading
 
@@ -352,16 +445,13 @@ class RealtimeVideoStream(VideoStream):
                         raise
                 if not isinstance(result, SemanticResult):
                     result = SemanticResult(depth=result, timestamp=timestamp)
-                elif result.timestamp is None:
-                    result = SemanticResult(
-                        depth=result.depth,
-                        segmentation=result.segmentation,
-                        detections=result.detections,
-                        tags=result.tags,
-                        embeddings=result.embeddings,
-                        timestamp=timestamp,
-                        metadata=result.metadata,
-                    )
+                else:
+                    result = result.with_timestamp(timestamp)
+                result = self._track(result, timestamp)
+                result = self._memory(result, timestamp)
+                result = self._identity(result, timestamp)
+                result = self._events(result, timestamp)
+                self._emit_observation(result, index, timestamp, image)
                 latency = time.perf_counter() - started
                 latencies.append(latency)
                 frames_processed += 1

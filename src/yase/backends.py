@@ -9,7 +9,8 @@ from typing import Any, Optional
 
 import numpy as np
 
-from .core import SemanticResult, load_image
+from .core import SemanticResult, _normalise_output, load_image
+from .errors import BackendError
 
 
 class CallableExtractor:
@@ -18,8 +19,8 @@ class CallableExtractor:
     def __init__(self, function: Any, task: str = "depth") -> None:
         if not callable(function):
             raise TypeError("function must be callable")
-        if task not in ("depth", "segmentation", "both"):
-            raise ValueError("task must be depth, segmentation, or both")
+        if task not in ("depth", "segmentation", "both", "semantic"):
+            raise ValueError("task must be depth, segmentation, both, or semantic")
         self.function = function
         self.task = task
 
@@ -31,6 +32,10 @@ class CallableExtractor:
             return SemanticResult(depth=np.asarray(output))
         if self.task == "segmentation":
             return SemanticResult(segmentation=np.asarray(output))
+        if self.task == "semantic":
+            if isinstance(output, (Mapping, SemanticResult)):
+                return _normalise_output(output, self.task, timestamp=None)
+            raise TypeError("semantic task requires a SemanticResult or mapping")
         if not isinstance(output, (tuple, list)) or len(output) != 2:
             raise TypeError("both task requires a (depth, segmentation) pair")
         return SemanticResult(
@@ -63,6 +68,7 @@ class TorchScriptExtractor:
                 "install the torch extra to use TorchScriptExtractor"
             ) from exc
         self._torch = torch
+        self.model_path = str(model_path)
         self.device = torch.device(
             device or ("cuda" if torch.cuda.is_available() else "cpu")
         )
@@ -93,18 +99,30 @@ class TorchScriptExtractor:
         else:
             outputs = [output.detach().cpu().numpy()]
         results = []
+        metadata = {
+            "backend": "torchscript",
+            "model_path": self.model_path,
+            "device": str(self.device),
+            "task": self.task,
+        }
         for index in range(outputs[0].shape[0]):
             values = [value[index] for value in outputs]
             if self.task == "segmentation":
-                results.append(SemanticResult(segmentation=values[0].squeeze()))
+                results.append(
+                    SemanticResult(segmentation=values[0].squeeze(), metadata=metadata)
+                )
             elif self.task == "both":
                 results.append(
                     SemanticResult(
-                        depth=values[0].squeeze(), segmentation=values[1].squeeze()
+                        depth=values[0].squeeze(),
+                        segmentation=values[1].squeeze(),
+                        metadata=metadata,
                     )
                 )
             else:
-                results.append(SemanticResult(depth=values[0].squeeze()))
+                results.append(
+                    SemanticResult(depth=values[0].squeeze(), metadata=metadata)
+                )
         return results
 
     def extract(self, image: Any) -> SemanticResult:
@@ -133,12 +151,27 @@ class OnnxRuntimeExtractor:
         input_name: Optional[str] = None,
         output_names: Optional[Any] = None,
         size: Optional[tuple] = None,
-        providers: Optional[list] = None,
+        providers: Optional[Sequence[Any]] = None,
+        provider_options: Optional[Sequence[Mapping[str, Any]]] = None,
+        session_options: Optional[Any] = None,
+        input_layout: str = "NCHW",
+        graph_optimization_level: Optional[Any] = None,
+        enable_profiling: bool = False,
     ) -> None:
         if task not in ("depth", "segmentation", "both"):
             raise ValueError("task must be depth, segmentation, or both")
         if size is not None and (len(size) != 2 or size[0] <= 0 or size[1] <= 0):
             raise ValueError("size must be a positive (width, height) pair")
+        if input_layout not in ("NCHW", "NHWC"):
+            raise ValueError("input_layout must be NCHW or NHWC")
+        if provider_options is not None and providers is None:
+            raise ValueError("provider_options requires providers")
+        if provider_options is not None and any(
+            isinstance(provider, tuple) for provider in providers or ()
+        ):
+            raise ValueError(
+                "use provider_options with provider names, not provider tuples"
+            )
         if session is None:
             try:
                 import onnxruntime as ort
@@ -146,9 +179,28 @@ class OnnxRuntimeExtractor:
                 raise ImportError(
                     "install the onnx extra to use OnnxRuntimeExtractor"
                 ) from exc
-            kwargs = {"providers": providers} if providers is not None else {}
+            if session_options is None and (
+                graph_optimization_level is not None or enable_profiling
+            ):
+                session_options = ort.SessionOptions()
+            if session_options is not None:
+                if graph_optimization_level is not None:
+                    session_options.graph_optimization_level = graph_optimization_level
+                if enable_profiling:
+                    session_options.enable_profiling = True
+            kwargs = {}
+            if providers is not None:
+                kwargs["providers"] = list(providers)
+            if provider_options is not None:
+                kwargs["provider_options"] = [dict(item) for item in provider_options]
+            if session_options is not None:
+                kwargs["sess_options"] = session_options
             session = ort.InferenceSession(model_path, **kwargs)
         self.session = session
+        self.model_path = str(model_path)
+        self.providers = providers
+        self.provider_options = provider_options
+        self.input_layout = input_layout
         self.task = task
         self.size = size
         inputs = session.get_inputs()
@@ -156,6 +208,17 @@ class OnnxRuntimeExtractor:
             raise ValueError("ONNX session has no inputs")
         self.input_name = input_name or inputs[0].name
         self.output_names = list(output_names) if output_names is not None else None
+
+    @staticmethod
+    def available_providers() -> tuple[str, ...]:
+        """Return providers offered by the installed ONNX Runtime build."""
+        try:
+            import onnxruntime as ort
+        except ImportError as exc:
+            raise ImportError(
+                "install the onnx extra to inspect ONNX Runtime providers"
+            ) from exc
+        return tuple(ort.get_available_providers())
 
     def _prepare_image(self, image: Any) -> np.ndarray:
         array = load_image(image).astype(np.float32)
@@ -172,6 +235,8 @@ class OnnxRuntimeExtractor:
 
     def _prepare(self, image: Any) -> np.ndarray:
         array = self._prepare_image(image)
+        if self.input_layout == "NHWC":
+            return np.ascontiguousarray(array[None, ...])
         return np.ascontiguousarray(array.transpose(2, 0, 1)[None, ...])
 
     def _prepare_batch(self, images: Sequence[Any]) -> np.ndarray:
@@ -180,7 +245,10 @@ class OnnxRuntimeExtractor:
             raise ValueError("extract_batch requires at least one image")
         if self.size is None and len({array.shape for array in arrays}) != 1:
             raise ValueError("images must have the same shape when size is None")
-        return np.ascontiguousarray(np.stack(arrays, axis=0).transpose(0, 3, 1, 2))
+        stacked = np.stack(arrays, axis=0)
+        if self.input_layout == "NHWC":
+            return np.ascontiguousarray(stacked)
+        return np.ascontiguousarray(stacked.transpose(0, 3, 1, 2))
 
     @staticmethod
     def _without_batch(output: Any) -> np.ndarray:
@@ -199,14 +267,30 @@ class OnnxRuntimeExtractor:
             raise ValueError("ONNX output batch is empty")
         values = [np.asarray(output) for output in outputs]
         results = []
+        metadata = {
+            "backend": "onnxruntime",
+            "model_path": self.model_path,
+            "task": self.task,
+            "providers": list(
+                self.session.get_providers()
+                if hasattr(self.session, "get_providers")
+                else (self.providers or [])
+            ),
+        }
         for index in range(batch_size):
             fields = [self._without_batch(value[index : index + 1]) for value in values]
             if self.task == "depth":
-                results.append(SemanticResult(depth=fields[0]))
+                results.append(SemanticResult(depth=fields[0], metadata=metadata))
             elif self.task == "segmentation":
-                results.append(SemanticResult(segmentation=fields[0]))
+                results.append(
+                    SemanticResult(segmentation=fields[0], metadata=metadata)
+                )
             else:
-                results.append(SemanticResult(depth=fields[0], segmentation=fields[1]))
+                results.append(
+                    SemanticResult(
+                        depth=fields[0], segmentation=fields[1], metadata=metadata
+                    )
+                )
         return results
 
     def extract(self, image: Any) -> SemanticResult:
@@ -235,6 +319,14 @@ class CompositeExtractor:
         "detections",
         "tags",
         "embeddings",
+        "ocr",
+        "caption",
+        "scene",
+        "events",
+        "keypoints",
+        "relations",
+        "document",
+        "depth_map",
     )
 
     def __init__(self, backends: Any, conflict: str = "error") -> None:
@@ -262,11 +354,19 @@ class CompositeExtractor:
                 detections=output.get("detections"),
                 tags=output.get("tags"),
                 embeddings=output.get("embeddings"),
+                ocr=output.get("ocr", output.get("text")),
+                caption=output.get("caption"),
+                scene=output.get("scene"),
+                events=output.get("events"),
+                keypoints=output.get("keypoints", output.get("poses")),
+                relations=output.get("relations"),
+                document=output.get("document"),
+                depth_map=output.get("depth_map"),
                 timestamp=output.get("timestamp"),
                 metadata={
                     key: value
                     for key, value in output.items()
-                    if key not in cls._FIELDS + ("mask", "timestamp")
+                    if key not in cls._FIELDS + ("mask", "text", "timestamp", "poses")
                 },
             )
         if default_field not in cls._FIELDS:
@@ -307,7 +407,7 @@ class CompositeExtractor:
             try:
                 result = self._coerce(self._invoke(backend, image), source)
             except Exception as exc:
-                raise RuntimeError(f"backend '{source}' failed: {exc}") from exc
+                raise BackendError(str(source), str(exc), original=exc) from exc
             for field in self._FIELDS:
                 self._merge(merged, field, getattr(result, field), str(source))
             if result.timestamp is not None:
@@ -335,6 +435,14 @@ class CompositeExtractor:
             embeddings=merged.get("embeddings"),
             timestamp=timestamp,
             metadata=metadata,
+            ocr=merged.get("ocr"),
+            caption=merged.get("caption"),
+            scene=merged.get("scene"),
+            events=merged.get("events"),
+            keypoints=merged.get("keypoints"),
+            relations=merged.get("relations"),
+            document=merged.get("document"),
+            depth_map=merged.get("depth_map"),
         )
 
 
