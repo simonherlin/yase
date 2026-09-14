@@ -14,9 +14,12 @@
 - extract_bundle(image, ...) returns an `ObservationBundle` that binds the
   result to a `FrameRef` and accepts explicit model provenance and uncertainty.
 - `InputLimits(max_pixels=..., max_width=..., max_height=..., max_channels=...,
-  `max_bytes=...)` can be passed to `Yase(..., input_limits=...)` or used
+  max_bytes=...)` can be passed to `Yase(..., input_limits=...)` or used
   directly with `load_image(..., limits=...)`. Violations raise `InputError`
   after decoding and before backend execution.
+- The `extract`, `video`, and `benchmark` CLI commands expose the same
+  controls through `--max-pixels`, `--max-width`, `--max-height`,
+  `--max-channels`, and `--max-bytes`.
 
 ## SemanticResult
 

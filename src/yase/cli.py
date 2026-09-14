@@ -8,6 +8,7 @@ from typing import Optional
 
 from . import (
     BenchmarkRunner,
+    InputLimits,
     __version__,
     default_model_catalog,
     default_registry,
@@ -27,6 +28,38 @@ from . import (
 from .core import Yase
 from .serialization import result_to_dict, write_jsonl
 from .video import RealtimeVideoStream, VideoStream
+
+
+def _positive_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be an integer") from exc
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be positive")
+    return parsed
+
+
+def _add_input_limits(parser: argparse.ArgumentParser) -> None:
+    """Add consistent resource-limit flags to image-processing commands."""
+    parser.add_argument("--max-pixels", type=_positive_int)
+    parser.add_argument("--max-width", type=_positive_int)
+    parser.add_argument("--max-height", type=_positive_int)
+    parser.add_argument("--max-channels", type=_positive_int)
+    parser.add_argument("--max-bytes", type=_positive_int)
+
+
+def _input_limits(args: argparse.Namespace) -> Optional[InputLimits]:
+    values = {
+        "max_pixels": args.max_pixels,
+        "max_width": args.max_width,
+        "max_height": args.max_height,
+        "max_channels": args.max_channels,
+        "max_bytes": args.max_bytes,
+    }
+    if not any(value is not None for value in values.values()):
+        return None
+    return InputLimits(**values)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -93,6 +126,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     extract.add_argument("--output", type=Path)
     extract.add_argument("--include-arrays", action="store_true")
+    _add_input_limits(extract)
     extract.set_defaults(handler=_extract)
 
     video = subparsers.add_parser("video", help="extract semantics from a video")
@@ -112,6 +146,7 @@ def _parser() -> argparse.ArgumentParser:
     video.add_argument("--realtime", action="store_true")
     video.add_argument("--output", type=Path)
     video.add_argument("--include-arrays", action="store_true")
+    _add_input_limits(video)
     video.set_defaults(handler=_video)
 
     benchmark = subparsers.add_parser(
@@ -129,6 +164,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     benchmark.add_argument("--warmup", type=int, default=0)
     benchmark.add_argument("--output", type=Path)
+    _add_input_limits(benchmark)
     benchmark.set_defaults(handler=_benchmark)
     return parser
 
@@ -201,6 +237,7 @@ def _extract(args: argparse.Namespace) -> int:
         task=args.task,
         model=args.model,
         model_path=args.model_path,
+        input_limits=_input_limits(args),
     )
     results = extractor.extract_many(discover_images(args.images))
     valid = [result for result in results if result is not None]
@@ -220,6 +257,7 @@ def _video(args: argparse.Namespace) -> int:
         task=args.task,
         model=args.model,
         model_path=args.model_path,
+        input_limits=_input_limits(args),
     )
     stream_type = RealtimeVideoStream if args.realtime else VideoStream
     stream_options = {"max_frames": args.max_frames}
@@ -248,6 +286,7 @@ def _benchmark(args: argparse.Namespace) -> int:
         task=args.task,
         model=args.model,
         model_path=args.model_path,
+        input_limits=_input_limits(args),
     )
     report = BenchmarkRunner(warmup=args.warmup).run(
         extractor,

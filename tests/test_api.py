@@ -1671,6 +1671,45 @@ def test_cli_diagnostics_reports_readiness(capsys):
     assert "runtime" in payload
 
 
+def test_cli_processing_commands_parse_input_limits():
+    from yase.cli import _input_limits, _parser
+
+    args = _parser().parse_args(
+        [
+            "extract",
+            "frame.jpg",
+            "--model",
+            "onnx",
+            "--model-path",
+            "model.onnx",
+            "--max-pixels",
+            "10000",
+            "--max-width",
+            "640",
+            "--max-bytes",
+            "1000000",
+        ]
+    )
+    limits = _input_limits(args)
+    assert limits is not None
+    assert limits.max_pixels == 10000
+    assert limits.max_width == 640
+    assert limits.max_bytes == 1000000
+    with pytest.raises(SystemExit):
+        _parser().parse_args(
+            [
+                "video",
+                "input.mp4",
+                "--model",
+                "onnx",
+                "--model-path",
+                "model.onnx",
+                "--max-pixels",
+                "0",
+            ]
+        )
+
+
 def test_scheduler_reorders_dag_and_reuses_bounded_stage_cache():
     calls = []
 

@@ -290,6 +290,16 @@ Result: version 0.20.0, 100 deterministic tests passing before final validation.
 Result: release checks pass locally; CI now gates publication-shaped artifacts
 on the full test matrix.
 
+## Cycle 26 — CLI input safety controls
+
+- [x] Expose all `InputLimits` dimensions on image, video, and benchmark CLI
+  commands.
+- [x] Reject non-positive values before model initialization.
+- [x] Propagate limits through the existing `Yase` API boundary.
+- [x] Add parser regression coverage and update the API reference.
+
+Result: version 0.21.0, 101 deterministic tests passing before final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full
