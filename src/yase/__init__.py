@@ -1,12 +1,121 @@
 """Yase: semantic extraction for images and real-time video."""
 
+from .adapters import (
+    PaddleOCRExtractor,
+    PromptableSegmentationExtractor,
+    RFDETRExtractor,
+    TesseractExtractor,
+    TransformersGroundingDinoExtractor,
+    TransformersImageEmbeddingExtractor,
+    TransformersObjectDetectionExtractor,
+    TransformersSAM3Extractor,
+    TransformersSAM3VideoExtractor,
+    TransformersVLMExtractor,
+)
+from .artifacts import ArtifactInfo, inspect_artifact, sha256_file, verify_artifact
 from .backends import (
     CallableExtractor,
     CompositeExtractor,
     OnnxRuntimeExtractor,
     TorchScriptExtractor,
 )
+from .benchmark import BenchmarkReport, BenchmarkRunner
+from .calibration import TemperatureScaler
+from .cascade import AdaptiveSemanticCascade, CascadePolicy, RouteDecision
 from .core import Extractor, ImageInput, SemanticResult, Yase, load_image
+from .datasets import (
+    CocoDataset,
+    CocoImage,
+    discover_images,
+    load_coco_dataset,
+    load_coco_predictions,
+    load_mot_sequence,
+    write_coco_predictions,
+    write_mot_sequence,
+)
+from .diagnostics import HealthReport, RuntimeInfo, collect_runtime_info, health_check
+from .errors import (
+    BackendError,
+    InputError,
+    PipelineError,
+    SchedulerError,
+    StageCancelled,
+    YaseError,
+)
+from .events import (
+    DwellRule,
+    EventEngine,
+    LineCrossingRule,
+    PresenceRule,
+    StreamContext,
+    ZoneRule,
+)
+from .fusion import FusedEvidence, MultimodalConsensus
+from .index import NumpyVectorIndex, SearchHit
+from .limits import InputLimits
+from .memory import SemanticTrackMemory, TrackMemoryState
+from .metrics import (
+    AveragePrecisionResult,
+    DetectionMetrics,
+    HOTACurveResult,
+    HOTAResult,
+    MaskMetrics,
+    MeanAveragePrecisionResult,
+    TrackingMetrics,
+    evaluate_average_precision,
+    evaluate_detections,
+    evaluate_hota,
+    evaluate_hota_curve,
+    evaluate_mask_average_precision,
+    evaluate_masks,
+    evaluate_mean_average_precision,
+    evaluate_mean_mask_average_precision,
+    evaluate_tracking,
+)
+from .models import ModelCard, ModelCatalog, default_model_catalog
+from .normalization import normalise_detections
+from .observation import (
+    EmbeddingRecord,
+    FrameRef,
+    ModelProvenance,
+    ObservationBundle,
+    Uncertainty,
+    observation_to_json,
+    write_observation_jsonl,
+)
+from .pipeline import PipelineStage, SemanticPipeline
+from .registry import BackendRegistry, BackendSpec, default_registry
+from .reid import GlobalIdentity, GlobalIdentityStore, cosine_similarity
+from .retrieval import QdrantVectorIndex
+from .runtimes import OpenVINOExtractor, TensorRTExtractor
+from .scheduler import (
+    ObservationScheduler,
+    SchedulerConfig,
+    SchedulerReport,
+    StageExecution,
+)
+from .schema import (
+    BoundingBox,
+    DepthMap,
+    Detection,
+    Keypoint,
+    OrientedBoundingBox,
+    Pose,
+    Relation,
+    SemanticEvent,
+    TextRegion,
+)
+from .serialization import result_to_dict, result_to_json, write_jsonl
+from .sinks import (
+    CallbackSink,
+    FanoutSink,
+    JsonlObservationSink,
+    MemorySink,
+    ObservationSink,
+    QueueSink,
+)
+from .stages import Stage, StageContext, StageSpec, validate_stage_specs
+from .tracking import ByteTrackLite, ExternalTrackerAdapter, IoUTracker, box_iou
 from .video import (
     FrameResult,
     RealtimeVideoStream,
@@ -15,21 +124,140 @@ from .video import (
     process_video,
 )
 
-__version__ = "0.2.0"
+__version__ = "0.18.0"
 
 __all__ = [
     "CallableExtractor",
+    "CocoDataset",
+    "CocoImage",
+    "discover_images",
+    "BoundingBox",
+    "BackendRegistry",
+    "BackendSpec",
+    "BackendError",
+    "ByteTrackLite",
+    "BenchmarkReport",
+    "BenchmarkRunner",
+    "AdaptiveSemanticCascade",
+    "AveragePrecisionResult",
+    "ArtifactInfo",
+    "CascadePolicy",
+    "CallbackSink",
     "CompositeExtractor",
+    "Detection",
+    "DetectionMetrics",
+    "DepthMap",
+    "DwellRule",
+    "EmbeddingRecord",
+    "ExternalTrackerAdapter",
+    "EventEngine",
+    "GlobalIdentity",
+    "GlobalIdentityStore",
+    "HealthReport",
     "Extractor",
     "OnnxRuntimeExtractor",
+    "OpenVINOExtractor",
     "FrameResult",
+    "FrameRef",
+    "FanoutSink",
+    "FusedEvidence",
     "ImageInput",
+    "InputError",
+    "InputLimits",
+    "IoUTracker",
+    "Keypoint",
+    "JsonlObservationSink",
+    "NumpyVectorIndex",
+    "PipelineStage",
+    "PipelineError",
+    "LineCrossingRule",
+    "HOTAResult",
+    "HOTACurveResult",
+    "MaskMetrics",
+    "MeanAveragePrecisionResult",
+    "PresenceRule",
+    "PaddleOCRExtractor",
+    "PromptableSegmentationExtractor",
+    "QdrantVectorIndex",
+    "QueueSink",
+    "Relation",
+    "RuntimeInfo",
+    "RFDETRExtractor",
+    "SearchHit",
+    "SemanticEvent",
+    "SemanticTrackMemory",
+    "SemanticPipeline",
     "SemanticResult",
+    "ObservationScheduler",
+    "SchedulerConfig",
+    "SchedulerError",
+    "SchedulerReport",
+    "Stage",
+    "StageContext",
+    "StageCancelled",
+    "StageExecution",
+    "StageSpec",
+    "MultimodalConsensus",
+    "ModelCard",
+    "ModelCatalog",
+    "ModelProvenance",
+    "MemorySink",
+    "ObservationBundle",
+    "ObservationSink",
+    "OrientedBoundingBox",
+    "Pose",
+    "StreamContext",
     "TorchScriptExtractor",
+    "TensorRTExtractor",
+    "TextRegion",
+    "TemperatureScaler",
+    "TrackMemoryState",
+    "TrackingMetrics",
+    "TesseractExtractor",
+    "TransformersImageEmbeddingExtractor",
+    "TransformersGroundingDinoExtractor",
+    "TransformersObjectDetectionExtractor",
+    "TransformersVLMExtractor",
+    "TransformersSAM3Extractor",
+    "TransformersSAM3VideoExtractor",
+    "box_iou",
+    "cosine_similarity",
+    "RouteDecision",
+    "result_to_dict",
+    "result_to_json",
+    "write_jsonl",
+    "write_observation_jsonl",
+    "write_coco_predictions",
+    "evaluate_detections",
+    "evaluate_hota",
+    "evaluate_hota_curve",
+    "evaluate_average_precision",
+    "evaluate_mask_average_precision",
+    "evaluate_mean_mask_average_precision",
+    "evaluate_mean_average_precision",
+    "evaluate_masks",
+    "evaluate_tracking",
+    "inspect_artifact",
+    "default_model_catalog",
     "RealtimeVideoStream",
     "VideoStats",
     "VideoStream",
     "Yase",
+    "YaseError",
+    "Uncertainty",
+    "validate_stage_specs",
     "load_image",
+    "load_coco_dataset",
+    "load_coco_predictions",
+    "normalise_detections",
+    "collect_runtime_info",
+    "health_check",
+    "observation_to_json",
+    "sha256_file",
+    "verify_artifact",
+    "default_registry",
     "process_video",
+    "load_mot_sequence",
+    "write_mot_sequence",
+    "ZoneRule",
 ]

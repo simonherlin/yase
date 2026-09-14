@@ -1,18 +1,117 @@
+import asyncio
+import json
 import sys
 from contextlib import contextmanager
+from io import StringIO
+from threading import Event
 
 import numpy as np
 import pytest
 
 from yase import (
+    AdaptiveSemanticCascade,
+    ArtifactInfo,
+    AveragePrecisionResult,
+    BackendError,
+    BackendRegistry,
+    BenchmarkRunner,
+    BoundingBox,
+    ByteTrackLite,
     CallableExtractor,
+    CallbackSink,
+    CocoDataset,
+    CocoImage,
     CompositeExtractor,
+    DepthMap,
+    Detection,
+    DetectionMetrics,
+    DwellRule,
+    EmbeddingRecord,
+    EventEngine,
+    ExternalTrackerAdapter,
+    FanoutSink,
+    FrameRef,
+    GlobalIdentityStore,
+    HealthReport,
+    HOTACurveResult,
+    HOTAResult,
+    InputError,
+    InputLimits,
+    IoUTracker,
+    JsonlObservationSink,
+    Keypoint,
+    LineCrossingRule,
+    MaskMetrics,
+    MeanAveragePrecisionResult,
+    MemorySink,
+    ModelProvenance,
+    MultimodalConsensus,
+    NumpyVectorIndex,
+    ObservationBundle,
+    ObservationScheduler,
     OnnxRuntimeExtractor,
+    OpenVINOExtractor,
+    OrientedBoundingBox,
+    PipelineStage,
+    Pose,
+    PresenceRule,
+    PromptableSegmentationExtractor,
+    QdrantVectorIndex,
+    QueueSink,
     RealtimeVideoStream,
+    Relation,
+    RFDETRExtractor,
+    RuntimeInfo,
+    SchedulerConfig,
+    SchedulerError,
+    SemanticEvent,
+    SemanticPipeline,
     SemanticResult,
+    SemanticTrackMemory,
+    StageCancelled,
+    StageContext,
+    StageExecution,
+    StageSpec,
+    TemperatureScaler,
+    TensorRTExtractor,
+    TesseractExtractor,
+    TextRegion,
+    TrackingMetrics,
+    TransformersSAM3Extractor,
+    TransformersSAM3VideoExtractor,
+    Uncertainty,
     VideoStats,
     Yase,
+    ZoneRule,
+    collect_runtime_info,
+    default_model_catalog,
+    default_registry,
+    discover_images,
+    evaluate_average_precision,
+    evaluate_detections,
+    evaluate_hota,
+    evaluate_hota_curve,
+    evaluate_mask_average_precision,
+    evaluate_masks,
+    evaluate_mean_average_precision,
+    evaluate_mean_mask_average_precision,
+    evaluate_tracking,
+    health_check,
+    inspect_artifact,
+    load_coco_dataset,
+    load_coco_predictions,
     load_image,
+    load_mot_sequence,
+    normalise_detections,
+    observation_to_json,
+    result_to_dict,
+    result_to_json,
+    sha256_file,
+    validate_stage_specs,
+    verify_artifact,
+    write_coco_predictions,
+    write_mot_sequence,
+    write_observation_jsonl,
 )
 from yase.video import VideoStream
 
@@ -85,6 +184,27 @@ def test_video_stride_and_release():
     assert [item.frame_index for item in frames] == [0, 2, 4]
     assert all(item.result.depth.shape == (2, 3) for item in frames)
     assert capture.released
+
+
+def test_video_stride_one_processes_every_frame_and_emits_observations():
+    sink = MemorySink()
+    stream = VideoStream(
+        FakeCapture(4),
+        lambda image: np.zeros(image.shape[:2]),
+        sink=sink,
+        source_id="camera-7",
+    )
+    frames = list(stream)
+    assert [item.frame_index for item in frames] == [0, 1, 2, 3]
+    assert [
+        item.frame_id for item in [bundle.frame for bundle in sink.observations]
+    ] == [
+        0,
+        1,
+        2,
+        3,
+    ]
+    assert sink.observations[0].frame.source_id == "camera-7"
 
 
 def test_video_max_frames_and_metadata():
@@ -180,6 +300,26 @@ def test_load_image_rejects_invalid_shapes_and_order():
         load_image(np.zeros((2, 2, 3)), color_order="XYZ")
 
 
+def test_input_limits_validate_decoded_images_and_yase_inputs():
+    limits = InputLimits(max_pixels=4, max_width=2, max_height=2, max_bytes=12)
+    valid = np.zeros((2, 2, 3), dtype=np.uint8)
+    assert limits.validate(valid) is valid
+    with pytest.raises(InputError, match="pixel limit"):
+        InputLimits(max_pixels=3).validate(valid)
+    with pytest.raises(InputError, match="width limit"):
+        Yase(
+            extractor=lambda image: image[..., 0],
+            input_limits=InputLimits(max_width=2),
+        ).extract(np.zeros((2, 3, 3), dtype=np.uint8))
+    result = Yase(
+        extractor=lambda image: image[..., 0],
+        input_limits=InputLimits(max_pixels=4),
+    ).extract(valid)
+    assert result.depth.shape == (2, 2)
+    with pytest.raises(ValueError, match="positive"):
+        InputLimits(max_channels=0)
+
+
 def test_normalise_tuple_and_result_timestamp():
     both = Yase(
         task="both",
@@ -258,7 +398,731 @@ def test_realtime_worker_exception_is_propagated_and_closed():
     with pytest.raises(RuntimeError, match="worker"):
         list(stream)
     stream.close()
-    assert capture.released
+
+
+def test_rich_schema_and_pipeline_preserve_semantic_fields():
+    box = BoundingBox.from_xywh(1, 2, 3, 4)
+    result = SemanticPipeline(
+        {
+            "objects": lambda _image: {
+                "detections": [Detection("person", 0.9, box)],
+                "ocr": [TextRegion("hello", 0.8, box)],
+            },
+            "events": lambda _image: {
+                "events": [SemanticEvent("arrival", 0.7, 1.0)],
+            },
+        }
+    ).extract(np.zeros((4, 4, 3), dtype=np.uint8), timestamp=3.0)
+    assert result.detections[0].box.area == 12
+    assert result.ocr[0].text == "hello"
+    assert result.events[0].label == "arrival"
+    assert result.timestamp == 3.0
+    batch = SemanticPipeline(
+        {"objects": lambda image: {"tags": [int(image[0, 0, 0])]}}
+    ).extract_many(
+        [np.zeros((2, 2, 3), dtype=np.uint8), np.ones((2, 2, 3), dtype=np.uint8)],
+        timestamps=[1.0, 2.0],
+    )
+    assert [item.tags for item in batch] == [[0], [1]]
+
+
+def test_numpy_vector_index_search_and_result_ingestion():
+    index = NumpyVectorIndex()
+    index.add_result("a", SemanticResult(embeddings=np.array([1.0, 0.0])))
+    index.add("b", [0.0, 1.0], metadata={"kind": "other"})
+    hits = index.search([0.9, 0.1], limit=2)
+    assert [hit.item_id for hit in hits] == ["a", "b"]
+    assert hits[1].metadata["kind"] == "other"
+    assert index.search([0.0, 1.0], where={"kind": "other"})[0].item_id == "b"
+
+
+def test_numpy_vector_index_persistence(tmp_path):
+    index = NumpyVectorIndex()
+    index.add("a", [1.0, 0.0], metadata={"source": "test"})
+    path = tmp_path / "vectors.npz"
+    index.save(path)
+    restored = NumpyVectorIndex.load(path)
+    assert restored.search([1.0, 0.0])[0].metadata["source"] == "test"
+
+
+def test_backend_registry_is_explicit_and_replaceable():
+    registry = BackendRegistry()
+    registry.register("fake", lambda value=1: value, capabilities=("test",))
+    assert registry.create("fake", value=3) == 3
+    assert registry.get("fake").capabilities == ("test",)
+    with pytest.raises(ValueError, match="already registered"):
+        registry.register("fake", lambda: 2)
+
+
+def test_composite_reports_structured_backend_error():
+    def failing(_image):
+        raise ValueError("bad input")
+
+    with pytest.raises(BackendError) as error:
+        CompositeExtractor({"detector": failing}).extract(
+            np.zeros((2, 2, 3), dtype=np.uint8)
+        )
+    assert error.value.backend == "detector"
+
+
+def test_iou_tracker_keeps_ids_and_expires_missing_tracks():
+    tracker = IoUTracker(iou_threshold=0.2, max_missed=1)
+    first = tracker.update([Detection("person", 0.9, (0, 0, 10, 10))])
+    second = tracker.update([Detection("person", 0.8, (1, 1, 11, 11))])
+    assert first[0].track_id == second[0].track_id
+    tracker.update([])
+    assert tracker.active_ids
+    tracker.update([])
+    assert not tracker.active_ids
+
+
+def test_presence_event_engine_emits_enter_and_exit():
+    engine = EventEngine([PresenceRule("person", enter_frames=2, exit_frames=2)])
+    detection = Detection("person", 0.9, (0, 0, 10, 10), track_id=3)
+    assert engine.update(SemanticResult(detections=[detection]), 1.0) == []
+    entered = engine.update(SemanticResult(detections=[detection]), 2.0)
+    assert entered[0].metadata["type"] == "enter"
+    assert engine.update(SemanticResult(detections=[]), 3.0) == []
+    exited = engine.update(SemanticResult(detections=[]), 4.0)
+    assert exited[0].metadata["type"] == "exit"
+
+
+def test_qdrant_adapter_works_with_injected_client_and_models():
+    from types import SimpleNamespace
+
+    class FakeModels:
+        class Distance:
+            COSINE = "cosine"
+
+        VectorParams = staticmethod(lambda **kwargs: kwargs)
+        PointStruct = staticmethod(lambda **kwargs: SimpleNamespace(**kwargs))
+        Filter = staticmethod(lambda **kwargs: kwargs)
+        FieldCondition = staticmethod(lambda **kwargs: kwargs)
+        MatchValue = staticmethod(lambda **kwargs: kwargs)
+
+    class FakeClient:
+        def __init__(self):
+            self.created = False
+            self.points = []
+
+        def collection_exists(self, _name):
+            return self.created
+
+        def create_collection(self, **_kwargs):
+            self.created = True
+
+        def upsert(self, points, **_kwargs):
+            self.points.extend(points)
+
+        def query_points(self, **_kwargs):
+            point = SimpleNamespace(id="a", score=1.0, payload={"kind": "test"})
+            return SimpleNamespace(points=[point])
+
+    index = QdrantVectorIndex(
+        "images", dimension=2, client=FakeClient(), models=FakeModels
+    )
+    index.add("a", [1.0, 0.0], {"kind": "test"})
+    assert index.search([1.0, 0.0])[0].item_id == "a"
+
+
+def test_video_tracker_and_event_engine_integration():
+    capture = FakeCapture(3)
+    detection = Detection("person", 0.9, (0, 0, 2, 2))
+
+    def extractor(_image):
+        return SemanticResult(detections=[detection])
+
+    stream = VideoStream(
+        capture,
+        extractor,
+        tracker=IoUTracker(iou_threshold=0.1),
+        event_engine=EventEngine([PresenceRule("person")]),
+    )
+    frames = list(stream)
+    assert frames[0].result.detections[0].track_id == 1
+    assert frames[0].result.events[0].metadata["type"] == "enter"
+
+
+def test_video_memory_runs_after_tracker():
+    capture = FakeCapture(2)
+    detection = Detection("person", 0.9, (0, 0, 2, 2))
+    memory = SemanticTrackMemory()
+    stream = VideoStream(
+        capture,
+        lambda _image: SemanticResult(detections=[detection]),
+        tracker=IoUTracker(iou_threshold=0.1),
+        memory=memory,
+    )
+    frames = list(stream)
+    assert frames[1].result.detections[0].attributes["seen_count"] == 2
+
+
+def test_adaptive_cascade_refines_then_uses_fast_path():
+    calls = {"fast": 0, "accurate": 0}
+    box = BoundingBox(0, 0, 2, 2)
+
+    def fast(_image):
+        calls["fast"] += 1
+        return {"detections": [Detection("person", 0.95, box)]}
+
+    def accurate(_image):
+        calls["accurate"] += 1
+        return {"detections": [Detection("person", 0.99, box)]}
+
+    cascade = AdaptiveSemanticCascade(fast, accurate)
+    first = cascade.extract(np.zeros((8, 8, 3), dtype=np.uint8))
+    second = cascade.extract(np.zeros((8, 8, 3), dtype=np.uint8))
+    assert first.metadata["cascade"]["route"] == "fast+accurate"
+    assert second.metadata["cascade"]["route"] == "fast"
+    assert calls == {"fast": 2, "accurate": 1}
+
+
+def test_semantic_track_memory_adds_stable_attributes_and_expires():
+    memory = SemanticTrackMemory(max_missed=1)
+    detection = Detection("person", 0.8, (0, 0, 2, 2), track_id=4)
+    first = memory.update(SemanticResult(detections=[detection]), timestamp=1)
+    second = memory.update(SemanticResult(detections=[detection]), timestamp=2)
+    assert first.detections[0].attributes["seen_count"] == 1
+    assert second.detections[0].attributes["seen_count"] == 2
+    memory.update(SemanticResult(detections=[]), timestamp=3)
+    assert memory.states
+    memory.update(SemanticResult(detections=[]), timestamp=4)
+    assert not memory.states
+
+
+def test_multimodal_consensus_fuses_boxes_and_audits_evidence():
+    box_a = Detection("car", 0.8, (0, 0, 10, 10))
+    box_b = Detection("car", 0.9, (1, 1, 11, 11))
+    result = MultimodalConsensus().fuse(
+        {
+            "detector": SemanticResult(detections=[box_a]),
+            "vlm": SemanticResult(detections=[box_b]),
+        }
+    )
+    assert len(result.detections) == 1
+    assert result.detections[0].attributes["evidence_count"] == 2
+    assert result.metadata["consensus"][0]["abstained"] is False
+
+
+def test_benchmark_runner_reports_latency_and_quality():
+    def extractor(_image):
+        return SemanticResult(tags=["ok"])
+
+    report = BenchmarkRunner().run(
+        extractor,
+        [np.zeros((2, 2, 3), dtype=np.uint8)] * 3,
+        evaluator=lambda result, _item: {"has_tags": float(bool(result.tags))},
+    )
+    assert report.samples == 3
+    assert report.failures == 0
+    assert report.throughput > 0
+    assert report.to_dict()["quality"]["has_tags"] == 1.0
+
+
+def test_bytetrack_lite_uses_low_score_detections_for_existing_tracks():
+    tracker = ByteTrackLite(high_threshold=0.7, low_threshold=0.2, iou_threshold=0.1)
+    first = tracker.update([Detection("person", 0.9, (0, 0, 10, 10))])
+    second = tracker.update([Detection("person", 0.3, (1, 0, 11, 10))])
+    assert first[0].track_id == second[0].track_id
+    assert tracker.update([Detection("person", 0.1, (2, 0, 12, 10))]) == []
+
+
+def test_rfdetr_adapter_normalizes_injected_model():
+    class Raw:
+        xyxy = np.asarray([[0, 0, 4, 4]])
+        confidence = np.asarray([0.8])
+        class_id = np.asarray([2])
+        class_name = ["car"]
+
+    class Model:
+        def predict(self, _image, threshold):
+            assert threshold == 0.5
+            return Raw()
+
+    result = RFDETRExtractor(model=Model()).extract(np.zeros((4, 4, 3), dtype=np.uint8))
+    assert result.detections[0].label == "car"
+    assert result.metadata["backend"] == "rf-detr"
+
+
+def test_promptable_segmentation_adapter_normalizes_predictor():
+    class Predictor:
+        def segment(self, _image, prompt):
+            assert prompt == "the red car"
+            return {"mask": np.ones((4, 4), dtype=np.uint8), "quality": 0.9}
+
+    result = PromptableSegmentationExtractor(Predictor()).extract(
+        np.zeros((4, 4, 3), dtype=np.uint8), prompt="the red car"
+    )
+    assert result.segmentation.shape == (4, 4)
+    assert result.metadata["quality"] == 0.9
+
+
+def test_transformers_sam3_adapter_normalizes_masks_boxes_and_scores():
+    class FakeTorch:
+        class cuda:
+            @staticmethod
+            def is_available():
+                return False
+
+        @staticmethod
+        def device(name):
+            return name
+
+        @staticmethod
+        @contextmanager
+        def inference_mode():
+            yield
+
+    class FakeInputs(dict):
+        def to(self, _device):
+            return self
+
+    class Processor:
+        def __call__(self, **_kwargs):
+            return FakeInputs(original_sizes=np.asarray([[4, 5]]))
+
+        def post_process_instance_segmentation(self, _outputs, **_kwargs):
+            return [
+                {
+                    "masks": np.asarray([[[1, 0, 0, 0, 0]] * 4], dtype=np.uint8),
+                    "boxes": np.asarray([[0, 0, 1, 4]], dtype=np.float32),
+                    "scores": np.asarray([0.8], dtype=np.float32),
+                }
+            ]
+
+    class Model:
+        def to(self, _device):
+            return self
+
+        def eval(self):
+            return self
+
+        def __call__(self, **_kwargs):
+            return object()
+
+    result = TransformersSAM3Extractor(
+        prompt="person",
+        processor=Processor(),
+        model=Model(),
+        torch_module=FakeTorch,
+    ).extract(np.zeros((4, 5, 3), dtype=np.uint8))
+    assert result.segmentation.shape == (1, 4, 5)
+    assert result.detections[0].label == "person"
+
+
+def test_model_catalog_and_detection_metrics_are_serializable():
+    catalog = default_model_catalog()
+    assert "sam3" in catalog.names()
+    assert catalog.get("rf-detr").task == "detection"
+    metrics = evaluate_detections(
+        [Detection("car", 0.9, (0, 0, 10, 10))],
+        [Detection("car", 1.0, (1, 1, 11, 11))],
+    )
+    assert isinstance(metrics, DetectionMetrics)
+    assert metrics.f1 == 1.0
+    assert metrics.to_dict()["mean_iou"] > 0.5
+
+
+def test_transformers_sam3_video_adapter_preserves_object_ids():
+    class FakeTorch:
+        class cuda:
+            @staticmethod
+            def is_available():
+                return False
+
+        @staticmethod
+        def device(name):
+            return name
+
+    class Processor:
+        def init_video_session(self, **kwargs):
+            assert len(kwargs["video"]) == 2
+            return object()
+
+        def add_text_prompt(self, inference_session, text):
+            assert text == "person"
+            return inference_session
+
+        def postprocess_outputs(self, _session, output):
+            return output
+
+    class Model:
+        def to(self, _device):
+            return self
+
+        def propagate_in_video_iterator(self, **_kwargs):
+            for frame_idx in range(2):
+                yield {
+                    "frame_idx": frame_idx,
+                    "masks": np.ones((1, 2, 2), dtype=np.uint8),
+                    "boxes": np.asarray([[0, 0, 2, 2]], dtype=np.float32),
+                    "scores": np.asarray([0.9]),
+                    "object_ids": np.asarray([7]),
+                }
+
+    extractor = TransformersSAM3VideoExtractor(
+        prompt="person",
+        model=Model(),
+        processor=Processor(),
+        torch_module=FakeTorch,
+    )
+    results = extractor.extract_video([np.zeros((2, 2, 3), dtype=np.uint8)] * 2)
+    assert len(results) == 2
+    assert results[1].detections[0].track_id == 7
+
+
+def test_cli_models_lists_filtered_model_cards(capsys):
+    from yase.cli import main
+
+    assert main(["models", "--task", "detection"]) == 0
+    output = capsys.readouterr().out
+    assert "rf-detr" in output
+    assert "sam3" not in output
+
+
+def test_default_registry_exposes_modern_optional_backends():
+    names = default_registry().names()
+    assert {"rf-detr", "sam3", "sam3-video", "grounding-dino"}.issubset(names)
+
+
+def test_zone_and_line_event_rules_emit_geometry_events():
+    inside = Detection("person", 0.9, (1, 1, 3, 3), track_id=8)
+    outside = Detection("person", 0.9, (8, 1, 10, 3), track_id=8)
+    zone = ZoneRule("person", [(0, 0), (5, 0), (5, 5), (0, 5)])
+    assert (
+        zone.evaluate(SemanticResult(detections=[inside]), 1.0)[0].metadata["type"]
+        == "zone_enter"
+    )
+    assert (
+        zone.evaluate(SemanticResult(detections=[outside]), 2.0)[0].metadata["type"]
+        == "zone_exit"
+    )
+    line = LineCrossingRule("person", (5, 0), (5, 10))
+    line.evaluate(SemanticResult(detections=[inside]), 1.0)
+    crossed = line.evaluate(SemanticResult(detections=[outside]), 2.0)
+    assert crossed[0].metadata["type"] == "line_crossing"
+
+
+def test_global_identity_store_matches_embeddings_across_cameras():
+    store = GlobalIdentityStore(similarity_threshold=0.8)
+    first = Detection("person", 0.9, (0, 0, 2, 2), attributes={"embedding": [1.0, 0.0]})
+    second = Detection(
+        "person", 0.9, (1, 1, 3, 3), attributes={"embedding": [0.99, 0.01]}
+    )
+    one = store.update([first], camera_id="cam-a", timestamp=1.0)
+    two = store.update([second], camera_id="cam-b", timestamp=2.0)
+    assert one[0].attributes["global_id"] == two[0].attributes["global_id"]
+    assert store.identities[two[0].attributes["global_id"]].camera_ids == (
+        "cam-a",
+        "cam-b",
+    )
+
+
+def test_tracking_metrics_detect_identity_switches():
+    truth = [
+        [Detection("person", 1.0, (0, 0, 10, 10), track_id=4)],
+        [Detection("person", 1.0, (1, 0, 11, 10), track_id=4)],
+    ]
+    predictions = [
+        [Detection("person", 0.9, (0, 0, 10, 10), track_id=1)],
+        [Detection("person", 0.9, (1, 0, 11, 10), track_id=2)],
+    ]
+    metrics = evaluate_tracking(predictions, truth)
+    assert isinstance(metrics, TrackingMetrics)
+    assert metrics.identity_switches == 1
+    assert metrics.idf1 < 1.0
+
+
+def test_hota_is_perfect_for_perfect_track_sequence():
+    truth = [
+        [Detection("person", 1.0, (0, 0, 10, 10), track_id=4)],
+        [Detection("person", 1.0, (1, 0, 11, 10), track_id=4)],
+    ]
+    result = evaluate_hota(truth, truth)
+    assert isinstance(result, HOTAResult)
+    assert result.hota == 1.0
+    assert result.association_accuracy == 1.0
+
+
+def test_hota_curve_uses_default_mot_threshold_grid():
+    truth = [[Detection("person", 1.0, (0, 0, 10, 10), track_id=4)]]
+    result = evaluate_hota_curve((frame for frame in truth), truth)
+    assert isinstance(result, HOTACurveResult)
+    assert result.alphas == tuple(
+        round(value, 2) for value in np.linspace(0.05, 0.95, 19)
+    )
+    assert result.mean_hota == pytest.approx(1.0)
+    assert result.per_threshold[0].association_accuracy == pytest.approx(1.0)
+
+
+def test_hota_curve_rejects_invalid_thresholds():
+    with pytest.raises(ValueError, match="alphas"):
+        evaluate_hota_curve([], [], alphas=[])
+    with pytest.raises(ValueError, match=r"\[0, 1\]"):
+        evaluate_hota_curve([[]], [[]], alphas=[1.1])
+
+
+def test_average_precision_and_map_are_perfect_on_perfect_predictions():
+    truth = [Detection("person", 1.0, (0, 0, 10, 10), track_id=4)]
+    prediction = [Detection("person", 0.9, (0, 0, 10, 10), track_id=2)]
+    average_precision = evaluate_average_precision(prediction, truth)
+    mean_average_precision = evaluate_mean_average_precision([prediction], [truth])
+    assert isinstance(average_precision, AveragePrecisionResult)
+    assert average_precision.average_precision == pytest.approx(1.0)
+    assert isinstance(mean_average_precision, MeanAveragePrecisionResult)
+    assert mean_average_precision.mean_average_precision == pytest.approx(1.0)
+    assert len(mean_average_precision.iou_thresholds) == 10
+
+
+def test_average_precision_penalizes_high_score_false_positive():
+    truth = [Detection("person", 1.0, (0, 0, 10, 10))]
+    predictions = [
+        Detection("person", 0.95, (20, 20, 30, 30)),
+        Detection("person", 0.9, (0, 0, 10, 10)),
+    ]
+    result = evaluate_average_precision(predictions, truth)
+    assert result.average_precision == pytest.approx(0.5)
+    assert result.average_recall == 1.0
+
+
+def test_mask_average_precision_uses_masks_and_validates_frames():
+    truth_mask = np.ones((3, 3), dtype=np.uint8)
+    truth = [Detection("car", 1.0, (0, 0, 3, 3), mask=truth_mask)]
+    prediction = [Detection("car", 0.8, (0, 0, 3, 3), mask=truth_mask)]
+    result = evaluate_mask_average_precision([prediction], [truth])
+    assert result.average_precision == pytest.approx(1.0)
+    with pytest.raises(ValueError, match="equal frame counts"):
+        evaluate_average_precision([prediction], [])
+
+
+def test_coco_loader_rasterizes_polygons_and_exports_predictions(tmp_path):
+    annotation_path = tmp_path / "instances.json"
+    annotation_path.write_text(
+        json.dumps(
+            {
+                "images": [
+                    {"id": 7, "file_name": "frame.jpg", "width": 6, "height": 5},
+                    {"id": 8, "file_name": "empty.jpg", "width": 6, "height": 5},
+                ],
+                "categories": [{"id": 1, "name": "car"}],
+                "annotations": [
+                    {
+                        "id": 10,
+                        "image_id": 7,
+                        "category_id": 1,
+                        "bbox": [1, 1, 3, 2],
+                        "area": 6,
+                        "segmentation": [[1, 1, 4, 1, 4, 3, 1, 3]],
+                    },
+                    {
+                        "id": 11,
+                        "image_id": 7,
+                        "category_id": 1,
+                        "bbox": [0, 0, 1, 1],
+                        "iscrowd": 1,
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    dataset = load_coco_dataset(annotation_path)
+    assert isinstance(dataset, CocoDataset)
+    assert isinstance(dataset.images[0], CocoImage)
+    assert dataset.image_ids == (7, 8)
+    assert len(dataset.frames()[0]) == 1
+    assert dataset.frames()[0][0].mask.any()
+    assert evaluate_mask_average_precision(
+        dataset.frames(), dataset.frames()
+    ).average_precision == pytest.approx(1.0)
+
+    output_path = tmp_path / "predictions.json"
+    count = write_coco_predictions(
+        dataset.frames(),
+        output_path,
+        image_ids=dataset.image_ids,
+        category_ids={"car": 1},
+        include_masks=True,
+    )
+    assert count == 1
+    rows = json.loads(output_path.read_text(encoding="utf-8"))
+    assert rows[0]["image_id"] == 7
+    assert rows[0]["segmentation"]["size"] == [5, 6]
+    loaded_predictions = load_coco_predictions(output_path, dataset, include_masks=True)
+    assert evaluate_mean_mask_average_precision(
+        loaded_predictions, dataset.frames()
+    ).mean_average_precision == pytest.approx(1.0)
+
+
+def test_coco_cli_evaluation_and_image_discovery(tmp_path, capsys):
+    from yase.cli import main
+
+    payload = {
+        "images": [{"id": 1, "file_name": "a.jpg", "width": 4, "height": 4}],
+        "categories": [{"id": 1, "name": "car"}],
+        "annotations": [
+            {
+                "id": 1,
+                "image_id": 1,
+                "category_id": 1,
+                "bbox": [0, 0, 2, 2],
+                "segmentation": [[0, 0, 2, 0, 2, 2, 0, 2]],
+            }
+        ],
+    }
+    ground_truth = tmp_path / "gt.json"
+    predictions = tmp_path / "predictions.json"
+    ground_truth.write_text(json.dumps(payload), encoding="utf-8")
+    predictions.write_text(
+        json.dumps(
+            [
+                {
+                    "image_id": 1,
+                    "category_id": 1,
+                    "bbox": [0, 0, 2, 2],
+                    "score": 0.9,
+                    "segmentation": [[0, 0, 2, 0, 2, 2, 0, 2]],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    assert main(["evaluate-coco", str(predictions), str(ground_truth), "--masks"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["bbox"]["mean_average_precision"] == pytest.approx(1.0)
+    assert result["mask"]["mean_average_precision"] == pytest.approx(1.0)
+
+    image_dir = tmp_path / "images"
+    image_dir.mkdir()
+    (image_dir / "b.png").touch()
+    (image_dir / "a.jpg").touch()
+    (image_dir / "skip.txt").touch()
+    assert [item.name for item in discover_images([image_dir])] == ["a.jpg", "b.png"]
+
+
+def test_mask_metrics_and_mot_roundtrip(tmp_path):
+    mask = np.ones((3, 3), dtype=np.uint8)
+    prediction = Detection("car", 0.9, (0, 0, 3, 3), mask=mask, track_id=2)
+    metrics = evaluate_masks([prediction], [prediction])
+    assert isinstance(metrics, MaskMetrics)
+    assert metrics.f1 == 1.0
+    path = tmp_path / "gt.txt"
+    assert write_mot_sequence([[prediction]], path) == 1
+    restored = load_mot_sequence(path)
+    assert restored[0][0].track_id == 2
+    assert restored[0][0].box.width == 3
+
+
+def test_dwell_rule_emits_once_after_duration():
+    rule = DwellRule("person", 2.0)
+    detection = Detection("person", 0.9, (0, 0, 2, 2), track_id=5)
+    result = SemanticResult(detections=[detection])
+    assert rule.evaluate(result, 0.0) == []
+    assert rule.evaluate(result, 1.0) == []
+    event = rule.evaluate(result, 2.0)[0]
+    assert event.metadata["type"] == "dwell"
+    assert rule.evaluate(result, 3.0) == []
+
+
+def test_benchmark_tracking_reports_quality_metrics():
+    tracker = IoUTracker(iou_threshold=0.1)
+    frame = [Detection("person", 0.9, (0, 0, 2, 2), track_id=None)]
+    truth = [Detection("person", 1.0, (0, 0, 2, 2), track_id=1)]
+    report = BenchmarkRunner().run_tracking(tracker, [frame], [[truth[0]]])
+    assert report.quality["mota"] == 1.0
+    assert report.quality["idf1"] == 1.0
+
+
+def test_cli_evaluate_mot_reports_hota_and_tracking(tmp_path, capsys):
+    from yase.cli import main
+
+    truth = tmp_path / "truth.txt"
+    prediction = tmp_path / "prediction.txt"
+    truth.write_text("1,4,0,0,2,2,1,1,1,1\n", encoding="utf-8")
+    prediction.write_text("1,4,0,0,2,2,0.9,1,1,1\n", encoding="utf-8")
+    assert main(["evaluate-mot", str(prediction), str(truth)]) == 0
+    output = capsys.readouterr().out
+    assert '"hota"' in output
+    assert '"idf1": 1.0' in output
+
+
+def test_cli_artifact_inspection_and_verification(tmp_path, capsys):
+    from yase.cli import main
+
+    path = tmp_path / "model.onnx"
+    path.write_bytes(b"model")
+    assert main(["artifact", str(path), "--sha256"]) == 0
+    output = capsys.readouterr().out
+    digest = json.loads(output)["sha256"]
+    assert main(["artifact", str(path), "--verify", digest]) == 0
+    assert json.loads(capsys.readouterr().out)["size_bytes"] == 5
+
+
+def test_external_tracker_adapter_normalizes_mapping_output():
+    class Tracker:
+        def update(self, _detections):
+            return [{"bbox": (0, 0, 2, 2), "track_id": 12, "label": "car"}]
+
+    result = ExternalTrackerAdapter(Tracker()).update([])
+    assert result[0].track_id == 12
+
+
+def test_video_identity_store_receives_camera_id():
+    capture = FakeCapture(1)
+    detection = Detection("person", 0.9, (0, 0, 2, 2), attributes={"embedding": [1, 0]})
+    stream = VideoStream(
+        capture,
+        lambda _image: SemanticResult(detections=[detection]),
+        identity_store=GlobalIdentityStore(),
+        camera_id="cam-1",
+    )
+    frame = list(stream)[0]
+    assert frame.result.detections[0].attributes["camera_id"] == "cam-1"
+
+
+def test_benchmark_compare_uses_same_inputs_for_each_backend():
+    images = [np.zeros((2, 2, 3), dtype=np.uint8)] * 2
+    reports = BenchmarkRunner().compare(
+        {
+            "a": lambda _image: {"tags": ["a"]},
+            "b": lambda _image: {"tags": ["b"]},
+        },
+        images,
+    )
+    assert set(reports) == {"a", "b"}
+    assert all(report.samples == 2 for report in reports.values())
+
+
+def test_temperature_scaler_calibrates_and_can_be_used_by_consensus():
+    scaler = TemperatureScaler().fit([0.9, 0.8, 0.2, 0.1], [1, 1, 0, 0], steps=20)
+    assert scaler.temperature > 0
+    assert scaler.transform(0.9) > scaler.transform(0.2)
+    detection = Detection("car", 0.8, (0, 0, 4, 4))
+    result = MultimodalConsensus(calibrators={"model": scaler}).fuse(
+        {"model": SemanticResult(detections=[detection])}
+    )
+    assert result.detections[0].score > 0.5
+
+
+def test_tesseract_adapter_and_json_serialization():
+    class FakeTesseract:
+        def image_to_data(self, _image, **_kwargs):
+            return {
+                "text": ["hello", ""],
+                "conf": ["90", "-1"],
+                "left": [1, 0],
+                "top": [2, 0],
+                "width": [3, 0],
+                "height": [4, 0],
+            }
+
+    result = TesseractExtractor(engine=FakeTesseract()).extract(
+        np.zeros((8, 8, 3), dtype=np.uint8)
+    )
+    assert result.ocr[0].text == "hello"
+    payload = result_to_dict(result)
+    assert payload["ocr"][0]["box"]["x2"] == 4.0
+    assert '"ocr"' in result_to_json(result)
 
 
 def test_realtime_queue_size_is_fixed_to_latest_frame():
@@ -321,6 +1185,54 @@ def test_onnx_validates_task_size_outputs_and_optional_dependency():
         ).extract(np.zeros((2, 2, 3)))
     with pytest.raises(ImportError, match="onnx"):
         OnnxRuntimeExtractor("missing.onnx")
+
+
+def test_onnx_supports_nhwc_and_provider_configuration():
+    session = FakeOnnxSession([np.ones((1, 2, 2), dtype=np.float32)])
+    backend = OnnxRuntimeExtractor(
+        "unused.onnx",
+        session=session,
+        input_layout="NHWC",
+        providers=["CUDAExecutionProvider"],
+        provider_options=[{"device_id": "0"}],
+    )
+    backend.extract(np.zeros((2, 3, 3), dtype=np.uint8))
+    assert session.calls[0][1]["pixels"].shape == (1, 2, 3, 3)
+    with pytest.raises(ValueError, match="provider_options"):
+        OnnxRuntimeExtractor(
+            "unused.onnx",
+            session=FakeOnnxSession([]),
+            provider_options=[{"device_id": "0"}],
+        )
+
+
+def test_detection_normalisation_handles_columnar_rows_and_normalized_boxes():
+    detections = normalise_detections(
+        {
+            "boxes": [[0.1, 0.2, 0.5, 0.8]],
+            "scores": [0.9],
+            "labels": [2],
+        },
+        image_shape=(100, 200),
+        box_format="normalized_xyxy",
+        label_map={2: "car"},
+    )
+    assert detections[0].label == "car"
+    assert detections[0].box.as_xyxy() == pytest.approx((20, 20, 100, 80))
+    rows = normalise_detections([[0, 0, 4, 4, 0.8, 1]], label_map={1: "person"})
+    assert rows[0].label == "person"
+    assert normalise_detections(rows, score_threshold=0.9) == []
+
+
+def test_artifact_helpers_are_reproducible(tmp_path):
+    path = tmp_path / "model.onnx"
+    path.write_bytes(b"yase-model")
+    info = inspect_artifact(str(path), checksum=True)
+    assert isinstance(info, ArtifactInfo)
+    assert info.sha256 == sha256_file(str(path))
+    assert verify_artifact(str(path), info.sha256).size_bytes == len(b"yase-model")
+    with pytest.raises(ValueError, match="checksum"):
+        verify_artifact(str(path), "0" * 64)
 
 
 def test_composite_merges_fields_and_preserves_timestamp():
@@ -453,6 +1365,38 @@ def test_onnx_batch_rejects_mismatched_shapes_without_resize():
         backend.extract_batch(images)
 
 
+def test_openvino_extractor_uses_injected_compiled_model():
+    class Port:
+        def get_any_name(self):
+            return "pixels"
+
+    class CompiledModel:
+        inputs = [Port()]
+
+        def __call__(self, inputs):
+            tensor = next(iter(inputs.values()))
+            return {"depth": np.zeros((tensor.shape[0], 2, 2), dtype=np.float32)}
+
+    backend = OpenVINOExtractor(compiled_model=CompiledModel())
+    results = backend.extract_batch(
+        [np.zeros((2, 2, 3), dtype=np.uint8), np.ones((2, 2, 3), dtype=np.uint8)]
+    )
+    assert len(results) == 2
+    assert results[0].depth.shape == (2, 2)
+    assert results[0].metadata["backend"] == "openvino"
+
+
+def test_tensorrt_extractor_accepts_custom_runner():
+    class Runner:
+        def infer(self, tensor):
+            return {"depth": np.ones((tensor.shape[0], 2, 2), dtype=np.float32)}
+
+    backend = TensorRTExtractor(runner=Runner())
+    result = backend.extract(np.zeros((2, 2, 3), dtype=np.uint8))
+    assert result.depth.shape == (2, 2)
+    assert result.metadata["backend"] == "tensorrt"
+
+
 def test_torchscript_batch_uses_one_model_call(monkeypatch):
     class Tensor:
         def __init__(self, value):
@@ -516,3 +1460,314 @@ def test_torchscript_batch_uses_one_model_call(monkeypatch):
     )
     assert len(results) == 2 and model.calls == 1
     assert results[0].depth.shape == (2, 2)
+
+
+def test_observation_bundle_keeps_frame_provenance_and_uncertainty():
+    digest = "a" * 64
+    result = SemanticResult(depth=np.ones((2, 3)), timestamp=4.5)
+    provenance = ModelProvenance(
+        model_id="depth-model",
+        revision="v1",
+        artifact_sha256=digest,
+        runtime="onnxruntime",
+        device="cpu",
+    )
+    bundle = ObservationBundle.from_result(
+        result,
+        frame_id=7,
+        source_id="camera-1",
+        uncertainty={"depth": Uncertainty(0.82, calibrated=True, method="ece")},
+        provenance=(provenance,),
+        metadata={"tenant": "demo"},
+        width=3,
+        height=2,
+    )
+    payload = bundle.to_dict()
+    assert payload["schema_version"] == "1.0"
+    assert payload["frame"]["source_id"] == "camera-1"
+    assert payload["provenance"][0]["artifact_sha256"] == digest
+    assert payload["uncertainty"]["depth"]["calibrated"] is True
+    assert payload["result"]["depth"] == {"dtype": "float64", "shape": [2, 3]}
+
+
+def test_observation_contract_validation_and_embedding_metadata():
+    with pytest.raises(ValueError, match="finite"):
+        FrameRef(frame_id=0, timestamp=float("nan"))
+    with pytest.raises(ValueError, match="hex digest"):
+        ModelProvenance(model_id="model", artifact_sha256="bad")
+    with pytest.raises(ValueError, match=r"\[0, 1\]"):
+        Uncertainty(confidence=1.1)
+
+    embedding = EmbeddingRecord(
+        vector=np.array([3.0, 4.0]) / 5.0,
+        space="clip-v1",
+        model_id="siglip",
+        normalized=True,
+    )
+    assert embedding.to_dict()["shape"] == [2]
+    assert embedding.to_dict(include_values=True)["vector"] == [0.6, 0.8]
+
+
+def test_stage_specs_validate_ordered_dependencies_and_pipeline_compatibility():
+    detector = StageSpec(
+        "detector", provides=("detections",), capabilities=("open-vocabulary",)
+    )
+    caption = StageSpec("caption", requires=("detections",), provides=("caption",))
+    assert "caption" in validate_stage_specs((detector, caption))
+    with pytest.raises(ValueError, match="unavailable"):
+        validate_stage_specs((caption, detector))
+    with pytest.raises(ValueError, match="duplicate"):
+        validate_stage_specs((detector, detector))
+
+    context = StageContext(metadata={"request_id": "abc"})
+    assert context.metadata["request_id"] == "abc"
+    assert not context.cancelled
+    context.cancel_event = Event()
+    context.cancel_event.set()
+    assert context.cancelled
+    pipeline = SemanticPipeline(
+        [
+            PipelineStage(
+                "detector",
+                lambda image: {"detections": [1]},
+                spec=detector,
+            ),
+            PipelineStage(
+                "caption",
+                lambda image: {"caption": "scene"},
+                spec=caption,
+            ),
+        ]
+    )
+    assert "caption" in pipeline.validate()
+
+    class ContractedStage:
+        spec = detector
+
+        def run(self, image, context):
+            assert image.shape == (2, 2, 3)
+            context.metadata["called"] = True
+            return {"detections": [{"score": 1.0}]}
+
+    contracted = SemanticPipeline(
+        [PipelineStage("detector", ContractedStage(), spec=detector)]
+    )
+    assert contracted.extract(np.zeros((2, 2, 3), dtype=np.uint8)).detections
+
+
+def test_yase_extract_bundle_infers_dimensions():
+    api = Yase(extractor=lambda image: {"depth": image[..., 0]})
+    bundle = api.extract_bundle(
+        np.zeros((4, 5, 3), dtype=np.uint8), frame_id=3, source_id="stream"
+    )
+    assert bundle.frame == FrameRef(
+        frame_id=3,
+        source_id="stream",
+        width=5,
+        height=4,
+    )
+    assert bundle.result.depth.shape == (4, 5)
+
+
+def test_observation_json_and_jsonl_are_stable_and_array_safe():
+    bundle = ObservationBundle.from_result(
+        SemanticResult(depth=np.ones((1, 2), dtype=np.float32)),
+        frame_id=1,
+        metadata={"score": np.float32(0.5)},
+    )
+    payload = json.loads(observation_to_json(bundle))
+    assert payload["result"]["depth"] == {"dtype": "float32", "shape": [1, 2]}
+    assert payload["metadata"]["score"] == 0.5
+    output = StringIO()
+    assert write_observation_jsonl([bundle, bundle], output) == 2
+    assert len(output.getvalue().splitlines()) == 2
+
+
+def test_observation_sinks_support_archive_callback_fanout_and_bounded_queue():
+    bundle = ObservationBundle.from_result(SemanticResult(caption="scene"))
+    memory = MemorySink(max_items=1)
+    assert memory.emit(bundle)
+    assert not memory.emit(bundle)
+    callback_values = []
+    callback = CallbackSink(callback_values.append)
+    stream = StringIO()
+    jsonl = JsonlObservationSink(stream, flush_each=True)
+    fanout = FanoutSink((callback, jsonl))
+    assert fanout.emit(bundle)
+    jsonl.close()
+    assert callback_values == [bundle]
+    assert len(stream.getvalue().splitlines()) == 1
+
+    queue_sink = QueueSink(maxsize=1, on_full="drop")
+    assert queue_sink.emit(bundle)
+    assert not queue_sink.emit(bundle)
+    assert queue_sink.dropped == 1
+    assert queue_sink.get(timeout=0.1) == bundle
+    queue_sink.close()
+    with pytest.raises(RuntimeError, match="closed"):
+        queue_sink.emit(bundle)
+
+
+def test_rich_vision_contracts_validate_and_survive_composition():
+    pose = Pose(
+        keypoints=(
+            Keypoint("nose", 10.0, 12.0, score=0.95, visible=True),
+            Keypoint("left_eye", 9.0, 11.0, score=0.8),
+        ),
+        score=0.9,
+        skeleton="coco17",
+    )
+    obb = OrientedBoundingBox(10.0, 12.0, 8.0, 6.0, 0.25)
+    depth = DepthMap(np.ones((2, 3), dtype=np.float32), unit="m", scale=1.0)
+    relation = Relation(1, "next_to", 2, score=0.7, evidence=("detector",))
+    assert obb.as_cxcywh_angle()[-1] == 0.25
+    assert depth.values.shape == (2, 3)
+    result = CompositeExtractor(
+        [
+            lambda image: {
+                "keypoints": [pose],
+                "relations": [relation],
+                "document": {"pages": 1},
+            }
+        ]
+    ).extract(np.zeros((2, 3, 3), dtype=np.uint8))
+    assert result.keypoints == [pose]
+    assert result.relations == [relation]
+    assert result.document == {"pages": 1}
+    depth_result = Yase(
+        extractor=lambda image: {
+            "depth_map": DepthMap(np.ones((2, 3), dtype=np.float32), unit="m")
+        }
+    ).extract(np.zeros((2, 3, 3), dtype=np.uint8))
+    assert depth_result.depth_map.unit == "m"
+    with pytest.raises(ValueError, match="2-D"):
+        DepthMap(np.zeros((1, 1, 1)))
+
+
+def test_runtime_diagnostics_are_lazy_and_machine_readable():
+    runtime = collect_runtime_info(
+        optional_packages=("numpy", "package_that_is_missing")
+    )
+    assert isinstance(runtime, RuntimeInfo)
+    assert runtime.optional_packages["numpy"] is True
+    assert runtime.optional_packages["package_that_is_missing"] is False
+
+    healthy = health_check(lambda image: image)
+    assert isinstance(healthy, HealthReport)
+    assert healthy.ready
+    degraded = health_check(object(), required_packages=("package_that_is_missing",))
+    assert degraded.status == "degraded"
+    assert degraded.ready is False
+    assert degraded.to_dict()["checks"]["extractor_interface"] is False
+
+
+def test_cli_diagnostics_reports_readiness(capsys):
+    from yase.cli import main
+
+    assert main(["diagnostics"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "ok"
+    assert "runtime" in payload
+
+
+def test_scheduler_reorders_dag_and_reuses_bounded_stage_cache():
+    calls = []
+
+    class Detector:
+        def run(self, image, context):
+            calls.append(("detector", context.metadata["stage"]))
+            return {"detections": [{"score": float(image.mean())}]}
+
+    class Caption:
+        def run(self, image, context):
+            calls.append(("caption", context.metadata["inputs"]["detections"]))
+            return {"caption": "one object"}
+
+    detector_spec = StageSpec("detector", provides=("detections",))
+    caption_spec = StageSpec("caption", requires=("detections",), provides=("caption",))
+    scheduler = ObservationScheduler(
+        [
+            PipelineStage("caption", Caption(), spec=caption_spec),
+            PipelineStage("detector", Detector(), spec=detector_spec),
+        ],
+        config=SchedulerConfig(cache_size=2),
+    )
+    assert [stage.name for stage in scheduler.plan] == ["detector", "caption"]
+    image = np.zeros((2, 2, 3), dtype=np.uint8)
+    first = scheduler.run(image)
+    second = scheduler.run(image)
+    assert first.fields["caption"] == "one object"
+    assert [item.status for item in second.stages] == ["cached", "cached"]
+    assert len(calls) == 2
+    assert second.cache_hits == 2
+    assert scheduler.cache_info() == {"size": 2, "capacity": 2}
+    batch = scheduler.run_many([image, np.ones((2, 2, 3), dtype=np.uint8)])
+    assert len(batch) == 2
+    assert batch[0].as_result().detections[0]["score"] == 0.0
+    with pytest.raises(ValueError, match="same length"):
+        scheduler.run_many([image], frames=[])
+
+
+def test_scheduler_supports_async_execution_and_callbacks():
+    events = []
+    spec = StageSpec("tags", provides=("tags",))
+    scheduler = ObservationScheduler(
+        [PipelineStage("tags", lambda image: {"tags": ["outdoor"]}, spec=spec)],
+        config=SchedulerConfig(cache_size=0),
+        on_stage=events.append,
+    )
+    report = asyncio.run(scheduler.arun(np.zeros((1, 1, 3), dtype=np.uint8)))
+    assert report.fields["tags"] == ["outdoor"]
+    assert isinstance(events[0], StageExecution)
+    assert events[0].status == "completed"
+
+
+def test_scheduler_handles_optional_failures_and_cancellation():
+    failing = StageSpec("optional", provides=("caption",), optional=True)
+    scheduler = ObservationScheduler(
+        [
+            PipelineStage(
+                "optional",
+                lambda image: (_ for _ in ()).throw(RuntimeError("offline")),
+                spec=failing,
+            )
+        ],
+        config=SchedulerConfig(on_error="skip", cache_size=0),
+    )
+    report = scheduler.run(np.zeros((1, 1, 3), dtype=np.uint8))
+    assert report.stages[0].status == "failed"
+    cancel = Event()
+    cancel.set()
+    with pytest.raises(StageCancelled, match="cancelled"):
+        scheduler.run(np.zeros((1, 1, 3), dtype=np.uint8), cancel_event=cancel)
+
+
+def test_scheduler_rejects_unresolvable_graph_and_bad_stage_name():
+    missing = StageSpec("caption", requires=("detections",), provides=("caption",))
+    with pytest.raises(SchedulerError, match="dependencies"):
+        ObservationScheduler([PipelineStage("caption", lambda image: {}, spec=missing)])
+    wrong = StageSpec("right", provides=("tags",))
+    with pytest.raises(SchedulerError, match="does not match"):
+        ObservationScheduler([PipelineStage("wrong", lambda image: {}, spec=wrong)])
+
+
+def test_semantic_pipeline_can_promote_contracts_to_sync_async_and_bundle_apis():
+    detector = StageSpec("detector", provides=("detections",))
+    caption = StageSpec("caption", requires=("detections",), provides=("caption",))
+    pipeline = SemanticPipeline(
+        [
+            PipelineStage("caption", lambda image: {"caption": "scene"}, spec=caption),
+            PipelineStage(
+                "detector", lambda image: {"detections": ["object"]}, spec=detector
+            ),
+        ]
+    )
+    image = np.zeros((2, 3, 3), dtype=np.uint8)
+    result = pipeline.extract_scheduled(image, timestamp=2.0)
+    assert result.caption == "scene"
+    assert result.metadata["scheduler"]["stages"][0]["name"] == "detector"
+    async_result = asyncio.run(pipeline.extract_scheduled_async(image))
+    assert async_result.caption == "scene"
+    bundle = pipeline.extract_bundle_scheduled(image, frame_id=9, source_id="cam")
+    assert bundle.frame.frame_id == 9
+    assert bundle.result.caption == "scene"

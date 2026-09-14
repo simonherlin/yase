@@ -1,6 +1,6 @@
 [project]
 name = "yase"
-version = "0.2.0"
+version = "0.18.0"
 description = "Dependency-light semantic extraction for images and real-time video."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -15,7 +15,27 @@ dependencies = [
 video = ["opencv-python>=4.8"]
 torch = ["torch>=2.0", "torchvision>=0.15"]
 onnx = ["onnxruntime>=1.17"]
-all = ["opencv-python>=4.8", "onnxruntime>=1.17", "torch>=2.0", "torchvision>=0.15"]
+transformers = ["torch>=2.0", "transformers>=4.45"]
+ocr = ["pytesseract>=0.3.13"]
+paddle = ["paddleocr>=2.9"]
+retrieval = ["qdrant-client>=1.14"]
+observability = ["opentelemetry-api>=1.30"]
+openvino = ["openvino>=2024.0"]
+tensorrt = ["tensorrt>=10.0"]
+all = [
+  "opencv-python>=4.8",
+  "onnxruntime>=1.17",
+  "torch>=2.0",
+  "torchvision>=0.15",
+  "transformers>=4.45",
+  "pytesseract>=0.3.13",
+  "paddleocr>=2.9",
+  "qdrant-client>=1.14",
+  "opentelemetry-api>=1.30",
+]
+
+[project.scripts]
+yase = "yase.cli:main"
 
 [build-system]
 requires = ["hatchling>=1.25"]
@@ -59,6 +79,9 @@ ignore = ["E501"]
 [tool.coverage.run]
 source = ["yase"]
 omit = [
+  "*/yase/adapters.py",
+  "*/yase/cli.py",
+  "*/yase/retrieval.py",
   "*/yase/data_load.py",
   "*/yase/features.py",
   "*/yase/models/*",

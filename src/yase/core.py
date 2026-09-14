@@ -5,11 +5,13 @@ weights or requires PyTorch.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable, Optional, Protocol, Union
 
 import numpy as np
+
+from .limits import InputLimits
 
 ImageInput = Union[str, Path, np.ndarray, Any]
 
@@ -25,12 +27,26 @@ class SemanticResult:
     embeddings: Optional[np.ndarray] = None
     timestamp: Optional[float] = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    ocr: Optional[Any] = None
+    caption: Optional[str] = None
+    scene: Optional[Any] = None
+    events: Optional[Any] = None
+    keypoints: Optional[Any] = None
+    relations: Optional[Any] = None
+    document: Optional[Any] = None
+    depth_map: Optional[Any] = None
 
     def __post_init__(self) -> None:
         for name in ("depth", "segmentation", "embeddings"):
             value = getattr(self, name)
             if value is not None and not isinstance(value, np.ndarray):
                 object.__setattr__(self, name, np.asarray(value))
+
+    def with_timestamp(self, timestamp: Optional[float]) -> "SemanticResult":
+        """Return a copy with ``timestamp`` when one is supplied."""
+        if timestamp is None or self.timestamp == timestamp:
+            return self
+        return replace(self, timestamp=timestamp)
 
 
 class Extractor(Protocol):
@@ -39,7 +55,11 @@ class Extractor(Protocol):
     def extract(self, image: ImageInput) -> SemanticResult: ...
 
 
-def load_image(image: ImageInput, color_order: str = "RGB") -> np.ndarray:
+def load_image(
+    image: ImageInput,
+    color_order: str = "RGB",
+    limits: Optional[InputLimits] = None,
+) -> np.ndarray:
     """Return an HxWxC uint8 RGB array.
 
     Paths and Pillow images are converted to RGB. Numpy arrays are copied only
@@ -52,9 +72,11 @@ def load_image(image: ImageInput, color_order: str = "RGB") -> np.ndarray:
         except ImportError as exc:
             raise ImportError("Pillow is required to load image paths") from exc
         with Image.open(image) as pil_image:
-            return np.asarray(pil_image.convert("RGB"))
+            array = np.asarray(pil_image.convert("RGB"))
+        return limits.validate(array) if limits is not None else array
     if hasattr(image, "convert") and hasattr(image, "size"):
-        return np.asarray(image.convert("RGB"))
+        array = np.asarray(image.convert("RGB"))
+        return limits.validate(array) if limits is not None else array
     array = np.asarray(image)
     if array.ndim not in (2, 3):
         raise ValueError("image must have 2 or 3 dimensions")
@@ -67,7 +89,8 @@ def load_image(image: ImageInput, color_order: str = "RGB") -> np.ndarray:
         array = array[..., ::-1]
     elif color_order.upper() != "RGB":
         raise ValueError("color_order must be RGB or BGR")
-    return np.ascontiguousarray(array)
+    array = np.ascontiguousarray(array)
+    return limits.validate(array) if limits is not None else array
 
 
 def _normalise_output(
@@ -75,17 +98,7 @@ def _normalise_output(
 ) -> SemanticResult:
     """Adapt common backend return values to SemanticResult."""
     if isinstance(output, SemanticResult):
-        if timestamp is None:
-            return output
-        return SemanticResult(
-            depth=output.depth,
-            segmentation=output.segmentation,
-            detections=output.detections,
-            tags=output.tags,
-            embeddings=output.embeddings,
-            timestamp=timestamp,
-            metadata=output.metadata,
-        )
+        return output.with_timestamp(timestamp)
     if isinstance(output, Mapping):
         return SemanticResult(
             depth=output.get("depth"),
@@ -94,6 +107,14 @@ def _normalise_output(
             tags=output.get("tags"),
             embeddings=output.get("embeddings"),
             timestamp=timestamp,
+            ocr=output.get("ocr", output.get("text")),
+            caption=output.get("caption"),
+            scene=output.get("scene"),
+            events=output.get("events"),
+            keypoints=output.get("keypoints", output.get("poses")),
+            relations=output.get("relations"),
+            document=output.get("document"),
+            depth_map=output.get("depth_map"),
             metadata={
                 k: v
                 for k, v in output.items()
@@ -105,6 +126,16 @@ def _normalise_output(
                     "detections",
                     "tags",
                     "embeddings",
+                    "ocr",
+                    "text",
+                    "caption",
+                    "scene",
+                    "events",
+                    "keypoints",
+                    "poses",
+                    "relations",
+                    "document",
+                    "depth_map",
                 )
             },
         )
@@ -134,13 +165,19 @@ class Yase:
         extractor: Optional[Any] = None,
         model: str = "custom",
         color_order: str = "RGB",
+        input_limits: Optional[InputLimits] = None,
         **backend_options: Any,
     ) -> None:
-        if task not in ("depth", "segmentation", "both"):
-            raise ValueError("task must be 'depth', 'segmentation', or 'both'")
+        if task not in ("depth", "segmentation", "both", "semantic"):
+            raise ValueError(
+                "task must be 'depth', 'segmentation', 'both', or 'semantic'"
+            )
+        if color_order.upper() not in ("RGB", "BGR"):
+            raise ValueError("color_order must be RGB or BGR")
         self.task = task
         self.model = model
         self.color_order = color_order
+        self.input_limits = input_limits
         self._extractor = extractor
         self._backend_options = backend_options
 
@@ -151,10 +188,23 @@ class Yase:
                 from .backends import TorchScriptExtractor
 
                 self._extractor = TorchScriptExtractor(**self._backend_options)
+            elif self.model == "onnx":
+                from .backends import OnnxRuntimeExtractor
+
+                self._extractor = OnnxRuntimeExtractor(**self._backend_options)
+            elif self.model == "openvino":
+                from .runtimes import OpenVINOExtractor
+
+                self._extractor = OpenVINOExtractor(**self._backend_options)
+            elif self.model == "tensorrt":
+                from .runtimes import TensorRTExtractor
+
+                self._extractor = TensorRTExtractor(**self._backend_options)
             else:
                 raise ValueError(
                     "no backend is loaded by default; pass extractor=... or "
-                    'use model="torchscript" with model_path=...'
+                    'use model="torchscript", "onnx", "openvino", or "tensorrt" '
+                    "with a local artifact"
                 )
         return self._extractor
 
@@ -162,7 +212,7 @@ class Yase:
         self, image: ImageInput, timestamp: Optional[float] = None
     ) -> SemanticResult:
         """Extract semantics from one image."""
-        rgb = load_image(image, color_order=self.color_order)
+        rgb = load_image(image, color_order=self.color_order, limits=self.input_limits)
         backend = self.extractor
         if hasattr(backend, "extract"):
             output = backend.extract(rgb)
@@ -200,7 +250,10 @@ class Yase:
         backend = self.extractor
         if hasattr(backend, "extract_batch"):
             arrays = [
-                load_image(image, color_order=self.color_order) for image in items
+                load_image(
+                    image, color_order=self.color_order, limits=self.input_limits
+                )
+                for image in items
             ]
             try:
                 outputs = list(backend.extract_batch(arrays))
@@ -236,6 +289,42 @@ class Yase:
     ) -> SemanticResult:
         """Backward-compatible alias for extract."""
         return self.extract(input_data, timestamp=timestamp)
+
+    def extract_bundle(
+        self,
+        image: ImageInput,
+        timestamp: Optional[float] = None,
+        *,
+        frame_id: int = 0,
+        source_id: str = "default",
+        frame: Optional[Any] = None,
+        provenance: tuple = (),
+        uncertainty: Optional[Mapping[str, Any]] = None,
+        metadata: Optional[Mapping[str, Any]] = None,
+    ) -> Any:
+        """Extract one image and return a versioned observation bundle."""
+        from .observation import FrameRef, ObservationBundle
+
+        result = self.extract(image, timestamp=timestamp)
+        if frame is None:
+            array = load_image(
+                image, color_order=self.color_order, limits=self.input_limits
+            )
+            frame = FrameRef(
+                frame_id=frame_id,
+                source_id=source_id,
+                timestamp=result.timestamp,
+                width=array.shape[1],
+                height=array.shape[0],
+                color_order="RGB",
+            )
+        return ObservationBundle.from_result(
+            result,
+            frame=frame,
+            provenance=provenance,
+            uncertainty=uncertainty,
+            metadata=metadata,
+        )
 
     def __call__(
         self, image: ImageInput, timestamp: Optional[float] = None
