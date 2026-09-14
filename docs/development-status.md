@@ -326,6 +326,15 @@ Result: version 0.23.0, 103 deterministic tests passing before final validation.
 
 Result: version 0.24.0, 104 deterministic tests passing before final validation.
 
+## Cycle 30 — batch parallelism from CLI
+
+- [x] Expose `--max-workers` on the `extract` command.
+- [x] Preserve serial benchmark behavior for comparable latency reports.
+- [x] Reuse the same positive-integer validation as all CLI limits.
+- [x] Add parser coverage for the new execution control.
+
+Result: version 0.25.0, 104 deterministic tests passing before final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

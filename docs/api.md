@@ -12,6 +12,8 @@
   available. With error_policy=skip, failed positions contain None.
 - `extract_many(..., max_workers=N)` can run non-batch backends concurrently
   with bounded workers while preserving result order; the default is serial.
+- The `extract` CLI command exposes this as `--max-workers`; benchmark
+  execution remains serial by default for reproducible latency comparisons.
 - run_inference and __call__ are compatibility aliases.
 - extract_bundle(image, ...) returns an `ObservationBundle` that binds the
   result to a `FrameRef` and accepts explicit model provenance and uncertainty.

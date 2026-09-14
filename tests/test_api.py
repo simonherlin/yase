@@ -1730,6 +1730,8 @@ def test_cli_processing_commands_parse_input_limits():
             "640",
             "--max-bytes",
             "1000000",
+            "--max-workers",
+            "3",
         ]
     )
     limits = _input_limits(args)
@@ -1737,6 +1739,7 @@ def test_cli_processing_commands_parse_input_limits():
     assert limits.max_pixels == 10000
     assert limits.max_width == 640
     assert limits.max_bytes == 1000000
+    assert args.max_workers == 3
     with pytest.raises(SystemExit):
         _parser().parse_args(
             [

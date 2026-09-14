@@ -126,6 +126,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     extract.add_argument("--output", type=Path)
     extract.add_argument("--include-arrays", action="store_true")
+    extract.add_argument("--max-workers", type=_positive_int, default=1)
     _add_input_limits(extract)
     extract.set_defaults(handler=_extract)
 
@@ -239,7 +240,9 @@ def _extract(args: argparse.Namespace) -> int:
         model_path=args.model_path,
         input_limits=_input_limits(args),
     )
-    results = extractor.extract_many(discover_images(args.images))
+    results = extractor.extract_many(
+        discover_images(args.images), max_workers=args.max_workers
+    )
     valid = [result for result in results if result is not None]
     if args.output is not None:
         write_jsonl(valid, args.output, include_arrays=args.include_arrays)
