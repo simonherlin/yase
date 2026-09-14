@@ -1,3 +1,6 @@
+import sys
+from contextlib import contextmanager
+
 import numpy as np
 import pytest
 
@@ -424,3 +427,92 @@ def test_extract_many_rejects_wrong_native_batch_size():
 
     with pytest.raises(ValueError, match="one result"):
         Yase(extractor=BrokenBatch()).extract_many([np.zeros((1, 1, 3))])
+
+
+class BatchOnnxSession(FakeOnnxSession):
+    def run(self, names, inputs):
+        self.calls.append((names, inputs))
+        batch = inputs["pixels"].shape[0]
+        return [np.arange(batch, dtype=np.float32)[:, None, None, None]]
+
+
+def test_onnx_extract_batch_uses_one_call_and_preserves_order():
+    session = BatchOnnxSession([])
+    backend = OnnxRuntimeExtractor("unused.onnx", session=session)
+    images = [np.full((2, 3, 3), value, dtype=np.uint8) for value in (1, 2, 3)]
+    results = backend.extract_batch(images)
+    assert len(session.calls) == 1
+    assert session.calls[0][1]["pixels"].shape == (3, 3, 2, 3)
+    assert [float(item.depth.flat[0]) for item in results] == [0.0, 1.0, 2.0]
+
+
+def test_onnx_batch_rejects_mismatched_shapes_without_resize():
+    backend = OnnxRuntimeExtractor("unused.onnx", session=FakeOnnxSession([]))
+    images = [np.zeros((2, 2, 3), dtype=np.uint8), np.zeros((3, 2, 3), dtype=np.uint8)]
+    with pytest.raises(ValueError, match="same shape"):
+        backend.extract_batch(images)
+
+
+def test_torchscript_batch_uses_one_model_call(monkeypatch):
+    class Tensor:
+        def __init__(self, value):
+            self.value = np.asarray(value)
+
+        def permute(self, *order):
+            return Tensor(self.value.transpose(order))
+
+        def to(self, _device):
+            return self
+
+        def detach(self):
+            return self
+
+        def cpu(self):
+            return self
+
+        def numpy(self):
+            return self.value
+
+    class Model:
+        def __init__(self):
+            self.calls = 0
+
+        def eval(self):
+            return self
+
+        def __call__(self, tensor):
+            self.calls += 1
+            return Tensor(np.zeros((tensor.value.shape[0], 1, 2, 2)))
+
+    model = Model()
+    from types import SimpleNamespace
+
+    fake_cuda = SimpleNamespace(is_available=lambda: False)
+    fake_jit = SimpleNamespace(load=lambda *args, **kwargs: model)
+    fake_functional = SimpleNamespace(interpolate=lambda tensor, **kwargs: tensor)
+    fake_nn = SimpleNamespace(functional=fake_functional)
+
+    class FakeTorch:
+        cuda = fake_cuda
+        jit = fake_jit
+        nn = fake_nn
+        device = staticmethod(lambda name: name)
+        from_numpy = staticmethod(Tensor)
+
+        @staticmethod
+        @contextmanager
+        def inference_mode():
+            yield
+
+    monkeypatch.setitem(sys.modules, "torch", FakeTorch)
+    from yase.backends import TorchScriptExtractor
+
+    backend = TorchScriptExtractor("local.pt", size=(2, 2))
+    results = backend.extract_batch(
+        [
+            np.zeros((2, 2, 3), dtype=np.uint8),
+            np.ones((2, 2, 3), dtype=np.uint8),
+        ]
+    )
+    assert len(results) == 2 and model.calls == 1
+    assert results[0].depth.shape == (2, 2)

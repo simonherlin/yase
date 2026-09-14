@@ -52,6 +52,10 @@ class TorchScriptExtractor:
         task: str = "depth",
         size: Optional[tuple] = None,
     ) -> None:
+        if task not in ("depth", "segmentation", "both"):
+            raise ValueError("task must be depth, segmentation, or both")
+        if size is not None and (len(size) != 2 or size[0] <= 0 or size[1] <= 0):
+            raise ValueError("size must be a positive (width, height) pair")
         try:
             import torch
         except ImportError as exc:
@@ -66,22 +70,51 @@ class TorchScriptExtractor:
         self.task = task
         self.size = size
 
-    def extract(self, image: Any) -> SemanticResult:
+    def _prepare_batch(self, images: Sequence[Any]) -> Any:
         torch = self._torch
-        array = load_image(image).astype(np.float32) / 255.0
-        tensor = torch.from_numpy(array).permute(2, 0, 1).unsqueeze(0).to(self.device)
+        arrays = [load_image(image).astype(np.float32) / 255.0 for image in images]
+        if not arrays:
+            raise ValueError("extract_batch requires at least one image")
+        if self.size is None and len({array.shape for array in arrays}) != 1:
+            raise ValueError("images must have the same shape when size is None")
+        tensor = torch.from_numpy(np.stack(arrays)).permute(0, 3, 1, 2).to(self.device)
         if self.size is not None:
+            width, height = self.size
             tensor = torch.nn.functional.interpolate(
-                tensor, size=self.size, mode="bilinear", align_corners=False
+                tensor, size=(height, width), mode="bilinear", align_corners=False
             )
-        with torch.inference_mode():
-            output = self.model(tensor)
+        return tensor
+
+    def _results_from_output(self, output: Any) -> list[SemanticResult]:
         if isinstance(output, (tuple, list)):
-            output = output[0]
-        result = output.detach().cpu().numpy().squeeze()
-        if self.task == "segmentation":
-            return SemanticResult(segmentation=result)
-        return SemanticResult(depth=result)
+            if self.task == "both" and len(output) < 2:
+                raise ValueError("both task requires at least two model outputs")
+            outputs = [value.detach().cpu().numpy() for value in output]
+        else:
+            outputs = [output.detach().cpu().numpy()]
+        results = []
+        for index in range(outputs[0].shape[0]):
+            values = [value[index] for value in outputs]
+            if self.task == "segmentation":
+                results.append(SemanticResult(segmentation=values[0].squeeze()))
+            elif self.task == "both":
+                results.append(
+                    SemanticResult(
+                        depth=values[0].squeeze(), segmentation=values[1].squeeze()
+                    )
+                )
+            else:
+                results.append(SemanticResult(depth=values[0].squeeze()))
+        return results
+
+    def extract(self, image: Any) -> SemanticResult:
+        return self.extract_batch([image])[0]
+
+    def extract_batch(self, images: Sequence[Any]) -> list[SemanticResult]:
+        """Run one model call for an ordered batch of images."""
+        with self._torch.inference_mode():
+            output = self.model(self._prepare_batch(images))
+        return self._results_from_output(output)
 
 
 class OnnxRuntimeExtractor:
@@ -124,7 +157,7 @@ class OnnxRuntimeExtractor:
         self.input_name = input_name or inputs[0].name
         self.output_names = list(output_names) if output_names is not None else None
 
-    def _prepare(self, image: Any) -> np.ndarray:
+    def _prepare_image(self, image: Any) -> np.ndarray:
         array = load_image(image).astype(np.float32)
         if self.size is not None:
             from PIL import Image
@@ -135,8 +168,19 @@ class OnnxRuntimeExtractor:
                     (width, height), Image.Resampling.BILINEAR
                 )
             )
-        array = array.astype(np.float32, copy=False) / np.float32(255.0)
+        return array.astype(np.float32, copy=False) / np.float32(255.0)
+
+    def _prepare(self, image: Any) -> np.ndarray:
+        array = self._prepare_image(image)
         return np.ascontiguousarray(array.transpose(2, 0, 1)[None, ...])
+
+    def _prepare_batch(self, images: Sequence[Any]) -> np.ndarray:
+        arrays = [self._prepare_image(image) for image in images]
+        if not arrays:
+            raise ValueError("extract_batch requires at least one image")
+        if self.size is None and len({array.shape for array in arrays}) != 1:
+            raise ValueError("images must have the same shape when size is None")
+        return np.ascontiguousarray(np.stack(arrays, axis=0).transpose(0, 3, 1, 2))
 
     @staticmethod
     def _without_batch(output: Any) -> np.ndarray:
@@ -145,19 +189,34 @@ class OnnxRuntimeExtractor:
             value = value[0]
         return value
 
-    def extract(self, image: Any) -> SemanticResult:
-        tensor = self._prepare(image)
-        outputs = self.session.run(self.output_names, {self.input_name: tensor})
+    def _results_from_outputs(self, outputs: Any) -> list[SemanticResult]:
         if not outputs:
             raise ValueError("ONNX session returned no outputs")
         if self.task == "both" and len(outputs) < 2:
             raise ValueError("both task requires at least two ONNX outputs")
-        values = [self._without_batch(output) for output in outputs]
-        if self.task == "depth":
-            return SemanticResult(depth=values[0])
-        if self.task == "segmentation":
-            return SemanticResult(segmentation=values[0])
-        return SemanticResult(depth=values[0], segmentation=values[1])
+        batch_size = np.asarray(outputs[0]).shape[0]
+        if batch_size < 1:
+            raise ValueError("ONNX output batch is empty")
+        values = [np.asarray(output) for output in outputs]
+        results = []
+        for index in range(batch_size):
+            fields = [self._without_batch(value[index : index + 1]) for value in values]
+            if self.task == "depth":
+                results.append(SemanticResult(depth=fields[0]))
+            elif self.task == "segmentation":
+                results.append(SemanticResult(segmentation=fields[0]))
+            else:
+                results.append(SemanticResult(depth=fields[0], segmentation=fields[1]))
+        return results
+
+    def extract(self, image: Any) -> SemanticResult:
+        return self.extract_batch([image])[0]
+
+    def extract_batch(self, images: Sequence[Any]) -> list[SemanticResult]:
+        """Run one ONNX session call for an ordered batch of images."""
+        tensor = self._prepare_batch(images)
+        outputs = self.session.run(self.output_names, {self.input_name: tensor})
+        return self._results_from_outputs(outputs)
 
 
 class CompositeExtractor:
