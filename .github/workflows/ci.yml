@@ -1,0 +1,57 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: latest
+          python-version: ${{ matrix.python-version }}
+      - run: uv sync --dev
+      - run: uv run ruff check src tests
+      - run: uv run ruff format --check src tests
+      - run: uv run pytest -q
+
+  release:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: latest
+          python-version: "3.11"
+      - run: uv sync --dev
+      - run: uv run python -m build --sdist --wheel
+      - name: Verify package artifacts
+        run: |
+          uv run python - <<'PY'
+          import pathlib
+          import zipfile
+
+          artifacts = sorted(pathlib.Path("dist").iterdir())
+          assert any(path.suffix == ".whl" for path in artifacts)
+          assert any(path.suffix == ".gz" for path in artifacts)
+          wheel = next(path for path in artifacts if path.suffix == ".whl")
+          with zipfile.ZipFile(wheel) as archive:
+              names = set(archive.namelist())
+          required = {
+              "yase/__init__.py",
+              "yase/cli.py",
+              "yase/limits.py",
+              "yase/observability.py",
+          }
+          missing = required - names
+          assert not missing, sorted(missing)
+          PY
+      - run: uv run yase diagnostics --require numpy

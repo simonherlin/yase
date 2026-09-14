@@ -281,6 +281,15 @@ Result: version 0.19.0, 99 deterministic tests passing before final validation.
 
 Result: version 0.20.0, 100 deterministic tests passing before final validation.
 
+## Cycle 25 — release artifact validation
+
+- [x] Validate sdist and wheel creation locally for version `0.20.0`.
+- [x] Verify critical public modules are included in the wheel.
+- [x] Add a CI release job with artifact and diagnostics smoke checks.
+
+Result: release checks pass locally; CI now gates publication-shaped artifacts
+on the full test matrix.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full
