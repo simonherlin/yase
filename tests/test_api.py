@@ -62,6 +62,7 @@ from yase import (
     Relation,
     RFDETRExtractor,
     RuntimeInfo,
+    RuntimeMetrics,
     SchedulerConfig,
     SchedulerError,
     SemanticEvent,
@@ -1755,6 +1756,35 @@ def test_scheduler_runs_independent_stages_in_parallel_with_stable_report_order(
     assert [stage.name for stage in report.stages] == ["caption", "tags"]
     with pytest.raises(ValueError, match="positive integer"):
         SchedulerConfig(max_workers=0)
+
+
+def test_scheduler_metrics_are_thread_safe_and_prometheus_compatible():
+    metrics = RuntimeMetrics(namespace="demo")
+    scheduler = ObservationScheduler(
+        [
+            PipelineStage(
+                "tags",
+                lambda image: {"tags": ["outdoor"]},
+                spec=StageSpec("tags", provides=("tags",)),
+            )
+        ],
+        config=SchedulerConfig(cache_size=0),
+        metrics=metrics,
+    )
+    scheduler.run(np.zeros((1, 1, 3), dtype=np.uint8))
+    snapshot = metrics.snapshot()
+    exposition = metrics.prometheus_text()
+    assert snapshot["runs"] == 1
+    assert snapshot["stage_counts"] == {"tags:completed": 1}
+    assert (
+        'demo_scheduler_stage_executions_total{stage="tags",status="completed"} 1'
+        in exposition
+    )
+    assert "demo_scheduler_elapsed_seconds_count 1" in exposition
+    with pytest.raises(ValueError, match="namespace"):
+        RuntimeMetrics(namespace="not-valid")
+    with pytest.raises(ValueError, match="namespace"):
+        RuntimeMetrics(namespace="123metrics")
 
 
 def test_scheduler_handles_optional_failures_and_cancellation():

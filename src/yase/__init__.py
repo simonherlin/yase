@@ -74,6 +74,7 @@ from .metrics import (
 )
 from .models import ModelCard, ModelCatalog, default_model_catalog
 from .normalization import normalise_detections
+from .observability import RuntimeMetrics
 from .observation import (
     EmbeddingRecord,
     FrameRef,
@@ -124,7 +125,7 @@ from .video import (
     process_video,
 )
 
-__version__ = "0.19.0"
+__version__ = "0.20.0"
 
 __all__ = [
     "CallableExtractor",
@@ -182,6 +183,7 @@ __all__ = [
     "QueueSink",
     "Relation",
     "RuntimeInfo",
+    "RuntimeMetrics",
     "RFDETRExtractor",
     "SearchHit",
     "SemanticEvent",

@@ -85,6 +85,11 @@ provides backpressure; `on_full="drop"` preserves the producer and increments
 `dropped` for realtime applications where freshness is more important than
 completeness.
 
+`RuntimeMetrics` is a thread-safe, dependency-free collector. Pass
+`metrics=RuntimeMetrics()` to `ObservationScheduler` and expose
+`prometheus_text()` from the host service; it tracks run totals, cache hits,
+per-stage status counts, and duration summaries.
+
 ## Backends
 
 CallableExtractor wraps a Python callable. CompositeExtractor combines named

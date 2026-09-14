@@ -272,6 +272,15 @@ Result: version 0.18.0, 98 deterministic tests passing before final validation.
 
 Result: version 0.19.0, 99 deterministic tests passing before final validation.
 
+## Cycle 24 — dependency-free runtime observability
+
+- [x] Add thread-safe `RuntimeMetrics` with bounded in-process state.
+- [x] Integrate scheduler reports without making Prometheus mandatory.
+- [x] Export counters and duration summaries in Prometheus text format.
+- [x] Add snapshot and exposition regression tests.
+
+Result: version 0.20.0, 100 deterministic tests passing before final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

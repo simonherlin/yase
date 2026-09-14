@@ -21,6 +21,7 @@ import numpy as np
 from .backends import CompositeExtractor
 from .core import ImageInput, SemanticResult, load_image
 from .errors import SchedulerError, StageCancelled
+from .observability import RuntimeMetrics
 from .observation import FrameRef
 from .serialization import _json_value
 from .stages import StageContext, StageSpec
@@ -116,6 +117,7 @@ class ObservationScheduler:
         *,
         config: Optional[SchedulerConfig] = None,
         on_stage: Optional[Callable[[StageExecution], None]] = None,
+        metrics: Optional[RuntimeMetrics] = None,
         initial_fields: Sequence[str] = ("image", "frame"),
     ) -> None:
         items = list(stages)
@@ -124,6 +126,7 @@ class ObservationScheduler:
         self.stages = tuple(items)
         self.config = config or SchedulerConfig()
         self.on_stage = on_stage
+        self.metrics = metrics
         self.initial_fields = frozenset(("image", "frame", *initial_fields))
         self._cache: OrderedDict[tuple, Any] = OrderedDict()
         self._plan = self._build_plan()
@@ -264,12 +267,15 @@ class ObservationScheduler:
                 continue
             self._record(executions, execution)
 
-        return SchedulerReport(
+        report = SchedulerReport(
             fields=fields,
             stages=tuple(executions),
             elapsed_seconds=time.perf_counter() - started,
             cache_hits=cache_hits,
         )
+        if self.metrics is not None:
+            self.metrics.record_report(report)
+        return report
 
     def _run_parallel(
         self,
@@ -432,12 +438,15 @@ class ObservationScheduler:
                                 f"stage '{stage.name}' failed: {exc}"
                             ) from exc
 
-        return SchedulerReport(
+        report = SchedulerReport(
             fields=fields,
             stages=tuple(executions),
             elapsed_seconds=time.perf_counter() - started,
             cache_hits=cache_hits,
         )
+        if self.metrics is not None:
+            self.metrics.record_report(report)
+        return report
 
     async def arun(self, image: ImageInput, **kwargs: Any) -> SchedulerReport:
         """Run without blocking an async event loop.
