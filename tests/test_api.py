@@ -1359,6 +1359,22 @@ def test_extract_many_fallback_skip_and_error_callback():
     assert recovered[1] is replacement
 
 
+def test_extract_many_can_parallelize_callable_backends_in_input_order():
+    barrier = Barrier(2)
+
+    class ParallelBackend:
+        def __call__(self, image):
+            barrier.wait(timeout=2)
+            return image[..., 0]
+
+    api = Yase(extractor=ParallelBackend())
+    image = np.zeros((2, 2, 3), dtype=np.uint8)
+    results = api.extract_many([image, image], max_workers=2)
+    assert [result.depth.shape for result in results] == [(2, 2), (2, 2)]
+    with pytest.raises(ValueError, match="positive integer"):
+        api.extract_many([image], max_workers=0)
+
+
 def test_extract_many_rejects_wrong_native_batch_size():
     class BrokenBatch:
         def extract_batch(self, images):

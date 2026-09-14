@@ -5,6 +5,7 @@ weights or requires PyTorch.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable, Optional, Protocol, Union
@@ -232,6 +233,7 @@ class Yase:
         timestamps: Optional[Sequence[Optional[float]]] = None,
         error_policy: str = "raise",
         on_error: Optional[Callable[[Exception, int], Optional[SemanticResult]]] = None,
+        max_workers: int = 1,
     ) -> list[Optional[SemanticResult]]:
         """Extract an ordered batch of images.
 
@@ -242,6 +244,12 @@ class Yase:
         """
         if error_policy not in ("raise", "skip"):
             raise ValueError("error_policy must be raise or skip")
+        if (
+            isinstance(max_workers, bool)
+            or not isinstance(max_workers, int)
+            or max_workers < 1
+        ):
+            raise ValueError("max_workers must be a positive integer")
         items = list(images)
         stamps = [None] * len(items) if timestamps is None else list(timestamps)
         if len(stamps) != len(items):
@@ -271,18 +279,30 @@ class Yase:
                 if not hasattr(backend, "extract") and not callable(backend):
                     return [None] * len(items)
 
-        results: list[Optional[SemanticResult]] = []
-        for index, (image, timestamp) in enumerate(zip(items, stamps)):
+        def recover(
+            index: int, image: ImageInput, timestamp: Optional[float]
+        ) -> Optional[SemanticResult]:
             try:
-                results.append(self.extract(image, timestamp=timestamp))
+                return self.extract(image, timestamp=timestamp)
             except Exception as exc:
                 if on_error is not None:
-                    results.append(on_error(exc, index))
+                    return on_error(exc, index)
                 elif error_policy == "skip":
-                    results.append(None)
+                    return None
                 else:
                     raise
-        return results
+
+        if max_workers == 1:
+            return [
+                recover(index, image, timestamp)
+                for index, (image, timestamp) in enumerate(zip(items, stamps))
+            ]
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [
+                executor.submit(recover, index, image, timestamp)
+                for index, (image, timestamp) in enumerate(zip(items, stamps))
+            ]
+            return [future.result() for future in futures]
 
     def run_inference(
         self, input_data: ImageInput, timestamp: Optional[float] = None

@@ -317,6 +317,15 @@ Result: version 0.22.0, 102 deterministic tests passing before final validation.
 
 Result: version 0.23.0, 103 deterministic tests passing before final validation.
 
+## Cycle 29 — bounded generic batch parallelism
+
+- [x] Add opt-in `Yase.extract_many(max_workers=N)` for non-batch backends.
+- [x] Preserve input order, timestamps, input limits, and error callbacks.
+- [x] Keep native `extract_batch` backends on their optimized path.
+- [x] Add a barrier-based concurrency regression test.
+
+Result: version 0.24.0, 104 deterministic tests passing before final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

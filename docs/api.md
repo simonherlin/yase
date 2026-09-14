@@ -10,6 +10,8 @@
 - extract_many(images, timestamps=None, error_policy=raise, on_error=None)
   preserves input order and uses a backend's native extract_batch method when
   available. With error_policy=skip, failed positions contain None.
+- `extract_many(..., max_workers=N)` can run non-batch backends concurrently
+  with bounded workers while preserving result order; the default is serial.
 - run_inference and __call__ are compatibility aliases.
 - extract_bundle(image, ...) returns an `ObservationBundle` that binds the
   result to a `FrameRef` and accepts explicit model provenance and uncertainty.

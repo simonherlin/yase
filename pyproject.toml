@@ -1,6 +1,6 @@
 [project]
 name = "yase"
-version = "0.23.0"
+version = "0.24.0"
 description = "Dependency-light semantic extraction for images and real-time video."
 readme = "README.md"
 requires-python = ">=3.9"
