@@ -2940,7 +2940,50 @@ def test_runtime_diagnostics_are_lazy_and_machine_readable():
     assert degraded.to_dict()["checks"]["extractor_interface"] is False
 
 
-def test_runtime_diagnostics_can_probe_optional_providers():
+def test_runtime_diagnostics_can_probe_optional_providers(monkeypatch):
+    class FakeOpenVINOCore:
+        available_devices = ["CPU"]
+
+        def get_property(self, _device, _name):
+            return "fake CPU"
+
+    class FakeCuda:
+        @staticmethod
+        def is_available():
+            return False
+
+    monkeypatch.setitem(
+        sys.modules,
+        "onnxruntime",
+        type(
+            "FakeONNXRuntime",
+            (),
+            {
+                "__version__": "test",
+                "get_available_providers": staticmethod(
+                    lambda: ["CPUExecutionProvider"]
+                ),
+            },
+        ),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "openvino",
+        type(
+            "FakeOpenVINO",
+            (),
+            {
+                "Core": FakeOpenVINOCore,
+                "get_version": staticmethod(lambda: "test"),
+            },
+        ),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "torch",
+        type("FakeTorch", (), {"__version__": "test", "cuda": FakeCuda}),
+    )
+    monkeypatch.setitem(sys.modules, "tensorrt", type("FakeTensorRT", (), {}))
     runtime = collect_runtime_info(
         optional_packages=("package_that_is_missing",), probe_providers=True
     )
