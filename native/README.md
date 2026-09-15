@@ -14,3 +14,8 @@ non-maximum suppression used by detector post-processing. `iou_matrix()` and
 and generic Python wheel remain portable when no compiler is available. The
 compiled artifact is intentionally not copied into a `py3-none-any` wheel:
 native wheels must be built with platform- and Python-ABI-specific tooling.
+
+The builder needs the matching Python development headers (`Python.h`). On
+Ubuntu install `python3-dev` or the exact interpreter package such as
+`python3.12-dev`. For non-system interpreters, set
+`YASE_PYTHON_INCLUDE_DIR` to the directory containing `Python.h`.
