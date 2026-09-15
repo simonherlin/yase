@@ -2754,6 +2754,51 @@ def test_openvino_extractor_uses_injected_compiled_model():
     assert results[0].metadata["backend"] == "openvino"
 
 
+def test_openvino_extractor_passes_compile_config_and_cache_dir(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    class Port:
+        def get_any_name(self):
+            return "pixels"
+
+    class CompiledModel:
+        inputs = [Port()]
+
+        def __call__(self, inputs):
+            tensor = next(iter(inputs.values()))
+            return {"depth": np.zeros((tensor.shape[0], 1, 1), dtype=np.float32)}
+
+    class Core:
+        def __init__(self):
+            self.calls = []
+
+        def compile_model(self, path, device, config):
+            self.calls.append((path, device, config))
+            return CompiledModel()
+
+    core = Core()
+    monkeypatch.setitem(sys.modules, "openvino", SimpleNamespace(Core=lambda: core))
+    backend = OpenVINOExtractor(
+        "model.xml",
+        device="GPU",
+        core=core,
+        compile_config={"PERFORMANCE_HINT": "LATENCY"},
+        cache_dir=tmp_path / "ov-cache",
+    )
+    assert core.calls == [
+        (
+            "model.xml",
+            "GPU",
+            {
+                "PERFORMANCE_HINT": "LATENCY",
+                "CACHE_DIR": str(tmp_path / "ov-cache"),
+            },
+        )
+    ]
+    result = backend.extract(np.zeros((1, 1, 3), dtype=np.uint8))
+    assert result.metadata["compile_config"]["CACHE_DIR"] == str(tmp_path / "ov-cache")
+
+
 def test_openvino_extractor_uses_async_queue_and_restores_input_order():
     class Port:
         def get_any_name(self):

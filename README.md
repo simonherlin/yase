@@ -167,7 +167,12 @@ native execution-context path or a custom runner managed by the application:
 ~~~python
 from yase import OpenVINOExtractor, TensorRTContextPool, TensorRTExtractor
 
-depth = OpenVINOExtractor("model.xml", device="AUTO").extract("photo.jpg")
+depth = OpenVINOExtractor(
+    "model.xml",
+    device="AUTO",
+    compile_config={"PERFORMANCE_HINT": "LATENCY"},
+    cache_dir=".yase-openvino-cache",
+).extract("photo.jpg")
 depth = TensorRTExtractor("model.plan").extract("photo.jpg")
 
 # Independent contexts for concurrent latency-sensitive inference:

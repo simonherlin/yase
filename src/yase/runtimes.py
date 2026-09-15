@@ -105,6 +105,8 @@ class OpenVINOExtractor:
         async_jobs: int = 0,
         record_timings: bool = False,
         cache: RuntimeCache[Any] | None = None,
+        compile_config: Mapping[str, Any] | None = None,
+        cache_dir: str | Path | None = None,
     ) -> None:
         _validate_options(task, size)
         if compiled_model is None and model_path is None:
@@ -117,6 +119,8 @@ class OpenVINOExtractor:
             raise ValueError("async_jobs must be a non-negative integer")
         if not isinstance(record_timings, bool):
             raise TypeError("record_timings must be a boolean")
+        if compile_config is not None and not isinstance(compile_config, Mapping):
+            raise TypeError("compile_config must be a mapping")
         self.model_path = str(model_path) if model_path is not None else None
         self.device = device
         self.task = task
@@ -126,6 +130,10 @@ class OpenVINOExtractor:
         self.async_jobs = async_jobs
         self.record_timings = record_timings
         self.cache = cache
+        self.compile_config = dict(compile_config or {})
+        self.cache_dir = str(cache_dir) if cache_dir is not None else None
+        if self.cache_dir is not None:
+            self.compile_config["CACHE_DIR"] = self.cache_dir
         self.output_names = tuple(output_names) if output_names is not None else None
         if compiled_model is None:
             try:
@@ -137,9 +145,15 @@ class OpenVINOExtractor:
             runtime_core = core or ov.Core()
 
             def compile_model() -> Any:
+                if self.compile_config:
+                    return runtime_core.compile_model(
+                        self.model_path, device, self.compile_config
+                    )
                 return runtime_core.compile_model(self.model_path, device)
 
-            cache_key = freeze_cache_key(("openvino", self.model_path, device))
+            cache_key = freeze_cache_key(
+                ("openvino", self.model_path, device, self.compile_config)
+            )
             compiled_model = (
                 cache.get_or_create(cache_key, compile_model)
                 if cache is not None
@@ -214,6 +228,7 @@ class OpenVINOExtractor:
                 "model_path": self.model_path,
                 "device": self.device,
                 "task": self.task,
+                "compile_config": dict(self.compile_config),
             },
             self.record_timings,
             {
