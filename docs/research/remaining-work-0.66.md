@@ -79,6 +79,11 @@ réel sur les petites listes.
    multimodal.
 5. Packs de modèles versionnés avec licences et benchmarks publiés.
 
+Le benchmark `benchmarks/native.py` couvre désormais la comparaison native /
+fallback des kernels locaux. Il reste à instrumenter les runtimes complets,
+car leur latence dépend du modèle, de la résolution, du provider et du
+matériel.
+
 ## Ce qui ne doit pas être fait maintenant
 
 - Ajouter tous les modèles disponibles sans contrat de sortie ou politique de

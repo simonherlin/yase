@@ -75,6 +75,12 @@ For repeatable local measurements, `yase benchmark image-*.jpg --model onnx
 Use `yase models` to inspect supported model families and license notes without
 loading or downloading any weights.
 
+To measure the optional local C++ kernels independently from model inference,
+run `uv run python benchmarks/native.py --boxes 256 --iterations 10`. The
+benchmark reports IoU and NMS latency for both implementations when the native
+extension is installed; it is intentionally a diagnostic, not a claim about
+end-to-end model speed.
+
 Detector outputs from external runtimes can be made framework-neutral with
 `normalise_detections()`, and local model files can be checked with
 `inspect_artifact()`/`verify_artifact()` before deployment.

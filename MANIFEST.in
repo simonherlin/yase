@@ -4,4 +4,5 @@ include tools/build_native.py tools/build_package.py tools/runtime_smoke.py
 recursive-include src/yase *.py py.typed
 recursive-include tests *.py
 recursive-include examples *.py
+recursive-include benchmarks *.py
 recursive-include docs *.md
