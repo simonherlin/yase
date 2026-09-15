@@ -4,6 +4,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Optional
 
+from .native import iou_matrix
 from .schema import BoundingBox, Detection
 
 
@@ -69,15 +70,22 @@ class IoUTracker:
         del timestamp  # Reserved for motion-aware trackers with the same API.
         current = list(detections or [])
         candidates = set(self._tracks)
+        track_ids = list(candidates)
+        overlaps = iou_matrix(
+            [self._tracks[track_id].box for track_id in track_ids],
+            [detection.box for detection in current],
+        )
         assigned: list[Detection] = []
-        for detection in current:
+        for detection_index, detection in enumerate(current):
             best_id: Optional[int] = None
             best_iou = self.iou_threshold
-            for track_id in candidates:
+            for track_index, track_id in enumerate(track_ids):
+                if track_id not in candidates:
+                    continue
                 state = self._tracks[track_id]
                 if self.class_aware and state.label != detection.label:
                     continue
-                score = box_iou(state.box, detection.box)
+                score = overlaps[track_index][detection_index]
                 if score >= best_iou:
                     best_iou = score
                     best_id = track_id

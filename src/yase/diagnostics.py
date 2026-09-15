@@ -69,6 +69,7 @@ def collect_runtime_info(
         "torch",
         "transformers",
         "paddleocr",
+        "yase._native",
     ),
 ) -> RuntimeInfo:
     """Inspect installed capabilities without importing heavy packages."""

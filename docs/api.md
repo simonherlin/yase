@@ -103,6 +103,10 @@ extraction attempts, failures, and latency summaries.
 Direct `CallableExtractor`, TorchScript, ONNX Runtime, OpenVINO, and TensorRT
 adapters also accept `input_limits=InputLimits(...)`.
 
+`yase.native.iou_matrix()` uses the compiled C++17 extension when available
+and transparently falls back to Python. Run `make native` to build it in place;
+`RuntimeInfo.optional_packages["yase._native"]` reports availability.
+
 `BackendRegistry.discover_entry_points()` explicitly loads third-party
 factories from the `yase.backends` entry-point group. Use
 `default_registry(include_plugins=True)` when plugin discovery is desired;

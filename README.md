@@ -19,6 +19,9 @@ uv sync --extra transformers
 uv sync --extra ocr
 # Optional OpenVINO runtime:
 uv sync --extra openvino
+
+# Optional C++17 tracking acceleration (requires g++ or clang++):
+make native
 ~~~
 
 The package can also be installed from a built wheel with

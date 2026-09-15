@@ -1,9 +1,9 @@
 PROJECT_NAME := yase
 
-.PHONY: help sync test lint format build check clean
+.PHONY: help sync test lint format native build check clean
 
 help:
-	@echo "Targets: sync test lint format build check clean"
+	@echo "Targets: sync test lint format native build check clean"
 
 sync:
 	uv sync --dev
@@ -16,6 +16,9 @@ lint:
 
 format:
 	uv run ruff format src tests
+
+native:
+	uv run python tools/build_native.py
 
 build:
 	uv build

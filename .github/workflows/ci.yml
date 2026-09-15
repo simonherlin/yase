@@ -55,3 +55,15 @@ jobs:
           assert not missing, sorted(missing)
           PY
       - run: uv run yase diagnostics --require numpy
+
+  native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: latest
+          python-version: "3.11"
+      - run: uv sync --dev
+      - run: uv run python tools/build_native.py
+      - run: uv run pytest -q -k "iou_matrix or tracking"

@@ -563,6 +563,21 @@ def test_iou_tracker_keeps_ids_and_expires_missing_tracks():
     assert not tracker.active_ids
 
 
+def test_iou_matrix_has_a_portable_fallback_and_native_contract():
+    import yase.native as native
+
+    values = native.iou_matrix([(0, 0, 2, 2)], [(1, 1, 3, 3)])
+    assert values[0][0] == pytest.approx(1 / 7)
+    assert isinstance(native.NATIVE_AVAILABLE, bool)
+    compiled = native._native_iou_matrix
+    native._native_iou_matrix = None
+    try:
+        fallback = native.iou_matrix([(0, 0, 2, 2)], [(1, 1, 3, 3)])
+    finally:
+        native._native_iou_matrix = compiled
+    assert fallback[0][0] == pytest.approx(1 / 7)
+
+
 def test_presence_event_engine_emits_enter_and_exit():
     engine = EventEngine([PresenceRule("person", enter_frames=2, exit_frames=2)])
     detection = Detection("person", 0.9, (0, 0, 10, 10), track_id=3)
