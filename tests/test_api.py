@@ -598,6 +598,18 @@ def test_nms_indices_is_class_aware_and_has_a_portable_fallback():
         nms_indices(boxes, scores[:2])
 
 
+def test_nms_indices_handles_empty_and_deterministic_boundary_cases():
+    assert nms_indices([], []) == []
+    overlapping = [(0, 0, 2, 2), (0, 0, 2, 2)]
+    assert nms_indices(overlapping, [0.5, 0.5], 0.5) == [0]
+    assert nms_indices(overlapping, [0.5, 0.5], 0.5, [1, 2]) == [0, 1]
+    assert nms_indices([(0, 0, 1, 1)], [0.5], 0.0) == [0]
+    with pytest.raises(ValueError, match="iou_threshold"):
+        nms_indices([], [], -0.1)
+    with pytest.raises(ValueError, match="class_ids"):
+        nms_indices([], [], class_ids=[1])
+
+
 def test_typed_non_maximum_suppression_preserves_detection_payload():
     first = Detection(
         "person", 0.8, (0, 0, 10, 10), track_id=7, attributes={"source": "a"}
