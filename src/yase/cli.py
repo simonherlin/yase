@@ -93,6 +93,10 @@ def _add_model_options(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="fail if requested ONNX providers are not active instead of falling back",
     )
+    parser.add_argument(
+        "--device",
+        help="runtime device for TorchScript/OpenVINO/TensorRT (e.g. CPU, GPU, cuda)",
+    )
 
 
 def _input_limits(args: argparse.Namespace) -> InputLimits | None:
@@ -245,6 +249,12 @@ def _make_extractor(args: argparse.Namespace) -> Yase:
             raise ValueError("--strict-providers requires at least one --provider")
         options["providers"] = args.provider
         options["strict_providers"] = args.strict_providers
+    if args.device:
+        if args.model not in {"torchscript", "openvino", "tensorrt"}:
+            raise ValueError(
+                "--device is supported with --model torchscript, openvino, or tensorrt"
+            )
+        options["device"] = args.device
     if args.model in _LOCAL_ARTIFACT_MODELS:
         if not args.model_path:
             raise ValueError(f"--model-path is required for {args.model}")

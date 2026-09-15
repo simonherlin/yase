@@ -3464,6 +3464,19 @@ def test_cli_processing_commands_parse_input_limits():
     configured = _make_extractor(onnx)
     assert configured._backend_options["providers"] == ["CUDAExecutionProvider"]
     assert configured._backend_options["strict_providers"] is True
+    openvino = _parser().parse_args(
+        [
+            "extract",
+            "frame.jpg",
+            "--model",
+            "openvino",
+            "--model-path",
+            "model.xml",
+            "--device",
+            "GPU",
+        ]
+    )
+    assert _make_extractor(openvino)._backend_options["device"] == "GPU"
     video = _parser().parse_args(
         [
             "video",
@@ -3478,6 +3491,10 @@ def test_cli_processing_commands_parse_input_limits():
     )
     assert video.batch_size == 8
     with pytest.raises(ValueError, match="require --model onnx"):
+        _make_extractor(modern)
+    modern.provider = []
+    modern.device = "GPU"
+    with pytest.raises(ValueError, match="--device is supported"):
         _make_extractor(modern)
     with pytest.raises(SystemExit):
         _parser().parse_args(
