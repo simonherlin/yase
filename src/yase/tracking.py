@@ -1,8 +1,9 @@
 """Dependency-free IoU multi-object tracking baseline."""
 
+import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Optional, Protocol, runtime_checkable
 
 from .native import iou_matrix
 from .schema import BoundingBox, Detection
@@ -17,6 +18,25 @@ def box_iou(left: BoundingBox, right: BoundingBox) -> float:
     intersection = max(0.0, x2 - x1) * max(0.0, y2 - y1)
     union = left.area + right.area - intersection
     return intersection / union if union else 0.0
+
+
+@runtime_checkable
+class Tracker(Protocol):
+    """Common online-tracker contract used by video streams."""
+
+    active_ids: tuple[int, ...]
+
+    def update(
+        self,
+        detections: Optional[Sequence[Detection]],
+        timestamp: Optional[float] = None,
+    ) -> list[Detection]: ...
+
+    def reset(self) -> None: ...
+
+    def state_dict(self) -> dict[str, Any]: ...
+
+    def load_state_dict(self, state: Mapping[str, Any]) -> None: ...
 
 
 @dataclass
@@ -61,6 +81,77 @@ class IoUTracker:
 
     def reset(self) -> None:
         self._tracks.clear()
+
+    def state_dict(self) -> dict[str, Any]:
+        """Return a JSON-compatible checkpoint of the active tracks."""
+        return {
+            "version": 1,
+            "next_id": self._next_id,
+            "tracks": [
+                {
+                    "track_id": track_id,
+                    "box": list(state.box.as_xyxy()),
+                    "label": state.label,
+                    "score": state.score,
+                    "missed": state.missed,
+                    "age": state.age,
+                }
+                for track_id, state in sorted(self._tracks.items())
+            ],
+        }
+
+    def load_state_dict(self, state: Mapping[str, Any]) -> None:
+        """Restore a checkpoint produced by :meth:`state_dict`."""
+        if not isinstance(state, Mapping) or state.get("version") != 1:
+            raise ValueError("unsupported IoUTracker state version")
+        next_id = state.get("next_id")
+        if isinstance(next_id, bool) or not isinstance(next_id, int) or next_id < 0:
+            raise ValueError("tracker state next_id must be a non-negative integer")
+        tracks = state.get("tracks", ())
+        if not isinstance(tracks, Sequence) or isinstance(tracks, (str, bytes)):
+            raise TypeError("tracker state tracks must be a sequence")
+        restored: dict[int, _TrackState] = {}
+        for item in tracks:
+            if not isinstance(item, Mapping):
+                raise TypeError("each tracker state entry must be a mapping")
+            track_id = item.get("track_id")
+            if (
+                isinstance(track_id, bool)
+                or not isinstance(track_id, int)
+                or track_id < 0
+                or track_id in restored
+            ):
+                raise ValueError(
+                    "tracker state contains an invalid or duplicate track_id"
+                )
+            label = item.get("label")
+            if not isinstance(label, str) or not label:
+                raise ValueError("tracker state labels must be non-empty strings")
+            missed = item.get("missed", 0)
+            age = item.get("age", 1)
+            if (
+                isinstance(missed, bool)
+                or not isinstance(missed, int)
+                or missed < 0
+                or isinstance(age, bool)
+                or not isinstance(age, int)
+                or age < 1
+            ):
+                raise ValueError("tracker state counters are invalid")
+            score = float(item.get("score", 0.0))
+            if not math.isfinite(score) or not 0 <= score <= 1:
+                raise ValueError("tracker state score must be finite and in [0, 1]")
+            restored[track_id] = _TrackState(
+                box=BoundingBox.from_sequence(item.get("box", ())),
+                label=label,
+                score=score,
+                missed=missed,
+                age=age,
+            )
+        if restored and next_id <= max(restored):
+            raise ValueError("tracker state next_id must exceed active track IDs")
+        self._next_id = next_id
+        self._tracks = restored
 
     def update(
         self,
@@ -181,6 +272,87 @@ class ByteTrackLite:
 
     def reset(self) -> None:
         self._tracks.clear()
+
+    def state_dict(self) -> dict[str, Any]:
+        """Return a JSON-compatible checkpoint of motion tracks."""
+        return {
+            "version": 1,
+            "next_id": self._next_id,
+            "tracks": [
+                {
+                    "track_id": track_id,
+                    "box": list(state.box.as_xyxy()),
+                    "label": state.label,
+                    "score": state.score,
+                    "velocity": [state.velocity_x, state.velocity_y],
+                    "missed": state.missed,
+                    "age": state.age,
+                }
+                for track_id, state in sorted(self._tracks.items())
+            ],
+        }
+
+    def load_state_dict(self, state: Mapping[str, Any]) -> None:
+        """Restore a checkpoint produced by :meth:`state_dict`."""
+        if not isinstance(state, Mapping) or state.get("version") != 1:
+            raise ValueError("unsupported ByteTrackLite state version")
+        next_id = state.get("next_id")
+        if isinstance(next_id, bool) or not isinstance(next_id, int) or next_id < 0:
+            raise ValueError("tracker state next_id must be a non-negative integer")
+        tracks = state.get("tracks", ())
+        if not isinstance(tracks, Sequence) or isinstance(tracks, (str, bytes)):
+            raise TypeError("tracker state tracks must be a sequence")
+        restored: dict[int, _MotionTrackState] = {}
+        for item in tracks:
+            if not isinstance(item, Mapping):
+                raise TypeError("each tracker state entry must be a mapping")
+            track_id = item.get("track_id")
+            if (
+                isinstance(track_id, bool)
+                or not isinstance(track_id, int)
+                or track_id < 0
+                or track_id in restored
+            ):
+                raise ValueError(
+                    "tracker state contains an invalid or duplicate track_id"
+                )
+            label = item.get("label")
+            if not isinstance(label, str) or not label:
+                raise ValueError("tracker state labels must be non-empty strings")
+            velocity = item.get("velocity", (0.0, 0.0))
+            if not isinstance(velocity, Sequence) or len(velocity) != 2:
+                raise ValueError("tracker state velocity must contain two values")
+            velocity_x = float(velocity[0])
+            velocity_y = float(velocity[1])
+            if not math.isfinite(velocity_x) or not math.isfinite(velocity_y):
+                raise ValueError("tracker state velocity must be finite")
+            missed = item.get("missed", 0)
+            age = item.get("age", 1)
+            if (
+                isinstance(missed, bool)
+                or not isinstance(missed, int)
+                or missed < 0
+                or isinstance(age, bool)
+                or not isinstance(age, int)
+                or age < 1
+            ):
+                raise ValueError("tracker state counters are invalid")
+            score = float(item.get("score", 0.0))
+            if not math.isfinite(score) or not 0 <= score <= 1:
+                raise ValueError("tracker state score must be finite and in [0, 1]")
+            restored[track_id] = _MotionTrackState(
+                box=BoundingBox.from_sequence(item.get("box", ())),
+                label=label,
+                score=score,
+                velocity_x=velocity_x,
+                velocity_y=velocity_y,
+                missed=missed,
+                age=age,
+            )
+        if restored and next_id <= max(restored):
+            raise ValueError("tracker state next_id must exceed active track IDs")
+        self._next_id = next_id
+        self._tracks = restored
 
     def update(
         self,
@@ -347,4 +519,10 @@ class ExternalTrackerAdapter:
         return output
 
 
-__all__ = ["ByteTrackLite", "ExternalTrackerAdapter", "IoUTracker", "box_iou"]
+__all__ = [
+    "ByteTrackLite",
+    "ExternalTrackerAdapter",
+    "IoUTracker",
+    "Tracker",
+    "box_iou",
+]

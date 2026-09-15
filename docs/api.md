@@ -173,7 +173,10 @@ OCR engine, embedding model, and VLM. `NumpyVectorIndex` provides local cosine
 search for small or offline embedding collections; production deployments can
 implement the same boundary with a vector database adapter.
 
-`IoUTracker` adds stable stream-local `track_id` values to typed detections.
+`Tracker` is the common online tracking protocol. `IoUTracker` adds stable
+stream-local `track_id` values to typed detections, and both built-in trackers
+support JSON-compatible `state_dict()` / `load_state_dict()` checkpoints for
+worker failover and resumable video jobs.
 `PresenceRule` and `EventEngine` turn frame-level detections into enter/exit
 `SemanticEvent` values. Pass `tracker=` and `event_engine=` to either video
 stream class to activate them.

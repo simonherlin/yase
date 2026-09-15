@@ -77,6 +77,7 @@ from yase import (
     TensorRTExtractor,
     TesseractExtractor,
     TextRegion,
+    Tracker,
     TrackingMetrics,
     TransformersSAM3Extractor,
     TransformersSAM3VideoExtractor,
@@ -563,6 +564,42 @@ def test_iou_tracker_keeps_ids_and_expires_missing_tracks():
     assert tracker.active_ids
     tracker.update([])
     assert not tracker.active_ids
+
+
+def test_trackers_round_trip_json_compatible_state():
+    tracker = IoUTracker(start_id=10)
+    first = tracker.update([Detection("person", 0.9, (0, 0, 10, 10))])
+    state = json.loads(json.dumps(tracker.state_dict()))
+    restored = IoUTracker(start_id=1)
+    restored.load_state_dict(state)
+    second = restored.update([Detection("person", 0.8, (1, 0, 11, 10))])
+    assert isinstance(restored, Tracker)
+    assert first[0].track_id == second[0].track_id == 10
+
+    motion = ByteTrackLite(start_id=20)
+    motion.update([Detection("person", 0.9, (0, 0, 10, 10))])
+    motion.update([Detection("person", 0.9, (2, 0, 12, 10))])
+    motion_state = json.loads(json.dumps(motion.state_dict()))
+    restored_motion = ByteTrackLite(start_id=1)
+    restored_motion.load_state_dict(motion_state)
+    assert restored_motion.state_dict() == motion_state
+    with pytest.raises(ValueError, match="state version"):
+        restored.load_state_dict({"version": 2})
+    with pytest.raises(ValueError, match="score"):
+        restored.load_state_dict(
+            {
+                "version": 1,
+                "next_id": 2,
+                "tracks": [
+                    {
+                        "track_id": 1,
+                        "box": [0, 0, 1, 1],
+                        "label": "person",
+                        "score": 2.0,
+                    }
+                ],
+            }
+        )
 
 
 def test_iou_matrix_has_a_portable_fallback_and_native_contract():

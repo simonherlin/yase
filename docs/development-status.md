@@ -445,6 +445,14 @@ Result: version 0.35.2, pending final validation.
 
 Result: version 0.35.3, pending final validation.
 
+## Cycle 44 — resumable tracker state
+
+- [x] Define a shared `Tracker` protocol for online update/reset/checkpoint APIs.
+- [x] Add versioned JSON-compatible state checkpoints to IoUTracker and ByteTrackLite.
+- [x] Validate IDs, boxes, labels, counters, velocity, and state versions on restore.
+
+Result: version 0.36.0, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

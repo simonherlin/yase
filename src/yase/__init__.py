@@ -117,7 +117,13 @@ from .sinks import (
     QueueSink,
 )
 from .stages import Stage, StageContext, StageSpec, validate_stage_specs
-from .tracking import ByteTrackLite, ExternalTrackerAdapter, IoUTracker, box_iou
+from .tracking import (
+    ByteTrackLite,
+    ExternalTrackerAdapter,
+    IoUTracker,
+    Tracker,
+    box_iou,
+)
 from .video import (
     FrameResult,
     RealtimeVideoStream,
@@ -126,7 +132,7 @@ from .video import (
     process_video,
 )
 
-__version__ = "0.35.3"
+__version__ = "0.36.0"
 
 __all__ = [
     "CallableExtractor",
@@ -217,6 +223,7 @@ __all__ = [
     "TrackMemoryState",
     "TrackingMetrics",
     "TesseractExtractor",
+    "Tracker",
     "TransformersImageEmbeddingExtractor",
     "TransformersGroundingDinoExtractor",
     "TransformersObjectDetectionExtractor",
