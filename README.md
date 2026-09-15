@@ -136,6 +136,15 @@ Qdrant deployments can keep multiple embedding spaces in one collection with
 `QdrantVectorIndex(..., vector_name="image")`; pass `payload_indexes=` for
 fields used frequently in filtered search.
 
+For a minimal HTTP deployment, install an ASGI server separately and expose
+the built-in service:
+
+~~~python
+from yase import Yase, create_asgi_app
+
+app = create_asgi_app(Yase(model="onnx", model_path="model.onnx"))
+~~~
+
 ## Batch extraction
 
 `extract_many` preserves input order and timestamps. Backends that implement

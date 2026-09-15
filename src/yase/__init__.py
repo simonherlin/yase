@@ -114,6 +114,7 @@ from .schema import (
     TextRegion,
 )
 from .serialization import result_to_dict, result_to_json, write_jsonl
+from .service import YaseASGI, create_asgi_app
 from .sinks import (
     CallbackSink,
     FanoutSink,
@@ -139,7 +140,7 @@ from .video import (
     process_video,
 )
 
-__version__ = "0.56.0"
+__version__ = "0.57.0"
 
 __all__ = [
     "CallableExtractor",
@@ -263,6 +264,8 @@ __all__ = [
     "VideoStats",
     "VideoStream",
     "Yase",
+    "YaseASGI",
+    "create_asgi_app",
     "YaseError",
     "Uncertainty",
     "validate_stage_specs",

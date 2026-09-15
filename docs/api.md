@@ -238,6 +238,12 @@ accepts `--labels`.
 Video CLI processing additionally exposes `--batch-size`; it is ignored for
 the latest-frame realtime worker, whose purpose is latency control.
 
+`YaseASGI` and `create_asgi_app()` provide a dependency-free ASGI boundary for
+hosts such as Uvicorn: `/health` and `/ready` return readiness JSON,
+`/metrics` exposes the facade's Prometheus text when metrics are attached, and
+POST `/extract` accepts `{ "image_base64": "...", "timestamp": ... }` without
+ever accepting a server-side path. The body limit defaults to 16 MiB.
+
 Optional adapters include `TesseractExtractor`, `PaddleOCRExtractor`,
 `TransformersImageEmbeddingExtractor`, and `TransformersVLMExtractor`. They
 load their heavy dependencies only when instantiated and default to local-only

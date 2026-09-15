@@ -1,9 +1,10 @@
 import asyncio
+import base64
 import json
 import sys
 from contextlib import contextmanager
 from importlib.metadata import metadata
-from io import StringIO
+from io import BytesIO, StringIO
 from threading import Barrier, Event
 
 import numpy as np
@@ -88,8 +89,10 @@ from yase import (
     Uncertainty,
     VideoStats,
     Yase,
+    YaseASGI,
     ZoneRule,
     collect_runtime_info,
+    create_asgi_app,
     default_model_catalog,
     default_registry,
     discover_images,
@@ -477,6 +480,59 @@ def test_opentelemetry_tracer_instruments_yase_and_records_errors():
     with pytest.raises(RuntimeError, match="bad"):
         failing.extract(np.ones((1, 1, 3), dtype=np.uint8))
     assert isinstance(tracer.spans[-1][1].exceptions[0], RuntimeError)
+
+
+def test_asgi_service_exposes_health_metrics_and_safe_image_extraction():
+    from PIL import Image
+
+    image_buffer = BytesIO()
+    Image.new("RGB", (1, 1), color=(7, 8, 9)).save(image_buffer, format="PNG")
+    encoded = base64.b64encode(image_buffer.getvalue()).decode("ascii")
+    metrics = RuntimeMetrics(namespace="http_test")
+    api = Yase(extractor=lambda image: image[..., 0], metrics=metrics)
+    app = create_asgi_app(api)
+    assert isinstance(app, YaseASGI)
+
+    async def request(target, method, path, payload=b""):
+        events = [{"type": "http.request", "body": payload, "more_body": False}]
+        sent = []
+
+        async def receive():
+            return events.pop(0)
+
+        async def send(message):
+            sent.append(message)
+
+        await target({"type": "http", "method": method, "path": path}, receive, send)
+        return sent
+
+    health = asyncio.run(request(app, "GET", "/health"))
+    assert health[0]["status"] == 200
+    assert json.loads(health[1]["body"])["status"] == "ok"
+
+    response = asyncio.run(
+        request(
+            app,
+            "POST",
+            "/extract",
+            json.dumps({"image_base64": encoded, "timestamp": 12.5}).encode("utf-8"),
+        )
+    )
+    payload = json.loads(response[1]["body"])
+    assert response[0]["status"] == 200
+    assert payload["result"]["depth"] == {"dtype": "uint8", "shape": [1, 1]}
+    assert payload["result"]["timestamp"] == 12.5
+
+    invalid = asyncio.run(
+        request(app, "POST", "/extract", b'{"image_base64":"not-base64"}')
+    )
+    assert invalid[0]["status"] == 400
+    assert json.loads(invalid[1]["body"])["error"]["type"] == "invalid_request"
+
+    too_large = asyncio.run(
+        request(create_asgi_app(api, max_body_bytes=2), "POST", "/extract", b"123")
+    )
+    assert too_large[0]["status"] == 413
 
 
 def test_normalise_tuple_and_result_timestamp():

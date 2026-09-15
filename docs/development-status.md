@@ -669,6 +669,19 @@ Result: version `0.55.0`, pending final validation.
 
 Result: version `0.56.0`, pending final validation.
 
+## Cycle 67 — dependency-free ASGI service surface
+
+- [x] Add `YaseASGI` and `create_asgi_app()` without requiring FastAPI or an
+  ASGI server in the base install.
+- [x] Expose `/health`, `/ready`, `/metrics`, and a POST `/extract` endpoint.
+- [x] Accept only base64-encoded image bytes, never server filesystem paths.
+- [x] Enforce request body limits and return structured 400/413/404/500 JSON
+  errors while preserving client disconnects.
+- [x] Add end-to-end fake-ASGI tests for health, extraction, invalid input, and
+  request-size rejection.
+
+Result: version `0.57.0`, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full
