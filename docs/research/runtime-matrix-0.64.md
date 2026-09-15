@@ -59,6 +59,11 @@ valid local execution target. Yase keeps the TensorRT adapter and context pool
 available for deployment hosts with a supported GPU, while this host uses
 OpenVINO GPU/AUTO or ONNX CPU as its validated paths.
 
+For completeness, a non-mutating `uv pip install --dry-run tensorrt` resolved
+TensorRT 11.3.0.99 with CUDA 13 bindings and libraries. The packages were not
+installed because the local GPU is outside the supported target generation;
+this avoids confusing a successful Python import with a valid CUDA engine.
+
 ## Reproduction
 
 ```bash
