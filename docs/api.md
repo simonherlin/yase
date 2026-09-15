@@ -181,6 +181,9 @@ search for small or offline embedding collections; `add_record()` and
 `search_record()` bind provenance-aware `EmbeddingRecord` values to an
 embedding space and persist that namespace. Production deployments can
 implement the same boundary with a vector database adapter.
+`QdrantVectorIndex` exposes the same record methods; it stores the space,
+model ID, and optional revision in each point payload and rejects cross-space
+queries before they reach the collection.
 
 `Tracker` is the common online tracking protocol. `IoUTracker` adds stable
 stream-local `track_id` values to typed detections, and both built-in trackers

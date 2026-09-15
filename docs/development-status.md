@@ -512,6 +512,16 @@ Result: version 0.41.0, pending final validation.
 
 Result: version 0.42.0, pending final validation.
 
+## Cycle 52 — provenance-safe Qdrant retrieval
+
+- [x] Add `EmbeddingRecord`-aware `add_record()` and `search_record()` methods.
+- [x] Bind a Qdrant adapter to one embedding space and reject mismatches.
+- [x] Persist `space`, `model_id`, and optional revision in point payloads.
+- [x] Reject empty IDs, non-finite vectors, and zero-norm queries.
+- [x] Add deterministic injected-client coverage without requiring Qdrant.
+
+Result: version 0.43.0, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

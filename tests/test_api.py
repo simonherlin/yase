@@ -778,6 +778,53 @@ def test_qdrant_adapter_works_with_injected_client_and_models():
     assert index.search([1.0, 0.0])[0].item_id == "a"
 
 
+def test_qdrant_adapter_enforces_embedding_spaces():
+    from types import SimpleNamespace
+
+    class FakeModels:
+        class Distance:
+            COSINE = "cosine"
+
+        VectorParams = staticmethod(lambda **kwargs: kwargs)
+        PointStruct = staticmethod(lambda **kwargs: SimpleNamespace(**kwargs))
+
+    class FakeClient:
+        def __init__(self):
+            self.points = []
+
+        def collection_exists(self, _name):
+            return False
+
+        def create_collection(self, **_kwargs):
+            pass
+
+        def upsert(self, points, **_kwargs):
+            self.points.extend(points)
+
+    client = FakeClient()
+    index = QdrantVectorIndex(
+        "embeddings", dimension=2, client=client, models=FakeModels, space="clip"
+    )
+    record = EmbeddingRecord(
+        vector=np.array([1.0, 0.0]), space="clip", model_id="model-a"
+    )
+    index.add_record("a", record)
+    assert client.points[0].payload == {"space": "clip", "model_id": "model-a"}
+    with pytest.raises(ValueError, match="space clip"):
+        index.add_record(
+            "b",
+            EmbeddingRecord(
+                vector=np.array([0.0, 1.0]), space="dino", model_id="model-b"
+            ),
+        )
+    with pytest.raises(ValueError, match="space clip"):
+        index.search_record(
+            EmbeddingRecord(
+                vector=np.array([0.0, 1.0]), space="dino", model_id="model-b"
+            )
+        )
+
+
 def test_video_tracker_and_event_engine_integration():
     capture = FakeCapture(3)
     detection = Detection("person", 0.9, (0, 0, 2, 2))
