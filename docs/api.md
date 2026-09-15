@@ -103,6 +103,8 @@ frames, and video latency summaries. Pass the same collector as `metrics=` to
 factories from the `yase.backends` entry-point group. Use
 `default_registry(include_plugins=True)` when plugin discovery is desired;
 the default registry remains built-in-only and lazy.
+Pass a registry to `Yase(model="plugin-name", registry=registry)` to resolve
+custom factories through the same facade.
 
 ## Backends
 

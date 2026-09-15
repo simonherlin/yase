@@ -481,6 +481,16 @@ def test_backend_registry_is_explicit_and_replaceable():
         registry.register("fake", lambda: 2)
 
 
+def test_yase_can_inject_a_registry_backend():
+    registry = BackendRegistry()
+    registry.register("mean", lambda **_options: lambda image: image[..., 0])
+    api = Yase(model="mean", registry=registry)
+    result = api.extract(np.zeros((2, 2, 3), dtype=np.uint8))
+    assert result.depth.shape == (2, 2)
+    with pytest.raises(TypeError, match="registry"):
+        Yase(model="mean", registry=object())
+
+
 def test_backend_registry_discovers_optional_entry_points(monkeypatch):
     from importlib import metadata
 

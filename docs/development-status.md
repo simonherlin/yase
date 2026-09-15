@@ -344,6 +344,15 @@ Result: version 0.25.0, 104 deterministic tests passing before final validation.
 
 Result: version 0.26.0, 105 deterministic tests passing before final validation.
 
+## Cycle 32 — registry-backed Yase facade
+
+- [x] Allow `Yase` to resolve custom models through an injected registry.
+- [x] Preserve native backend shortcuts and lazy initialization.
+- [x] Validate registry shape before inference starts.
+- [x] Add end-to-end facade coverage for a registered backend.
+
+Result: version 0.27.0, 106 deterministic tests passing before final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

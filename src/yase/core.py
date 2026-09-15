@@ -167,6 +167,7 @@ class Yase:
         model: str = "custom",
         color_order: str = "RGB",
         input_limits: Optional[InputLimits] = None,
+        registry: Optional[Any] = None,
         **backend_options: Any,
     ) -> None:
         if task not in ("depth", "segmentation", "both", "semantic"):
@@ -179,13 +180,20 @@ class Yase:
         self.model = model
         self.color_order = color_order
         self.input_limits = input_limits
+        if registry is not None and not hasattr(registry, "create"):
+            raise TypeError("registry must expose create(name, **options)")
+        self.registry = registry
         self._extractor = extractor
         self._backend_options = backend_options
 
     @property
     def extractor(self) -> Any:
         if self._extractor is None:
-            if self.model == "torchscript":
+            if self.registry is not None and self.model in self.registry.names():
+                self._extractor = self.registry.create(
+                    self.model, **self._backend_options
+                )
+            elif self.model == "torchscript":
                 from .backends import TorchScriptExtractor
 
                 self._extractor = TorchScriptExtractor(**self._backend_options)
