@@ -983,6 +983,26 @@ and one explicit optimized distribution path. The former hosted CI checks are
 archived as local release gates because GitHub Actions is intentionally disabled.
 C++ remains a focused accelerator instead of duplicating model runtimes.
 
+## Cycle 90 — hardware-adaptive runtime selection
+
+- [x] Detect ONNX Runtime providers, OpenVINO devices, TensorRT availability,
+  and Torch CUDA architecture compatibility without downloading model weights.
+- [x] Add `HardwareProfile` and `AdaptiveExtractor` with artifact-aware
+  candidate ordering for ONNX, OpenVINO, TorchScript, and TensorRT.
+- [x] Retry backend construction and provider inference failures on the next
+  compatible candidate, while recording the selected backend and fallback
+  errors in result metadata.
+- [x] Expose `Yase(model="auto")`, the `auto` registry/CLI backend,
+  `--preference`, `--device`, and strict `--no-fallback` operation.
+- [x] Validate on the reference workstation with a real ONNX graph: OpenVINO
+  GPU is selected, and an intentionally unavailable CUDA provider falls back
+  to ONNX CPU with an observable diagnostic.
+
+Result: local deployments can use one model artifact across heterogeneous
+machines without treating advertised providers as proof of compatibility.
+Explicit backend/device choices remain available for controlled production
+deployments.
+
 ## Exit criteria
 
 The package is considered ready for a first public release when the core and

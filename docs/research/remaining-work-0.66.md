@@ -16,6 +16,7 @@ un assemblage de modèles sans contrats stables.
 | Temps réel | prêt pour intégration | worker latest-frame/backpressure, matériel à mesurer |
 | Schéma sémantique | prêt pour 1.x | `SemanticResult` et `ObservationBundle` versionnés |
 | Backends | extensible | ONNX, OpenVINO, TensorRT, TorchScript, Transformers, OCR; providers vérifiables |
+| Adaptation matérielle | livré | `HardwareProfile`, sélection `model="auto"`, fallback observable; matrice multi-OS à exécuter sur les hôtes cibles |
 | Modèles | explicites | aucun poids téléchargé implicitement |
 | C++ | ciblé | IoU/NMS, fallback Python, wheel ABI optionnel |
 | Packaging | prêt localement | wheel pur 3.10–3.13, wheel natif Linux 3.13 validé, release externe outillée |
