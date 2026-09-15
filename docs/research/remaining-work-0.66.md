@@ -15,10 +15,10 @@ un assemblage de modèles sans contrats stables.
 | Vidéo fichier | prêt | stride, FPS, batch, tracking, sinks, checkpoints |
 | Temps réel | prêt pour intégration | worker latest-frame/backpressure, matériel à mesurer |
 | Schéma sémantique | prêt pour 1.x | `SemanticResult` et `ObservationBundle` versionnés |
-| Backends | extensible | ONNX, OpenVINO, TensorRT, TorchScript, Transformers, OCR |
+| Backends | extensible | ONNX, OpenVINO, TensorRT, TorchScript, Transformers, OCR; providers vérifiables |
 | Modèles | explicites | aucun poids téléchargé implicitement |
 | C++ | ciblé | IoU/NMS, fallback Python, wheel ABI optionnel |
-| Packaging | prêt localement | wheel pur 3.10–3.13, wheel natif Linux 3.13 validé |
+| Packaging | prêt localement | wheel pur 3.10–3.13, wheel natif Linux 3.13 validé, release externe outillée |
 | Service ASGI | prêt comme boundary | auth/rate-limit laissés au reverse-proxy |
 | Observabilité | solide localement | métriques et spans, corrélation distribuée encore à intégrer |
 | CI hébergée | désactivée | choix volontaire pour ne pas consommer de crédits |
@@ -52,9 +52,12 @@ réel sur les petites listes.
    l’adaptateur ; la clé `phase_timings` des rapports couvre ces phases, tandis
    que les transferts device explicites et les mesures GPU natives
    restent à valider sur les machines cibles.
-3. Valider les providers GPU sur des machines compatibles : CUDA EP, TensorRT,
-   OpenVINO GPU/NPU. Le poste local Maxwell ne peut pas être la preuve d’un
-   TensorRT moderne.
+3. [partiellement livré] Valider les providers GPU sur des machines
+   compatibles : CUDA EP, TensorRT, OpenVINO GPU/NPU. Le poste local a validé
+   OpenVINO CPU/GPU sur un modèle synthétique ; ONNX Runtime ne propose que
+   Azure/CPU et TensorRT n’est pas installé. Le poste local Maxwell ne peut pas
+   être la preuve d’un TensorRT moderne. `strict_providers=True` empêche
+   désormais une fausse validation par fallback CPU.
 4. [partiellement livré] Publier une matrice de compatibilité par OS, Python,
    runtime, architecture CPU/GPU et licence de checkpoint. `yase diagnostics`
    émet désormais les versions des distributions détectées et les providers

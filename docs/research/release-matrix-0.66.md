@@ -68,6 +68,23 @@ TensorRT doit être testé sur la famille de GPU cible avec l’engine correspon
 Un plan TensorRT sérialisé n’est pas supposé portable entre plateformes ou
 architectures GPU : produire une matrice par engine, OS, CUDA, driver et GPU.
 
+## Résultat de l’audit du poste de référence
+
+Le 15 septembre 2026, le poste Linux x86_64 de développement a rapporté :
+
+| Composant | Résultat | Interprétation |
+|---|---|---|
+| ONNX Runtime 1.30.0 | Azure + CPU | aucun provider CUDA installé |
+| OpenVINO 2026.3.1 | CPU + GPU | modèle synthétique compilé et exécuté sur les deux devices |
+| NVIDIA driver | 580.173.02, runtime CUDA 13.0 | driver visible via `nvidia-smi`, toolkit absent |
+| `nvcc` | absent | pas de compilation CUDA locale |
+| TensorRT / `trtexec` | absents | aucune validation TensorRT annoncée |
+| GPU | Quadro M3000M, 4 GiB | matériel ancien, à exclure de la matrice TensorRT moderne |
+
+Cette photographie ne remplace pas une matrice de release multi-OS. Elle
+confirme uniquement le chemin OpenVINO local et maintient les chemins ONNX
+CUDA/TensorRT explicitement non validés sur cette machine.
+
 ## Sources officielles consultées
 
 - cibuildwheel : <https://cibuildwheel.pypa.io/en/stable/options/>
