@@ -604,6 +604,16 @@ Result: version 0.51.0, pending final validation.
 
 Result: version 0.52.0, pending final validation.
 
+## Cycle 62 — full production audit
+
+- [x] Audit every public subsystem, optional runtime, persistence boundary, and release gate.
+- [x] Cross-check ONNX Runtime, OpenVINO, TensorRT, Transformers, and Qdrant official APIs.
+- [x] Separate delivered contracts, hardware-gated validation, and remaining P0/P1/P2 work.
+- [x] Publish the prioritized package-wide roadmap in `research/full-package-audit.md`.
+- [x] Repair the documentation index so every linked guide exists.
+
+Result: package-wide roadmap refreshed for the `0.52.0` release line.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full
