@@ -136,11 +136,32 @@ def collect_provider_info() -> dict[str, Any]:
         cuda = bool(torch.cuda.is_available())
         cuda_info: dict[str, Any] = {"available": cuda}
         if cuda:
-            cuda_info["device_count"] = int(torch.cuda.device_count())
+            device_count = int(torch.cuda.device_count())
+            cuda_info["device_count"] = device_count
             cuda_info["devices"] = [
-                str(torch.cuda.get_device_name(index))
-                for index in range(torch.cuda.device_count())
+                str(torch.cuda.get_device_name(index)) for index in range(device_count)
             ]
+            get_capability = getattr(torch.cuda, "get_device_capability", None)
+            capabilities = []
+            if callable(get_capability):
+                capabilities = [
+                    list(get_capability(index)) for index in range(device_count)
+                ]
+                cuda_info["compute_capabilities"] = capabilities
+            get_arch_list = getattr(torch.cuda, "get_arch_list", None)
+            raw_architectures = get_arch_list() if callable(get_arch_list) else ()
+            supported_architectures = [
+                str(value) for value in (raw_architectures or ())
+            ]
+            if supported_architectures:
+                cuda_info["supported_architectures"] = supported_architectures
+            usable = True
+            if capabilities and supported_architectures:
+                usable = all(
+                    f"sm_{major}{minor}" in supported_architectures
+                    for major, minor in capabilities
+                )
+            cuda_info["usable"] = usable
         info["torch"] = {
             "version": str(getattr(torch, "__version__", "unknown")),
             "cuda": cuda_info,

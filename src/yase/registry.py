@@ -116,9 +116,16 @@ def default_registry(*, include_plugins: bool = False) -> BackendRegistry:
         TransformersVLMExtractor,
     )
     from .backends import OnnxRuntimeExtractor, TorchScriptExtractor
+    from .hardware import AdaptiveExtractor
     from .runtimes import OpenVINOExtractor, TensorRTExtractor
 
     registry = BackendRegistry()
+    registry.register(
+        "auto",
+        lambda **options: AdaptiveExtractor(registry=registry, **options),
+        capabilities=("depth", "segmentation", "batch", "adaptive"),
+        metadata={"description": "hardware-aware local artifact selection"},
+    )
     registry.register(
         "torchscript",
         TorchScriptExtractor,

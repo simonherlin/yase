@@ -66,6 +66,7 @@ from .events import (
     ZoneRule,
 )
 from .fusion import FusedEvidence, MultimodalConsensus
+from .hardware import AdaptiveExtractor, BackendCandidate, HardwareProfile
 from .index import NumpyVectorIndex, SearchHit
 from .limits import InputLimits
 from .memory import SemanticTrackMemory, TrackMemoryState
@@ -174,6 +175,8 @@ __all__ = [
     "CHECKPOINT_VERSION",
     "build_from_config",
     "AdaptiveSemanticCascade",
+    "AdaptiveExtractor",
+    "BackendCandidate",
     "AveragePrecisionResult",
     "ArtifactInfo",
     "CascadePolicy",
@@ -189,6 +192,7 @@ __all__ = [
     "GlobalIdentity",
     "GlobalIdentityStore",
     "HealthReport",
+    "HardwareProfile",
     "Extractor",
     "OnnxRuntimeExtractor",
     "OpenVINOExtractor",

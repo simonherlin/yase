@@ -64,6 +64,18 @@ The complete 0.66.0 release gates are recorded in
 The CLI reports available local adapters with `yase info`. Extraction from a
 local ONNX model is available with `yase extract image.jpg --model onnx
 --model-path model.onnx`.
+For hardware-aware local inference, use `--model auto`: Yase inspects the
+artifact format and installed runtimes, tries the most suitable device, and
+records any fallback in result metadata. For example:
+
+~~~bash
+yase extract image.jpg --model auto --model-path model.onnx --device auto
+~~~
+
+Use `--preference openvino|onnx|torchscript|tensorrt` to constrain the
+selection, or `--device CPU` to prevent accelerator candidates. Automatic
+selection validates the backend by construction/inference; an advertised CUDA
+provider is not treated as usable when the actual hardware rejects it.
 Use `yase diagnostics --providers` when deploying to inspect actual ONNX
 providers, OpenVINO devices, and optional CUDA/TensorRT availability. Run
 `uv run python tools/runtime_smoke.py --all-openvino-devices` to compile and

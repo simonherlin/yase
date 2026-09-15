@@ -29,6 +29,7 @@ from .serialization import result_to_dict, write_jsonl
 from .video import RealtimeVideoStream, VideoStream
 
 _CLI_MODELS = (
+    "auto",
     "torchscript",
     "onnx",
     "openvino",
@@ -41,7 +42,7 @@ _CLI_MODELS = (
     "tesseract",
     "paddleocr",
 )
-_LOCAL_ARTIFACT_MODELS = {"torchscript", "onnx", "openvino", "tensorrt"}
+_LOCAL_ARTIFACT_MODELS = {"auto", "torchscript", "onnx", "openvino", "tensorrt"}
 _MODEL_ID_MODELS = {"sam3", "grounding-dino", "image-embedding", "vlm"}
 
 
@@ -95,7 +96,16 @@ def _add_model_options(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--device",
-        help="runtime device for TorchScript/OpenVINO/TensorRT (e.g. CPU, GPU, cuda)",
+        help=(
+            "runtime device for adaptive selection, TorchScript, OpenVINO, "
+            "or TensorRT (e.g. auto, CPU, GPU, cuda)"
+        ),
+    )
+    parser.add_argument(
+        "--preference",
+        choices=("auto", "openvino", "onnx", "torchscript", "tensorrt"),
+        default="auto",
+        help="preferred backend when --model auto is used",
     )
 
 
@@ -254,18 +264,29 @@ def _make_extractor(args: argparse.Namespace) -> Yase:
     """Build a CLI extractor while keeping optional dependencies lazy."""
     options = {"input_limits": _input_limits(args)}
     if args.provider or args.strict_providers:
-        if args.model != "onnx":
-            raise ValueError("--provider/--strict-providers require --model onnx")
+        if args.model not in {"onnx", "auto"}:
+            raise ValueError(
+                "--provider/--strict-providers require --model onnx or auto"
+            )
         if args.strict_providers and not args.provider:
             raise ValueError("--strict-providers requires at least one --provider")
         options["providers"] = args.provider
         options["strict_providers"] = args.strict_providers
+        if args.model == "auto":
+            if args.preference not in {"auto", "onnx"}:
+                raise ValueError("--provider requires --preference auto or onnx")
+            options["preference"] = "onnx"
     if args.device:
-        if args.model not in {"torchscript", "openvino", "tensorrt"}:
+        if args.model not in {"auto", "torchscript", "openvino", "tensorrt"}:
             raise ValueError(
-                "--device is supported with --model torchscript, openvino, or tensorrt"
+                "--device is supported with --model auto, torchscript, openvino, "
+                "or tensorrt"
             )
         options["device"] = args.device
+    if args.preference != "auto":
+        if args.model != "auto":
+            raise ValueError("--preference requires --model auto")
+        options["preference"] = args.preference
     if args.model in _LOCAL_ARTIFACT_MODELS:
         if not args.model_path:
             raise ValueError(f"--model-path is required for {args.model}")

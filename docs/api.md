@@ -82,6 +82,14 @@ provider availability into a readiness check and non-zero process exit.
 The same commands accept `--device CPU|GPU|cuda` for the TorchScript,
 OpenVINO, and TensorRT adapters.
 
+`AdaptiveExtractor` and `HardwareProfile` provide hardware-aware local model
+selection. `Yase(model="auto", model_path="model.onnx")` selects between
+OpenVINO and ONNX Runtime according to detected capabilities, while retrying
+the next candidate when provider initialization or inference fails. The
+selected backend, hardware profile, and fallback errors are written to result
+metadata. Set `device="CPU"` or `fallback=False` when an application needs a
+strict deployment policy.
+
 ## ObservationBundle and stage contracts
 
 `ObservationBundle` is the versioned transport contract for durable pipelines.

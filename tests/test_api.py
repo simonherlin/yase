@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 from yase import (
+    AdaptiveExtractor,
     AdaptiveSemanticCascade,
     ArtifactInfo,
     AveragePrecisionResult,
@@ -34,6 +35,7 @@ from yase import (
     FanoutSink,
     FrameRef,
     GlobalIdentityStore,
+    HardwareProfile,
     HealthReport,
     HOTACurveResult,
     HOTAResult,
@@ -1832,6 +1834,7 @@ def test_cli_models_lists_filtered_model_cards(capsys):
 def test_default_registry_exposes_modern_optional_backends():
     registry = default_registry()
     names = registry.names()
+    assert "auto" in names
     assert {"rf-detr", "sam3", "sam3-video", "grounding-dino"}.issubset(names)
     assert registry.get("vlm").capabilities == (
         "caption",
@@ -3457,6 +3460,48 @@ def test_health_check_accepts_distribution_names(monkeypatch):
     assert report.checks["package:paddlepaddle"] is True
 
 
+def test_hardware_profile_orders_candidates_by_artifact_and_device():
+    profile = HardwareProfile(
+        onnx_providers=("CUDAExecutionProvider", "CPUExecutionProvider"),
+        openvino_devices=("CPU", "GPU"),
+        torch_cuda_available=True,
+        torch_cuda_usable=False,
+    )
+    candidates = profile.candidates("model.onnx")
+    assert [candidate.name for candidate in candidates] == ["openvino", "onnx", "onnx"]
+    assert candidates[0].options["device"] == "AUTO"
+    assert candidates[1].options["providers"] == ["CUDAExecutionProvider"]
+    assert candidates[2].options["providers"] == ["CPUExecutionProvider"]
+
+    cpu_candidates = profile.candidates("model.onnx", device="CPU")
+    assert [candidate.name for candidate in cpu_candidates] == ["openvino", "onnx"]
+    assert profile.candidates("model.pt")[0].options["device"] == "cpu"
+
+
+def test_adaptive_extractor_falls_back_and_records_hardware():
+    class FakeBackend:
+        def extract(self, _image):
+            return SemanticResult(depth=np.ones((2, 2)))
+
+    class FakeRegistry:
+        def create(self, name, **_options):
+            if name == "openvino":
+                raise RuntimeError("GPU plugin unavailable")
+            return FakeBackend()
+
+    profile = HardwareProfile(openvino_devices=("GPU",))
+    extractor = AdaptiveExtractor(
+        "model.onnx",
+        registry=FakeRegistry(),
+        hardware=profile,
+    )
+    result = extractor.extract(np.zeros((2, 2, 3), dtype=np.uint8))
+    assert extractor.backend_name == "onnx"
+    assert result.metadata["adaptive_backend"] == "onnx"
+    assert result.metadata["hardware_profile"]["openvino_devices"] == ["GPU"]
+    assert "openvino:" in result.metadata["adaptive_fallback_errors"][0]
+
+
 def test_cli_processing_commands_parse_input_limits():
     from yase.cli import _input_limits, _make_extractor, _parser
 
@@ -3533,6 +3578,24 @@ def test_cli_processing_commands_parse_input_limits():
         ]
     )
     assert _make_extractor(openvino)._backend_options["device"] == "GPU"
+    adaptive = _parser().parse_args(
+        [
+            "extract",
+            "frame.jpg",
+            "--model",
+            "auto",
+            "--model-path",
+            "model.onnx",
+            "--device",
+            "auto",
+            "--preference",
+            "openvino",
+        ]
+    )
+    adaptive_yase = _make_extractor(adaptive)
+    assert adaptive_yase.model == "auto"
+    assert adaptive_yase._backend_options["preference"] == "openvino"
+    assert adaptive_yase._backend_options["device"] == "auto"
     video = _parser().parse_args(
         [
             "video",

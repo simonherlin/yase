@@ -225,6 +225,12 @@ class Yase:
                 self._extractor = self.registry.create(
                     self.model, **self._backend_options
                 )
+            elif self.model == "auto":
+                from .hardware import AdaptiveExtractor
+
+                self._extractor = AdaptiveExtractor(
+                    registry=self.registry, **self._backend_options
+                )
             elif self.model == "torchscript":
                 from .backends import TorchScriptExtractor
 
@@ -244,7 +250,8 @@ class Yase:
             else:
                 raise ValueError(
                     "no backend is loaded by default; pass extractor=... or "
-                    'use model="torchscript", "onnx", "openvino", or "tensorrt" '
+                    'use model="auto", "torchscript", "onnx", "openvino", or '
+                    '"tensorrt" '
                     "with a local artifact"
                 )
         return self._extractor
