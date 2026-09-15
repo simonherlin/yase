@@ -85,6 +85,16 @@ PyObject* iou_matrix(PyObject*, PyObject* arguments) {
     Py_DECREF(left_sequence);
     Py_DECREF(right_sequence);
 
+    std::vector<double> scores(left.size() * right.size(), 0.0);
+    Py_BEGIN_ALLOW_THREADS
+    for (size_t row = 0; row < left.size(); ++row) {
+        for (size_t column = 0; column < right.size(); ++column) {
+            scores[row * right.size() + column] =
+                intersection_over_union(left[row].data(), right[column].data());
+        }
+    }
+    Py_END_ALLOW_THREADS
+
     PyObject* result = PyList_New(static_cast<Py_ssize_t>(left.size()));
     if (result == nullptr) {
         return nullptr;
@@ -96,8 +106,7 @@ PyObject* iou_matrix(PyObject*, PyObject* arguments) {
             return nullptr;
         }
         for (size_t column = 0; column < right.size(); ++column) {
-            const double score = intersection_over_union(left[row].data(), right[column].data());
-            PyObject* value = PyFloat_FromDouble(score);
+            PyObject* value = PyFloat_FromDouble(scores[row * right.size() + column]);
             if (value == nullptr) {
                 Py_DECREF(values);
                 Py_DECREF(result);
