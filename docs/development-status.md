@@ -957,6 +957,18 @@ instead of relying on an implicit system/interpreter configuration match.
 Result: 0.65.0 is ready as a portable release candidate; CUDA/TensorRT remains
 explicitly hardware-gated by the local Maxwell GPU.
 
+## Cycle 88 — supported Python wheel matrix
+
+- [x] Install the 0.65.0 wheel in clean Python 3.10, 3.11, 3.12, and 3.13
+  environments.
+- [x] Verify import, public result construction, and version metadata in every
+  supported interpreter.
+- [x] Keep optional provider smoke tests concentrated on the validated Python
+  3.12 reference environment.
+
+Result: the published pure wheel imports across the complete advertised
+Python range; heavy provider combinations remain separately matrixed.
+
 ## Exit criteria
 
 The package is considered ready for a first public release when the core and

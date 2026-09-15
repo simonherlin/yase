@@ -17,6 +17,7 @@ Validation date: 2026-09-15. Reference environment: Python 3.12.3 on Ubuntu
 | Native extension | pass: C++17 IoU/NMS build and import |
 | Distribution | pass: wheel and sdist build |
 | Portable install | pass: clean Python 3.12 wheel environment |
+| Wheel import matrix | pass: Python 3.10, 3.11, 3.12, and 3.13 |
 
 ## Delivered production hardening
 
