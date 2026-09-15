@@ -641,6 +641,55 @@ def test_asgi_service_exposes_health_metrics_and_safe_image_extraction():
     assert too_many[0]["status"] == 400
 
 
+def test_asgi_offloads_inference_and_returns_structured_timeout():
+    import time
+
+    from PIL import Image
+
+    image_buffer = BytesIO()
+    Image.new("RGB", (1, 1), color=(1, 2, 3)).save(image_buffer, format="PNG")
+    encoded = base64.b64encode(image_buffer.getvalue()).decode("ascii")
+
+    class SlowExtractor:
+        def extract(self, image, timestamp=None):
+            time.sleep(0.03)
+            return image
+
+    app = create_asgi_app(
+        Yase(extractor=SlowExtractor()),
+        timeout_seconds=0.005,
+        max_concurrency=1,
+    )
+
+    async def request():
+        sent = []
+        events = [
+            {
+                "type": "http.request",
+                "body": json.dumps({"image_base64": encoded}).encode("utf-8"),
+                "more_body": False,
+            }
+        ]
+
+        async def receive():
+            return events.pop(0)
+
+        async def send(message):
+            sent.append(message)
+
+        await app(
+            {"type": "http", "method": "POST", "path": "/extract"},
+            receive,
+            send,
+        )
+        return sent
+
+    response = asyncio.run(request())
+    assert response[0]["status"] == 504
+    assert json.loads(response[1]["body"])["error"]["type"] == "inference_timeout"
+    app.close()
+
+
 def test_normalise_tuple_and_result_timestamp():
     both = Yase(
         task="both",

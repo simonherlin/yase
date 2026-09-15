@@ -68,8 +68,11 @@ réel sur les petites listes.
    et le partage optimisé des contextes TensorRT restent à traiter.
 2. Propager les contextes de trace dans les sinks, batches et appels de
    backends afin de relier une frame à ses stages.
-3. Ajouter timeouts, quotas et annulation au boundary ASGI ; l’authentification
-   et le rate-limit global restent idéalement au proxy ou à la plateforme.
+3. [partiellement livré] Ajouter timeouts, quotas et annulation au boundary ASGI
+   ; le pool de workers borné, `timeout_seconds`, réponse 504 et libération
+   sûre des images sont désormais implémentés. L’authentification, le
+   rate-limit global et les quotas par tenant restent idéalement au proxy ou à
+   la plateforme.
 4. Enrichir les checkpoints avec une politique de migration et une empreinte
    du modèle/configuration qui a produit l’état.
 5. Ajouter une file multi-étages optionnelle pour les flux temps réel lorsque

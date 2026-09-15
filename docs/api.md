@@ -284,7 +284,11 @@ ever accepting a server-side path. POST `/extract/batch` accepts
 and returns aligned results; the body limit defaults to 16 MiB and the batch
 limit defaults to 64 images. Pass `input_limits=InputLimits(...)` to
 `create_asgi_app()` to reject oversized decoded dimensions/arrays before they
-reach a custom backend.
+reach a custom backend. Extraction runs in a bounded worker pool so synchronous
+models do not block the event loop; tune `max_concurrency` and optionally set
+`timeout_seconds` for a structured HTTP 504 deadline. Call `app.close()` during
+service shutdown; a timed-out worker is allowed to finish in the pool before
+its decoded image is released.
 Pass the same `OpenTelemetryTracer` to `SemanticPipeline.as_scheduler()` or
 `extract_scheduled(..., tracer=...)` to emit `yase.stage.<name>` spans in
 addition to the facade-level extraction span.

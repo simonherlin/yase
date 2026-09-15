@@ -198,7 +198,8 @@ the built-in service:
 ~~~python
 from yase import Yase, create_asgi_app
 
-app = create_asgi_app(Yase(model="onnx", model_path="model.onnx"))
+api = Yase(model="onnx", model_path="model.onnx")
+app = create_asgi_app(api, max_concurrency=4, timeout_seconds=10.0)
 ~~~
 
 Deployments can also construct the same facade from a checked-in JSON/TOML
@@ -208,6 +209,8 @@ configuration using `load_config("yase.toml")`; only names registered in
 Serialized `SemanticResult` payloads include a `schema_version` and can be
 restored with `result_from_dict()` when arrays were exported explicitly.
 The ASGI service also exposes `/extract/batch` for ordered base64 image lots.
+Synchronous model calls run in a bounded worker pool; call `app.close()` when
+the host shuts down.
 Scheduler-based pipelines accept the same optional tracer to correlate each
 named stage with the parent extraction span.
 

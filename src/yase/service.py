@@ -6,15 +6,22 @@ containers, queues, and browser clients. A real ASGI server such as Uvicorn is
 kept outside the base dependency set.
 """
 
+import asyncio
 import base64
 import binascii
 import json
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from io import BytesIO
 from typing import Any
 
 from .diagnostics import health_check
 from .limits import InputLimits
 from .serialization import result_to_dict
+
+
+class _InferenceTimeout(TimeoutError):
+    """Internal marker distinguishing service deadlines from backend errors."""
 
 
 class YaseASGI:
@@ -27,6 +34,8 @@ class YaseASGI:
         max_body_bytes: int = 16 * 1024 * 1024,
         max_batch_size: int = 64,
         input_limits: InputLimits | None = None,
+        max_concurrency: int = 4,
+        timeout_seconds: float | None = None,
     ):
         if not hasattr(extractor, "extract"):
             raise TypeError("extractor must expose the Yase extract(image) API")
@@ -42,12 +51,67 @@ class YaseASGI:
             or max_batch_size < 1
         ):
             raise ValueError("max_batch_size must be a positive integer")
+        if (
+            isinstance(max_concurrency, bool)
+            or not isinstance(max_concurrency, int)
+            or max_concurrency < 1
+        ):
+            raise ValueError("max_concurrency must be a positive integer")
+        if timeout_seconds is not None and (
+            isinstance(timeout_seconds, bool)
+            or not isinstance(timeout_seconds, (int, float))
+            or timeout_seconds <= 0
+        ):
+            raise ValueError("timeout_seconds must be a positive number or None")
         if input_limits is not None and not isinstance(input_limits, InputLimits):
             raise TypeError("input_limits must be an InputLimits instance")
         self.extractor = extractor
         self.max_body_bytes = max_body_bytes
         self.max_batch_size = max_batch_size
         self.input_limits = input_limits
+        self.max_concurrency = max_concurrency
+        self.timeout_seconds = float(timeout_seconds) if timeout_seconds else None
+        self._executor = ThreadPoolExecutor(
+            max_workers=max_concurrency,
+            thread_name_prefix="yase-asgi",
+        )
+
+    @staticmethod
+    def _close_images(images: list[Any]) -> None:
+        for image in images:
+            close = getattr(image, "close", None)
+            if callable(close):
+                close()
+
+    async def _run_blocking(self, function: Any, resources: list[Any]) -> Any:
+        """Run extraction off-loop while keeping timed-out images alive safely."""
+        loop = asyncio.get_running_loop()
+        future = loop.run_in_executor(self._executor, function)
+        deferred_close = False
+        try:
+            if self.timeout_seconds is None:
+                return await future
+            try:
+                return await asyncio.wait_for(
+                    asyncio.shield(future), timeout=self.timeout_seconds
+                )
+            except asyncio.TimeoutError as exc:
+                deferred_close = True
+                future.add_done_callback(lambda _future: self._close_images(resources))
+                raise _InferenceTimeout(
+                    f"inference exceeded timeout_seconds={self.timeout_seconds}"
+                ) from exc
+        except asyncio.CancelledError:
+            deferred_close = True
+            future.add_done_callback(lambda _future: self._close_images(resources))
+            raise
+        finally:
+            if not deferred_close:
+                self._close_images(resources)
+
+    def close(self) -> None:
+        """Stop the bounded worker pool during application shutdown."""
+        self._executor.shutdown(wait=True, cancel_futures=True)
 
     def _decode_image(self, encoded: Any) -> Any:
         if not isinstance(encoded, str) or not encoded:
@@ -183,14 +247,20 @@ class YaseASGI:
                             "batch extraction requires a Yase facade with "
                             "extract_many()"
                         )
-                    results = extract_many(
+                    results = await self._run_blocking(
+                        partial(
+                            extract_many,
+                            images,
+                            timestamps=timestamps,
+                            error_policy=error_policy,
+                        ),
                         images,
-                        timestamps=timestamps,
-                        error_policy=error_policy,
                     )
-                finally:
-                    for image in images:
-                        image.close()
+                except (_InferenceTimeout, asyncio.CancelledError):
+                    raise
+                except Exception:
+                    self._close_images(images)
+                    raise
                 await self._send(
                     send,
                     200,
@@ -210,12 +280,22 @@ class YaseASGI:
             include_arrays = request.get("include_arrays", False)
             if not isinstance(include_arrays, bool):
                 raise ValueError("include_arrays must be boolean")
-            with self._decode_image(encoded) as image:
-                result = self.extractor.extract(image, timestamp=timestamp)
+            image = self._decode_image(encoded)
+            result = await self._run_blocking(
+                partial(self.extractor.extract, image, timestamp=timestamp),
+                [image],
+            )
             await self._send(
                 send,
                 200,
                 {"result": result_to_dict(result, include_arrays=include_arrays)},
+                "application/json",
+            )
+        except _InferenceTimeout as exc:
+            await self._send(
+                send,
+                504,
+                {"error": {"type": "inference_timeout", "message": str(exc)}},
                 "application/json",
             )
         except KeyError as exc:
