@@ -347,6 +347,22 @@ def test_input_limits_validate_decoded_images_and_yase_inputs():
         InputLimits(max_channels=0)
 
 
+def test_yase_records_direct_extraction_metrics_on_success_and_failure():
+    metrics = RuntimeMetrics(namespace="image_test")
+    api = Yase(
+        extractor=lambda image: image[..., 0],
+        input_limits=InputLimits(max_width=2),
+        metrics=metrics,
+    )
+    api.extract(np.zeros((1, 2, 3), dtype=np.uint8))
+    with pytest.raises(InputError):
+        api.extract(np.zeros((1, 3, 3), dtype=np.uint8))
+    extraction = metrics.snapshot()["extraction"]
+    assert extraction["attempts"] == 2
+    assert extraction["failures"] == 1
+    assert "image_test_extraction_attempts_total 2" in metrics.prometheus_text()
+
+
 def test_normalise_tuple_and_result_timestamp():
     both = Yase(
         task="both",

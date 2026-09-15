@@ -52,6 +52,9 @@ class RuntimeMetrics:
         self._video_dropped = 0
         self._video_latency_sum = 0.0
         self._video_observations = 0
+        self._extractions = 0
+        self._extraction_failures = 0
+        self._extraction_latency_sum = 0.0
 
     def record_report(self, report: Any) -> None:
         """Record one scheduler-like report."""
@@ -77,6 +80,14 @@ class RuntimeMetrics:
             )
             self._video_observations += processed
 
+    def record_extraction(self, duration_seconds: float, *, success: bool) -> None:
+        """Record one direct image extraction attempt."""
+        with self._lock:
+            self._extractions += 1
+            if not success:
+                self._extraction_failures += 1
+            self._extraction_latency_sum += float(duration_seconds)
+
     def snapshot(self) -> dict[str, Any]:
         """Return a copy suitable for JSON logging or dashboards."""
         with self._lock:
@@ -95,6 +106,11 @@ class RuntimeMetrics:
                     "frames_dropped": self._video_dropped,
                     "latency_seconds_sum": self._video_latency_sum,
                     "latency_observations": self._video_observations,
+                },
+                "extraction": {
+                    "attempts": self._extractions,
+                    "failures": self._extraction_failures,
+                    "latency_seconds_sum": self._extraction_latency_sum,
                 },
             }
 
@@ -139,6 +155,14 @@ class RuntimeMetrics:
                     f"{self._video_latency_sum:.9g}",
                     f"{prefix}_video_frame_latency_seconds_count "
                     f"{self._video_observations}",
+                    f"# TYPE {prefix}_extraction_attempts_total counter",
+                    f"{prefix}_extraction_attempts_total {self._extractions}",
+                    f"# TYPE {prefix}_extraction_failures_total counter",
+                    f"{prefix}_extraction_failures_total {self._extraction_failures}",
+                    f"# TYPE {prefix}_extraction_latency_seconds summary",
+                    f"{prefix}_extraction_latency_seconds_sum "
+                    f"{self._extraction_latency_sum:.9g}",
+                    f"{prefix}_extraction_latency_seconds_count {self._extractions}",
                 ]
             )
             return "\n".join(lines) + "\n"

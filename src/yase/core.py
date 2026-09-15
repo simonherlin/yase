@@ -4,6 +4,7 @@ Heavy model backends are loaded lazily so importing yase never downloads
 weights or requires PyTorch.
 """
 
+import time
 from collections.abc import Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
@@ -13,6 +14,7 @@ from typing import Any, Callable, Optional, Protocol, Union
 import numpy as np
 
 from .limits import InputLimits
+from .observability import RuntimeMetrics
 
 ImageInput = Union[str, Path, np.ndarray, Any]
 
@@ -168,6 +170,7 @@ class Yase:
         color_order: str = "RGB",
         input_limits: Optional[InputLimits] = None,
         registry: Optional[Any] = None,
+        metrics: Optional[RuntimeMetrics] = None,
         **backend_options: Any,
     ) -> None:
         if task not in ("depth", "segmentation", "both", "semantic"):
@@ -183,6 +186,7 @@ class Yase:
         if registry is not None and not hasattr(registry, "create"):
             raise TypeError("registry must expose create(name, **options)")
         self.registry = registry
+        self.metrics = metrics
         self._extractor = extractor
         self._backend_options = backend_options
 
@@ -221,19 +225,32 @@ class Yase:
         self, image: ImageInput, timestamp: Optional[float] = None
     ) -> SemanticResult:
         """Extract semantics from one image."""
-        rgb = load_image(image, color_order=self.color_order, limits=self.input_limits)
-        backend = self.extractor
-        if hasattr(backend, "extract"):
-            output = backend.extract(rgb)
-        elif hasattr(backend, "predict"):
-            output = backend.predict(rgb)
-        elif self.task == "depth" and hasattr(backend, "predict_depth"):
-            output = backend.predict_depth(rgb)
-        elif callable(backend):
-            output = backend(rgb)
-        else:
-            raise TypeError("extractor must be callable or expose extract/predict")
-        return _normalise_output(output, self.task, timestamp)
+        started = time.perf_counter()
+        try:
+            rgb = load_image(
+                image, color_order=self.color_order, limits=self.input_limits
+            )
+            backend = self.extractor
+            if hasattr(backend, "extract"):
+                output = backend.extract(rgb)
+            elif hasattr(backend, "predict"):
+                output = backend.predict(rgb)
+            elif self.task == "depth" and hasattr(backend, "predict_depth"):
+                output = backend.predict_depth(rgb)
+            elif callable(backend):
+                output = backend(rgb)
+            else:
+                raise TypeError("extractor must be callable or expose extract/predict")
+            result = _normalise_output(output, self.task, timestamp)
+        except Exception:
+            if self.metrics is not None:
+                self.metrics.record_extraction(
+                    time.perf_counter() - started, success=False
+                )
+            raise
+        if self.metrics is not None:
+            self.metrics.record_extraction(time.perf_counter() - started, success=True)
+        return result
 
     def extract_many(
         self,

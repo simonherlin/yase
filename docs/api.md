@@ -98,6 +98,8 @@ completeness.
 per-stage status counts, duration summaries, processed video frames, dropped
 frames, and video latency summaries. Pass the same collector as `metrics=` to
 `VideoStream` or `RealtimeVideoStream` to record stream statistics.
+Pass the same collector as `metrics=` to `Yase` to record direct image
+extraction attempts, failures, and latency summaries.
 
 `BackendRegistry.discover_entry_points()` explicitly loads third-party
 factories from the `yase.backends` entry-point group. Use

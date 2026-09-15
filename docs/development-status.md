@@ -353,6 +353,15 @@ Result: version 0.26.0, 105 deterministic tests passing before final validation.
 
 Result: version 0.27.0, 106 deterministic tests passing before final validation.
 
+## Cycle 33 — direct image observability
+
+- [x] Record successful and failed `Yase.extract` attempts.
+- [x] Export direct extraction latency summaries in `RuntimeMetrics`.
+- [x] Keep input validation failures visible to service operators.
+- [x] Add nominal and failure-path regression coverage.
+
+Result: version 0.28.0, 107 deterministic tests passing before final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full
