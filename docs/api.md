@@ -172,7 +172,9 @@ examples/onnx.py, and examples/video.py for runnable adapters.
 
 `SemanticPipeline` names and composes independent stages such as a detector,
 OCR engine, embedding model, and VLM. `NumpyVectorIndex` provides local cosine
-search for small or offline embedding collections; production deployments can
+search for small or offline embedding collections; `add_record()` and
+`search_record()` bind provenance-aware `EmbeddingRecord` values to an
+embedding space and persist that namespace. Production deployments can
 implement the same boundary with a vector database adapter.
 
 `Tracker` is the common online tracking protocol. `IoUTracker` adds stable

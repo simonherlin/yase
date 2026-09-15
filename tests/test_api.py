@@ -1145,6 +1145,27 @@ def test_global_identity_store_round_trips_json_checkpoint():
         restored.load_state_dict({"version": 2})
 
 
+def test_numpy_index_enforces_embedding_spaces_and_persists_them(tmp_path):
+    first = EmbeddingRecord(
+        np.asarray([1.0, 0.0]), space="siglip", model_id="model-a", normalized=True
+    )
+    second = EmbeddingRecord(
+        np.asarray([0.0, 1.0]), space="dinov2", model_id="model-b", normalized=True
+    )
+    index = NumpyVectorIndex()
+    index.add_record("one", first)
+    assert index.search_record(first)[0].item_id == "one"
+    with pytest.raises(ValueError, match="space"):
+        index.add_record("two", second)
+    path = tmp_path / "vectors.npz"
+    index.save(path)
+    restored = NumpyVectorIndex.load(path)
+    assert restored.space == "siglip"
+    assert restored.search_record(first)[0].item_id == "one"
+    with pytest.raises(ValueError, match="space"):
+        restored.search_record(second)
+
+
 def test_tracking_metrics_detect_identity_switches():
     truth = [
         [Detection("person", 1.0, (0, 0, 10, 10), track_id=4)],

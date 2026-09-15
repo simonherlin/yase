@@ -486,6 +486,14 @@ Result: version 0.38.1, pending final validation.
 
 Result: version 0.39.0, pending final validation.
 
+## Cycle 49 — embedding-space safety
+
+- [x] Add provenance-aware add/search methods to `NumpyVectorIndex`.
+- [x] Reject mixed embedding spaces while retaining the raw-vector API.
+- [x] Persist and restore the index namespace in NPZ checkpoints.
+
+Result: version 0.40.0, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

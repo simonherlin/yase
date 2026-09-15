@@ -14,6 +14,7 @@ from typing import Any, Optional
 import numpy as np
 
 from .core import SemanticResult
+from .observation import EmbeddingRecord
 
 
 @dataclass(frozen=True)
@@ -33,8 +34,13 @@ class NumpyVectorIndex:
     database adapter when the collection or concurrency requirements grow.
     """
 
-    def __init__(self, dimension: Optional[int] = None) -> None:
+    def __init__(
+        self, dimension: Optional[int] = None, space: Optional[str] = None
+    ) -> None:
+        if space is not None and not space:
+            raise ValueError("space must not be empty when provided")
         self.dimension = dimension
+        self.space = space
         self._vectors: dict[str, np.ndarray] = {}
         self._metadata: dict[str, Mapping[str, Any]] = {}
 
@@ -73,6 +79,26 @@ class NumpyVectorIndex:
         if result.embeddings is None:
             raise ValueError("SemanticResult does not contain embeddings")
         self.add(item_id, result.embeddings, metadata=metadata)
+
+    def add_record(
+        self,
+        item_id: str,
+        record: EmbeddingRecord,
+        metadata: Optional[Mapping[str, Any]] = None,
+    ) -> None:
+        """Add a provenance-aware embedding and bind the index to its space."""
+        if not isinstance(record, EmbeddingRecord):
+            raise TypeError("record must be an EmbeddingRecord")
+        if self.space is None:
+            self.space = record.space
+        if record.space != self.space:
+            raise ValueError(f"expected embeddings from space {self.space}")
+        payload = dict(metadata or {})
+        payload.setdefault("space", record.space)
+        payload.setdefault("model_id", record.model_id)
+        if record.revision is not None:
+            payload.setdefault("revision", record.revision)
+        self.add(item_id, record.vector, metadata=payload)
 
     def remove(self, item_id: str) -> None:
         self._vectors.pop(item_id, None)
@@ -114,6 +140,20 @@ class NumpyVectorIndex:
             hits.append(SearchHit(item_id, score, self._metadata[item_id]))
         return hits
 
+    def search_record(
+        self,
+        record: EmbeddingRecord,
+        limit: int = 10,
+        min_score: Optional[float] = None,
+        where: Optional[Mapping[str, Any]] = None,
+    ) -> list[SearchHit]:
+        """Search with a provenance-aware query embedding."""
+        if not isinstance(record, EmbeddingRecord):
+            raise TypeError("record must be an EmbeddingRecord")
+        if self.space is not None and record.space != self.space:
+            raise ValueError(f"expected embeddings from space {self.space}")
+        return self.search(record.vector, limit=limit, min_score=min_score, where=where)
+
     def save(self, destination: Any) -> None:
         """Persist vectors and JSON-compatible metadata to a compressed NPZ."""
         path = Path(destination)
@@ -131,6 +171,7 @@ class NumpyVectorIndex:
             ids=np.asarray(ids, dtype=str),
             vectors=vectors,
             metadata=np.asarray(metadata),
+            space=np.asarray(self.space or ""),
         )
 
     @classmethod
@@ -140,10 +181,11 @@ class NumpyVectorIndex:
             vectors = np.asarray(archive["vectors"], dtype=np.float32)
             ids = [str(value) for value in archive["ids"].tolist()]
             metadata = json.loads(str(archive["metadata"].item()))
+            space = str(archive["space"].item()) if "space" in archive else ""
         dimension = (
             int(vectors.shape[1]) if vectors.ndim == 2 and vectors.shape[1] else None
         )
-        index = cls(dimension=dimension)
+        index = cls(dimension=dimension, space=space or None)
         for item_id, vector in zip(ids, vectors):
             index.add(item_id, vector, metadata=metadata.get(item_id, {}))
         return index
