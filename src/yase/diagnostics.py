@@ -6,6 +6,7 @@ import platform
 import sys
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from importlib import metadata as importlib_metadata
 from typing import Any
 
 import numpy as np
@@ -22,6 +23,7 @@ class RuntimeInfo:
     cpu_count: int | None
     optional_packages: Mapping[str, bool] = field(default_factory=dict)
     provider_info: Mapping[str, Any] = field(default_factory=dict)
+    optional_versions: Mapping[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -32,6 +34,7 @@ class RuntimeInfo:
             "cpu_count": self.cpu_count,
             "optional_packages": dict(self.optional_packages),
             "provider_info": dict(self.provider_info),
+            "optional_versions": dict(self.optional_versions),
         }
 
 
@@ -158,17 +161,33 @@ def collect_runtime_info(
 
     Set ``probe_providers=True`` only for an explicit runtime readiness probe.
     """
+    available = {
+        package: importlib.util.find_spec(package) is not None
+        for package in optional_packages
+    }
+    distribution_names = {
+        "cv2": ("opencv-python", "opencv-python-headless"),
+        "yase._native": ("yase",),
+    }
+    versions: dict[str, str] = {}
+    for package, installed in available.items():
+        if not installed:
+            continue
+        for distribution in distribution_names.get(package, (package,)):
+            try:
+                versions[package] = importlib_metadata.version(distribution)
+                break
+            except importlib_metadata.PackageNotFoundError:
+                continue
     return RuntimeInfo(
         python=sys.version.split()[0],
         platform=platform.platform(),
         machine=platform.machine(),
         numpy=np.__version__,
         cpu_count=os.cpu_count(),
-        optional_packages={
-            package: importlib.util.find_spec(package) is not None
-            for package in optional_packages
-        },
+        optional_packages=available,
         provider_info=collect_provider_info() if probe_providers else {},
+        optional_versions=versions,
     )
 
 

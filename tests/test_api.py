@@ -3172,6 +3172,7 @@ def test_runtime_diagnostics_are_lazy_and_machine_readable():
     assert isinstance(runtime, RuntimeInfo)
     assert runtime.optional_packages["numpy"] is True
     assert runtime.optional_packages["package_that_is_missing"] is False
+    assert runtime.optional_versions["numpy"] == np.__version__
 
     healthy = health_check(lambda image: image)
     assert isinstance(healthy, HealthReport)
@@ -3234,6 +3235,7 @@ def test_runtime_diagnostics_can_probe_optional_providers(monkeypatch):
     assert "openvino" in runtime.provider_info
     assert "tensorrt" in runtime.provider_info
     assert runtime.to_dict()["provider_info"] == runtime.provider_info
+    assert runtime.to_dict()["optional_versions"] == runtime.optional_versions
 
 
 def test_cli_diagnostics_reports_readiness(capsys):

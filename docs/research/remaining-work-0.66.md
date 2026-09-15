@@ -53,8 +53,11 @@ réel sur les petites listes.
 3. Valider les providers GPU sur des machines compatibles : CUDA EP, TensorRT,
    OpenVINO GPU/NPU. Le poste local Maxwell ne peut pas être la preuve d’un
    TensorRT moderne.
-4. Publier une matrice de compatibilité par OS, Python, runtime, architecture
-   CPU/GPU et licence de checkpoint.
+4. [partiellement livré] Publier une matrice de compatibilité par OS, Python,
+   runtime, architecture CPU/GPU et licence de checkpoint. `yase diagnostics`
+   émet désormais les versions des distributions détectées et les providers
+   optionnels ; la matrice multi-OS/hardware et les licences de checkpoints
+   restent à exécuter dans des environnements de release dédiés.
 5. [partiellement livré] Ajouter une procédure de migration pour les versions
    futures de résultats, bundles et checkpoints, avec fixtures de versions
    précédentes. Les aliases de résultats et checkpoints non versionnés sont

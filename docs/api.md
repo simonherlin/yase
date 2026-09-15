@@ -57,7 +57,9 @@ The CLI exposes the same check through `yase diagnostics`; repeat
 `--require PACKAGE` to make optional runtime packages readiness requirements.
 Add `--providers` for an explicit probe of installed ONNX Runtime providers,
 OpenVINO devices, PyTorch CUDA, and TensorRT. The probe imports and initializes
-those optional runtimes only when requested.
+those optional runtimes only when requested. The JSON report also includes
+`optional_versions`, allowing a release matrix to record installed distribution
+versions instead of only booleans.
 Scores are normalized to `[0, 1]` by typed primitives, but their calibration is
 model-specific and should be documented in backend metadata.
 

@@ -368,8 +368,10 @@ report = scheduler.run(frame)
 The scheduler reorders the graph, caches repeatable stage outputs, propagates
 cancellation and deadlines, and exposes stage-level telemetry.
 
-For deployment probes, `yase diagnostics` reports Python, NumPy, CPU and
-optional runtime availability without loading model weights.
+For deployment probes, `yase diagnostics` reports Python, NumPy, CPU, optional
+runtime availability, and installed distribution versions without loading
+model weights. Add `--providers` when the target machine should also be probed
+for ONNX Runtime, OpenVINO, PyTorch CUDA, and TensorRT devices.
 
 For small collections, `NumpyVectorIndex` provides local cosine retrieval and
 can ingest `SemanticResult.embeddings`. For larger collections, keep this API
