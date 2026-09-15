@@ -1,12 +1,15 @@
 """Optional native acceleration with a deterministic Python fallback."""
 
+import math
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Optional
 
 try:  # The binary is built explicitly; importing Yase never compiles code.
     from ._native import iou_matrix as _native_iou_matrix
+    from ._native import nms_indices as _native_nms_indices
 except ImportError:  # pragma: no cover - exercised when no compiler artifact exists
     _native_iou_matrix = None
+    _native_nms_indices = None
 
 
 NATIVE_AVAILABLE = _native_iou_matrix is not None
@@ -53,4 +56,54 @@ def iou_matrix(left: Sequence[Any], right: Sequence[Any]) -> list[list[float]]:
     return _python_iou_matrix(normalized_left, normalized_right)
 
 
-__all__ = ["NATIVE_AVAILABLE", "iou_matrix"]
+def _python_nms_indices(
+    boxes: Sequence[tuple[float, float, float, float]],
+    scores: Sequence[float],
+    iou_threshold: float,
+    class_ids: Optional[Sequence[int]],
+) -> list[int]:
+    order = sorted(range(len(boxes)), key=lambda index: scores[index], reverse=True)
+    kept: list[int] = []
+    for index in order:
+        if all(
+            class_ids is None
+            or class_ids[index] != class_ids[other]
+            or _python_iou_matrix([boxes[index]], [boxes[other]])[0][0] <= iou_threshold
+            for other in kept
+        ):
+            kept.append(index)
+    return kept
+
+
+def nms_indices(
+    boxes: Sequence[Any],
+    scores: Sequence[float],
+    iou_threshold: float = 0.5,
+    class_ids: Optional[Sequence[int]] = None,
+) -> list[int]:
+    """Return stable greedy-NMS indices, using C++ when available."""
+    if not 0 <= iou_threshold <= 1:
+        raise ValueError("iou_threshold must be in [0, 1]")
+    normalized_boxes = [_box_values(box) for box in boxes]
+    normalized_scores = [float(score) for score in scores]
+    if len(normalized_boxes) != len(normalized_scores):
+        raise ValueError("boxes and scores must have the same length")
+    if not all(math.isfinite(score) for score in normalized_scores):
+        raise ValueError("scores must be finite")
+    normalized_classes = (
+        None if class_ids is None else [int(value) for value in class_ids]
+    )
+    if normalized_classes is not None and len(normalized_classes) != len(
+        normalized_boxes
+    ):
+        raise ValueError("boxes and class_ids must have the same length")
+    if _native_nms_indices is not None:
+        return _native_nms_indices(
+            normalized_boxes, normalized_scores, iou_threshold, normalized_classes
+        )
+    return _python_nms_indices(
+        normalized_boxes, normalized_scores, iou_threshold, normalized_classes
+    )
+
+
+__all__ = ["NATIVE_AVAILABLE", "iou_matrix", "nms_indices"]

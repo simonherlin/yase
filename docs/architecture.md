@@ -32,9 +32,9 @@ Yase is split into a lightweight core and optional capability layers:
     bounded-queue boundaries for downstream systems.
 16. `diagnostics.py` provides lazy runtime capability reports and readiness
     checks without importing optional frameworks.
-17. `native.py` exposes optional C++17 acceleration for tracking hot paths;
-    the public Python fallback remains deterministic when no compiler artifact
-    is installed.
+17. `native.py` exposes optional C++17 acceleration for IoU, greedy NMS, and
+    tracking hot paths; the public Python fallback remains deterministic when
+    no compiler artifact is installed.
 
 A backend may return a typed result, a mapping, or an array. The result schema
 supports depth, segmentation, detections, tags, embeddings, OCR, captions,

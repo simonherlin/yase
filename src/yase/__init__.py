@@ -73,6 +73,7 @@ from .metrics import (
     evaluate_tracking,
 )
 from .models import ModelCard, ModelCatalog, default_model_catalog
+from .native import nms_indices
 from .normalization import normalise_detections
 from .observability import RuntimeMetrics
 from .observation import (
@@ -125,7 +126,7 @@ from .video import (
     process_video,
 )
 
-__version__ = "0.31.0"
+__version__ = "0.32.0"
 
 __all__ = [
     "CallableExtractor",
@@ -252,6 +253,7 @@ __all__ = [
     "load_coco_dataset",
     "load_coco_predictions",
     "normalise_detections",
+    "nms_indices",
     "collect_runtime_info",
     "health_check",
     "observation_to_json",

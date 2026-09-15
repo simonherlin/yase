@@ -103,6 +103,7 @@ from yase import (
     load_coco_predictions,
     load_image,
     load_mot_sequence,
+    nms_indices,
     normalise_detections,
     observation_to_json,
     result_to_dict,
@@ -576,6 +577,24 @@ def test_iou_matrix_has_a_portable_fallback_and_native_contract():
     finally:
         native._native_iou_matrix = compiled
     assert fallback[0][0] == pytest.approx(1 / 7)
+
+
+def test_nms_indices_is_class_aware_and_has_a_portable_fallback():
+    import yase.native as native
+
+    boxes = [(0, 0, 10, 10), (1, 1, 11, 11), (1, 1, 11, 11)]
+    scores = [0.8, 0.9, 0.7]
+    assert nms_indices(boxes, scores, 0.5) == [1]
+    assert nms_indices(boxes, scores, 0.5, [1, 1, 2]) == [1, 2]
+    compiled = native._native_nms_indices
+    native._native_nms_indices = None
+    try:
+        fallback = native.nms_indices(boxes, scores, 0.5, [1, 1, 2])
+    finally:
+        native._native_nms_indices = compiled
+    assert fallback == [1, 2]
+    with pytest.raises(ValueError, match="same length"):
+        nms_indices(boxes, scores[:2])
 
 
 def test_bytetrack_lite_uses_the_same_native_matching_contract():

@@ -110,8 +110,151 @@ PyObject* iou_matrix(PyObject*, PyObject* arguments) {
     return result;
 }
 
+PyObject* nms_indices(PyObject*, PyObject* arguments) {
+    PyObject* box_objects = nullptr;
+    PyObject* score_objects = nullptr;
+    double threshold = 0.0;
+    PyObject* class_objects = Py_None;
+    if (!PyArg_ParseTuple(
+            arguments, "OOd|O:nms_indices", &box_objects, &score_objects, &threshold,
+            &class_objects)) {
+        return nullptr;
+    }
+    if (threshold < 0.0 || threshold > 1.0) {
+        PyErr_SetString(PyExc_ValueError, "iou_threshold must be in [0, 1]");
+        return nullptr;
+    }
+
+    PyObject* boxes_sequence = PySequence_Fast(box_objects, "boxes must be a sequence");
+    if (boxes_sequence == nullptr) {
+        return nullptr;
+    }
+    PyObject* scores_sequence = PySequence_Fast(score_objects, "scores must be a sequence");
+    if (scores_sequence == nullptr) {
+        Py_DECREF(boxes_sequence);
+        return nullptr;
+    }
+    const Py_ssize_t box_count = PySequence_Fast_GET_SIZE(boxes_sequence);
+    if (box_count != PySequence_Fast_GET_SIZE(scores_sequence)) {
+        PyErr_SetString(PyExc_ValueError, "boxes and scores must have the same length");
+        Py_DECREF(boxes_sequence);
+        Py_DECREF(scores_sequence);
+        return nullptr;
+    }
+
+    PyObject* classes_sequence = nullptr;
+    if (class_objects != Py_None) {
+        classes_sequence = PySequence_Fast(class_objects, "class_ids must be a sequence");
+        if (classes_sequence == nullptr) {
+            Py_DECREF(boxes_sequence);
+            Py_DECREF(scores_sequence);
+            return nullptr;
+        }
+        if (box_count != PySequence_Fast_GET_SIZE(classes_sequence)) {
+            PyErr_SetString(PyExc_ValueError, "boxes and class_ids must have the same length");
+            Py_DECREF(boxes_sequence);
+            Py_DECREF(scores_sequence);
+            Py_DECREF(classes_sequence);
+            return nullptr;
+        }
+    }
+
+    std::vector<std::array<double, 4>> boxes;
+    std::vector<double> scores;
+    std::vector<long> classes;
+    boxes.reserve(box_count);
+    scores.reserve(box_count);
+    if (classes_sequence != nullptr) {
+        classes.reserve(box_count);
+    }
+    for (Py_ssize_t index = 0; index < box_count; ++index) {
+        double values[4];
+        if (!read_box(PySequence_Fast_GET_ITEM(boxes_sequence, index), values)) {
+            Py_DECREF(boxes_sequence);
+            Py_DECREF(scores_sequence);
+            Py_XDECREF(classes_sequence);
+            return nullptr;
+        }
+        const double score = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(scores_sequence, index));
+        if (PyErr_Occurred()) {
+            Py_DECREF(boxes_sequence);
+            Py_DECREF(scores_sequence);
+            Py_XDECREF(classes_sequence);
+            return nullptr;
+        }
+        if (!std::isfinite(score)) {
+            PyErr_SetString(PyExc_ValueError, "scores must be finite");
+            Py_DECREF(boxes_sequence);
+            Py_DECREF(scores_sequence);
+            Py_XDECREF(classes_sequence);
+            return nullptr;
+        }
+        boxes.push_back({values[0], values[1], values[2], values[3]});
+        scores.push_back(score);
+        if (classes_sequence != nullptr) {
+            const long class_id = PyLong_AsLong(PySequence_Fast_GET_ITEM(classes_sequence, index));
+            if (PyErr_Occurred()) {
+                Py_DECREF(boxes_sequence);
+                Py_DECREF(scores_sequence);
+                Py_DECREF(classes_sequence);
+                return nullptr;
+            }
+            classes.push_back(class_id);
+        }
+    }
+    Py_DECREF(boxes_sequence);
+    Py_DECREF(scores_sequence);
+    Py_XDECREF(classes_sequence);
+
+    std::vector<size_t> order(boxes.size());
+    for (size_t index = 0; index < order.size(); ++index) {
+        order[index] = index;
+    }
+    std::stable_sort(order.begin(), order.end(), [&scores](size_t left, size_t right) {
+        return scores[left] > scores[right];
+    });
+    std::vector<size_t> kept;
+    std::vector<bool> suppressed(boxes.size(), false);
+    Py_BEGIN_ALLOW_THREADS
+    for (size_t position = 0; position < order.size(); ++position) {
+        const size_t current = order[position];
+        if (suppressed[current]) {
+            continue;
+        }
+        kept.push_back(current);
+        for (size_t next_position = position + 1; next_position < order.size(); ++next_position) {
+            const size_t next = order[next_position];
+            if (suppressed[next]) {
+                continue;
+            }
+            if (!classes.empty() && classes[current] != classes[next]) {
+                continue;
+            }
+            if (intersection_over_union(boxes[current].data(), boxes[next].data()) > threshold) {
+                suppressed[next] = true;
+            }
+        }
+    }
+    Py_END_ALLOW_THREADS
+
+    PyObject* result = PyList_New(static_cast<Py_ssize_t>(kept.size()));
+    if (result == nullptr) {
+        return nullptr;
+    }
+    for (size_t position = 0; position < kept.size(); ++position) {
+        PyObject* value = PyLong_FromSize_t(kept[position]);
+        if (value == nullptr) {
+            Py_DECREF(result);
+            return nullptr;
+        }
+        PyList_SET_ITEM(result, static_cast<Py_ssize_t>(position), value);
+    }
+    return result;
+}
+
 PyMethodDef methods[] = {
     {"iou_matrix", iou_matrix, METH_VARARGS, "Compute an IoU matrix in native code."},
+    {"nms_indices", nms_indices, METH_VARARGS, "Compute greedy NMS indices in native code."},
     {nullptr, nullptr, 0, nullptr},
 };
 

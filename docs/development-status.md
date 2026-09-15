@@ -389,6 +389,14 @@ Result: version 0.30.0, 109 tests passing with native code enabled locally.
 
 Result: version 0.31.0, 110 tests passing with native code enabled locally.
 
+## Cycle 37 — native greedy NMS
+
+- [x] Add deterministic C++17 greedy NMS with optional class-aware filtering.
+- [x] Keep a validated Python fallback for environments without a compiler.
+- [x] Expose the utility as a package-level API for detector integrations.
+
+Result: version 0.32.0, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full
