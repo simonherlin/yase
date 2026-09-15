@@ -385,6 +385,33 @@ class VideoStream:
             self._capture.release()
             self._capture = None
 
+    def save_checkpoint(
+        self, destination: Any, metadata: Optional[Mapping[str, Any]] = None
+    ) -> Any:
+        """Atomically checkpoint attached online state for worker recovery."""
+        from .checkpoints import save_stream_checkpoint
+
+        context = {"source_id": self.source_id, "camera_id": self.camera_id}
+        context.update(dict(metadata or {}))
+        return save_stream_checkpoint(
+            destination,
+            tracker=self.tracker,
+            memory=self.memory,
+            identity_store=self.identity_store,
+            metadata=context,
+        )
+
+    def load_checkpoint(self, source: Any) -> dict[str, Any]:
+        """Restore attached online state from a stream checkpoint."""
+        from .checkpoints import load_stream_checkpoint
+
+        return load_stream_checkpoint(
+            source,
+            tracker=self.tracker,
+            memory=self.memory,
+            identity_store=self.identity_store,
+        )
+
 
 def process_video(
     source: Union[str, int, Any], extractor: Any, **kwargs: Any

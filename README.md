@@ -158,6 +158,9 @@ which runs capture in a worker and keeps a bounded latest-frame buffer. Set
 drop_frames=False to apply backpressure instead of discarding stale frames.
 Pass tracker=ByteTrackLite() and memory=SemanticTrackMemory() to keep
 identities and semantic confidence stable across frames.
+Use `stream.save_checkpoint("state.json")` and
+`stream.load_checkpoint("state.json")` to resume attached tracker, memory, and
+cross-camera identity state after a worker restart.
 
 For analytics across several cameras, attach a `GlobalIdentityStore` and set
 `camera_id`; detections carrying an appearance vector in

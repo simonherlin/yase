@@ -875,6 +875,40 @@ def test_video_memory_runs_after_tracker():
     assert frames[1].result.detections[0].attributes["seen_count"] == 2
 
 
+def test_video_stream_checkpoint_methods_restore_attached_state(tmp_path):
+    detection = Detection("person", 0.9, (0, 0, 2, 2), track_id=None)
+    tracker = IoUTracker()
+    memory = SemanticTrackMemory()
+    stream = VideoStream(
+        FakeCapture(2),
+        lambda _image: SemanticResult(detections=[detection]),
+        tracker=tracker,
+        memory=memory,
+        source_id="camera-9",
+        camera_id="cam-9",
+    )
+    list(stream)
+    checkpoint = tmp_path / "video-state.json"
+    stream.save_checkpoint(checkpoint, metadata={"job_id": "resume-me"})
+
+    restored_tracker = IoUTracker()
+    restored_memory = SemanticTrackMemory()
+    restored_stream = VideoStream(
+        FakeCapture(0),
+        lambda _image: SemanticResult(detections=[]),
+        tracker=restored_tracker,
+        memory=restored_memory,
+    )
+    payload = restored_stream.load_checkpoint(checkpoint)
+    assert payload["metadata"] == {
+        "camera_id": "cam-9",
+        "job_id": "resume-me",
+        "source_id": "camera-9",
+    }
+    assert restored_tracker.active_ids == tracker.active_ids
+    assert restored_memory.states == memory.states
+
+
 def test_adaptive_cascade_refines_then_uses_fast_path():
     calls = {"fast": 0, "accurate": 0}
     box = BoundingBox(0, 0, 2, 2)

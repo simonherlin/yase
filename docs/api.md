@@ -169,6 +169,10 @@ from appearance embeddings stored in detection attributes.
 cross-camera identities resumable across worker restarts.
 `SemanticTrackMemory` exposes the same checkpoint contract for confidence EMA,
 label history, lifetime counters, and missed-frame state.
+`VideoStream.save_checkpoint()` and `load_checkpoint()` wrap the same atomic
+checkpoint envelope for the state components attached to a stream and include
+source/camera context in its metadata. `RealtimeVideoStream` inherits these
+methods.
 
 See examples/image.py, examples/batch.py, examples/composite.py,
 examples/onnx.py, and examples/video.py for runnable adapters.

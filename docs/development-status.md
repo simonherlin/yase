@@ -568,6 +568,15 @@ Result: version 0.47.0, pending final validation.
 
 Result: version 0.48.0, pending final validation.
 
+## Cycle 58 — stream checkpoint integration
+
+- [x] Add `VideoStream.save_checkpoint()` and `load_checkpoint()` convenience APIs.
+- [x] Include source and camera provenance in checkpoint metadata.
+- [x] Make the same API available to `RealtimeVideoStream` through inheritance.
+- [x] Add integration coverage with tracker and semantic memory recovery.
+
+Result: version 0.49.0, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full
