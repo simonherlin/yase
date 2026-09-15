@@ -26,25 +26,24 @@ def _python_iou_matrix(
     left: Sequence[tuple[float, float, float, float]],
     right: Sequence[tuple[float, float, float, float]],
 ) -> list[list[float]]:
-    result = []
-    for left_box in left:
-        row = []
-        for right_box in right:
-            x1 = max(left_box[0], right_box[0])
-            y1 = max(left_box[1], right_box[1])
-            x2 = min(left_box[2], right_box[2])
-            y2 = min(left_box[3], right_box[3])
-            intersection = max(0.0, x2 - x1) * max(0.0, y2 - y1)
-            left_area = max(0.0, left_box[2] - left_box[0]) * max(
-                0.0, left_box[3] - left_box[1]
-            )
-            right_area = max(0.0, right_box[2] - right_box[0]) * max(
-                0.0, right_box[3] - right_box[1]
-            )
-            union = left_area + right_area - intersection
-            row.append(intersection / union if union else 0.0)
-        result.append(row)
-    return result
+    return [
+        [_python_iou(left_box, right_box) for right_box in right] for left_box in left
+    ]
+
+
+def _python_iou(
+    left: tuple[float, float, float, float],
+    right: tuple[float, float, float, float],
+) -> float:
+    x1 = max(left[0], right[0])
+    y1 = max(left[1], right[1])
+    x2 = min(left[2], right[2])
+    y2 = min(left[3], right[3])
+    intersection = max(0.0, x2 - x1) * max(0.0, y2 - y1)
+    left_area = max(0.0, left[2] - left[0]) * max(0.0, left[3] - left[1])
+    right_area = max(0.0, right[2] - right[0]) * max(0.0, right[3] - right[1])
+    union = left_area + right_area - intersection
+    return intersection / union if union else 0.0
 
 
 def iou_matrix(left: Sequence[Any], right: Sequence[Any]) -> list[list[float]]:
@@ -68,7 +67,7 @@ def _python_nms_indices(
         if all(
             class_ids is None
             or class_ids[index] != class_ids[other]
-            or _python_iou_matrix([boxes[index]], [boxes[other]])[0][0] <= iou_threshold
+            or _python_iou(boxes[index], boxes[other]) <= iou_threshold
             for other in kept
         ):
             kept.append(index)

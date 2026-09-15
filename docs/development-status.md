@@ -405,6 +405,14 @@ Result: version 0.32.0, pending final validation.
 
 Result: version 0.33.0, pending final validation.
 
+## Cycle 39 — Python-only NMS fallback
+
+- [x] Remove per-comparison temporary IoU matrices from the fallback NMS path.
+- [x] Reuse one scalar IoU implementation for matrix and suppression operations.
+- [x] Keep the no-compiler installation path deterministic and dependency-light.
+
+Result: version 0.34.0, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full
