@@ -22,6 +22,9 @@ class BenchmarkReport:
     total_seconds: float
     latencies_seconds: tuple[float, ...]
     quality: Mapping[str, float] = field(default_factory=dict)
+    phase_latencies_seconds: Mapping[str, tuple[float, ...]] = field(
+        default_factory=dict
+    )
 
     @property
     def throughput(self) -> float:
@@ -40,6 +43,16 @@ class BenchmarkReport:
         return ordered[lower] + (ordered[upper] - ordered[lower]) * fraction
 
     def to_dict(self) -> dict[str, Any]:
+        phase_timings = {
+            phase: {
+                "samples": len(values),
+                "mean_seconds": mean(values) if values else 0.0,
+                "p50_seconds": self._percentile(values, 50),
+                "p95_seconds": self._percentile(values, 95),
+                "p99_seconds": self._percentile(values, 99),
+            }
+            for phase, values in self.phase_latencies_seconds.items()
+        }
         return {
             "name": self.name,
             "samples": self.samples,
@@ -55,8 +68,28 @@ class BenchmarkReport:
             "latency_p50_seconds": self.percentile(50),
             "latency_p95_seconds": self.percentile(95),
             "latency_p99_seconds": self.percentile(99),
+            "phase_timings": phase_timings,
             "quality": dict(self.quality),
         }
+
+    @staticmethod
+    def _percentile(values: tuple[float, ...], percentile: float) -> float:
+        if not values:
+            return 0.0
+        ordered = sorted(values)
+        index = (len(ordered) - 1) * percentile / 100
+        lower = int(index)
+        upper = min(lower + 1, len(ordered) - 1)
+        fraction = index - lower
+        return ordered[lower] + (ordered[upper] - ordered[lower]) * fraction
+
+    def phase_percentile(self, phase: str, percentile: float) -> float:
+        """Return a percentile for an instrumented backend phase."""
+        if not 0 <= percentile <= 100:
+            raise ValueError("percentile must be in [0, 100]")
+        return self._percentile(
+            tuple(self.phase_latencies_seconds.get(phase, ())), percentile
+        )
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), ensure_ascii=False, sort_keys=True)
@@ -85,6 +118,7 @@ class BenchmarkRunner:
         for item in items[: self.warmup]:
             self._invoke(extractor, item)
         latencies: list[float] = []
+        phase_values: dict[str, list[float]] = {}
         quality_values: dict[str, list[float]] = {}
         failures = 0
         started_total = time.perf_counter()
@@ -94,6 +128,15 @@ class BenchmarkRunner:
                 result = self._invoke(extractor, item)
                 elapsed = time.perf_counter() - started
                 latencies.append(elapsed)
+                timings = result.metadata.get("timings_seconds", {})
+                if isinstance(timings, Mapping):
+                    for phase, value in timings.items():
+                        try:
+                            duration = float(value)
+                        except (TypeError, ValueError):
+                            continue
+                        if duration >= 0:
+                            phase_values.setdefault(str(phase), []).append(duration)
                 if evaluator is not None:
                     for key, value in evaluator(result, item).items():
                         quality_values.setdefault(key, []).append(float(value))
@@ -110,6 +153,9 @@ class BenchmarkRunner:
             total_seconds=total,
             latencies_seconds=tuple(latencies),
             quality=quality,
+            phase_latencies_seconds={
+                phase: tuple(values) for phase, values in phase_values.items()
+            },
         )
 
     def compare(

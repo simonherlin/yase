@@ -216,6 +216,11 @@ Une release production doit satisfaire simultanément :
 - benchmark séparant prétraitement, transfert, inférence, post-traitement et
   latence de bout en bout.
 
+Le benchmark local fournit désormais l’attribution opt-in des phases
+prétraitement/inférence/post-traitement pour les quatre adaptateurs de modèles
+principaux. Le transfert device détaillé et la synchronisation GPU restent une
+validation hardware de release, car ils dépendent du provider réellement actif.
+
 ## 7. Décision immédiate
 
 Les tâches suivantes sont les plus rentables et doivent être implémentées dans

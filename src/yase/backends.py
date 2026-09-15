@@ -4,11 +4,13 @@ The core package has no model weights or framework dependency. These adapters
 are initialized explicitly by applications and accept local model artifacts.
 """
 
+import time
 from collections.abc import Mapping, Sequence
 from typing import Any
 
 import numpy as np
 
+from ._timing import add_phase_timings
 from .core import SemanticResult, _normalise_output, load_image
 from .errors import BackendError
 from .limits import InputLimits
@@ -64,11 +66,14 @@ class TorchScriptExtractor:
         task: str = "depth",
         size: tuple | None = None,
         input_limits: InputLimits | None = None,
+        record_timings: bool = False,
     ) -> None:
         if task not in ("depth", "segmentation", "both"):
             raise ValueError("task must be depth, segmentation, or both")
         if size is not None and (len(size) != 2 or size[0] <= 0 or size[1] <= 0):
             raise ValueError("size must be a positive (width, height) pair")
+        if not isinstance(record_timings, bool):
+            raise TypeError("record_timings must be a boolean")
         try:
             import torch
         except ImportError as exc:
@@ -84,6 +89,7 @@ class TorchScriptExtractor:
         self.task = task
         self.size = size
         self.input_limits = input_limits
+        self.record_timings = record_timings
 
     def _prepare_batch(self, images: Sequence[Any]) -> Any:
         torch = self._torch
@@ -103,7 +109,11 @@ class TorchScriptExtractor:
             )
         return tensor
 
-    def _results_from_output(self, output: Any) -> list[SemanticResult]:
+    def _results_from_output(
+        self,
+        output: Any,
+        timings: Mapping[str, float] | None = None,
+    ) -> list[SemanticResult]:
         if isinstance(output, (tuple, list)):
             if self.task == "both" and len(output) < 2:
                 raise ValueError("both task requires at least two model outputs")
@@ -111,12 +121,16 @@ class TorchScriptExtractor:
         else:
             outputs = [output.detach().cpu().numpy()]
         results = []
-        metadata = {
-            "backend": "torchscript",
-            "model_path": self.model_path,
-            "device": str(self.device),
-            "task": self.task,
-        }
+        metadata = add_phase_timings(
+            {
+                "backend": "torchscript",
+                "model_path": self.model_path,
+                "device": str(self.device),
+                "task": self.task,
+            },
+            self.record_timings,
+            timings or {},
+        )
         for index in range(outputs[0].shape[0]):
             values = [value[index] for value in outputs]
             if self.task == "segmentation":
@@ -142,9 +156,26 @@ class TorchScriptExtractor:
 
     def extract_batch(self, images: Sequence[Any]) -> list[SemanticResult]:
         """Run one model call for an ordered batch of images."""
+        started = time.perf_counter() if self.record_timings else 0.0
+        prepared = 0.0
+        inferred = 0.0
         with self._torch.inference_mode():
-            output = self.model(self._prepare_batch(images))
-        return self._results_from_output(output)
+            tensor = self._prepare_batch(images)
+            prepared = time.perf_counter() if self.record_timings else 0.0
+            output = self.model(tensor)
+            inferred = time.perf_counter() if self.record_timings else 0.0
+        results = self._results_from_output(
+            output,
+            {
+                "preprocess": prepared - started,
+                "inference": inferred - prepared,
+            },
+        )
+        if self.record_timings:
+            postprocess = time.perf_counter() - inferred
+            for result in results:
+                result.metadata["timings_seconds"]["postprocess"] = postprocess
+        return results
 
 
 class OnnxRuntimeExtractor:
@@ -171,6 +202,7 @@ class OnnxRuntimeExtractor:
         enable_profiling: bool = False,
         use_io_binding: bool = False,
         input_limits: InputLimits | None = None,
+        record_timings: bool = False,
     ) -> None:
         if task not in ("depth", "segmentation", "both"):
             raise ValueError("task must be depth, segmentation, or both")
@@ -180,6 +212,8 @@ class OnnxRuntimeExtractor:
             raise ValueError("input_layout must be NCHW or NHWC")
         if not isinstance(use_io_binding, bool):
             raise TypeError("use_io_binding must be a boolean")
+        if not isinstance(record_timings, bool):
+            raise TypeError("record_timings must be a boolean")
         if provider_options is not None and providers is None:
             raise ValueError("provider_options requires providers")
         if provider_options is not None and any(
@@ -221,6 +255,7 @@ class OnnxRuntimeExtractor:
         self.size = size
         self.input_limits = input_limits
         self.use_io_binding = use_io_binding
+        self.record_timings = record_timings
         inputs = session.get_inputs()
         if not inputs:
             raise ValueError("ONNX session has no inputs")
@@ -275,7 +310,11 @@ class OnnxRuntimeExtractor:
             value = value[0]
         return value
 
-    def _results_from_outputs(self, outputs: Any) -> list[SemanticResult]:
+    def _results_from_outputs(
+        self,
+        outputs: Any,
+        timings: Mapping[str, float] | None = None,
+    ) -> list[SemanticResult]:
         if not outputs:
             raise ValueError("ONNX session returned no outputs")
         if self.task == "both" and len(outputs) < 2:
@@ -285,17 +324,21 @@ class OnnxRuntimeExtractor:
             raise ValueError("ONNX output batch is empty")
         values = [np.asarray(output) for output in outputs]
         results = []
-        metadata = {
-            "backend": "onnxruntime",
-            "model_path": self.model_path,
-            "task": self.task,
-            "io_binding": self.use_io_binding,
-            "providers": list(
-                self.session.get_providers()
-                if hasattr(self.session, "get_providers")
-                else (self.providers or [])
-            ),
-        }
+        metadata = add_phase_timings(
+            {
+                "backend": "onnxruntime",
+                "model_path": self.model_path,
+                "task": self.task,
+                "io_binding": self.use_io_binding,
+                "providers": list(
+                    self.session.get_providers()
+                    if hasattr(self.session, "get_providers")
+                    else (self.providers or [])
+                ),
+            },
+            self.record_timings,
+            timings or {},
+        )
         for index in range(batch_size):
             fields = [self._without_batch(value[index : index + 1]) for value in values]
             if self.task == "depth":
@@ -343,9 +386,23 @@ class OnnxRuntimeExtractor:
 
     def extract_batch(self, images: Sequence[Any]) -> list[SemanticResult]:
         """Run one ONNX session call for an ordered batch of images."""
+        started = time.perf_counter() if self.record_timings else 0.0
         tensor = self._prepare_batch(images)
+        prepared = time.perf_counter() if self.record_timings else 0.0
         outputs = self._run(tensor)
-        return self._results_from_outputs(outputs)
+        inferred = time.perf_counter() if self.record_timings else 0.0
+        results = self._results_from_outputs(
+            outputs,
+            {
+                "preprocess": prepared - started,
+                "inference": inferred - prepared,
+            },
+        )
+        if self.record_timings:
+            postprocess = time.perf_counter() - inferred
+            for result in results:
+                result.metadata["timings_seconds"]["postprocess"] = postprocess
+        return results
 
 
 class CompositeExtractor:

@@ -5,6 +5,7 @@ This keeps the base package usable on CPU-only machines while exposing a
 stable ``extract``/``extract_batch`` contract to applications.
 """
 
+import time
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -13,6 +14,7 @@ from typing import Any
 
 import numpy as np
 
+from ._timing import add_phase_timings
 from .core import SemanticResult, load_image
 from .limits import InputLimits
 
@@ -100,6 +102,7 @@ class OpenVINOExtractor:
         input_limits: InputLimits | None = None,
         async_queue: Any = None,
         async_jobs: int = 0,
+        record_timings: bool = False,
     ) -> None:
         _validate_options(task, size)
         if compiled_model is None and model_path is None:
@@ -110,6 +113,8 @@ class OpenVINOExtractor:
             or async_jobs < 0
         ):
             raise ValueError("async_jobs must be a non-negative integer")
+        if not isinstance(record_timings, bool):
+            raise TypeError("record_timings must be a boolean")
         self.model_path = str(model_path) if model_path is not None else None
         self.device = device
         self.task = task
@@ -117,6 +122,7 @@ class OpenVINOExtractor:
         self.input_limits = input_limits
         self.async_queue = async_queue
         self.async_jobs = async_jobs
+        self.record_timings = record_timings
         self.output_names = tuple(output_names) if output_names is not None else None
         if compiled_model is None:
             try:
@@ -183,20 +189,36 @@ class OpenVINOExtractor:
         return self.extract_batch([image])[0]
 
     def extract_batch(self, images: Sequence[Any]) -> list[SemanticResult]:
+        started = time.perf_counter() if self.record_timings else 0.0
         tensor = _prepare_batch(images, self.size, self.input_limits)
+        prepared = time.perf_counter() if self.record_timings else 0.0
         outputs = self._ordered_outputs(self._run(tensor))
+        inferred = time.perf_counter() if self.record_timings else 0.0
         if not outputs:
             raise ValueError("OpenVINO model returned no outputs")
-        metadata = {
-            "backend": "openvino",
-            "model_path": self.model_path,
-            "device": self.device,
-            "task": self.task,
-        }
-        return [
+        metadata = add_phase_timings(
+            {
+                "backend": "openvino",
+                "model_path": self.model_path,
+                "device": self.device,
+                "task": self.task,
+            },
+            self.record_timings,
+            {
+                "preprocess": prepared - started,
+                "inference": inferred - prepared,
+            },
+        )
+        postprocess_started = time.perf_counter() if self.record_timings else 0.0
+        results = [
             _result_from_values(outputs, index, len(images), self.task, metadata)
             for index in range(len(images))
         ]
+        if self.record_timings:
+            metadata["timings_seconds"]["postprocess"] = (
+                time.perf_counter() - postprocess_started
+            )
+        return results
 
     def _async_outputs(self, request: Any) -> list[Any]:
         """Read outputs from one completed OpenVINO infer request."""
@@ -240,7 +262,9 @@ class OpenVINOExtractor:
         reconstructed by userdata index, so provider completion order cannot
         reorder the public batch contract.
         """
+        started = time.perf_counter() if self.record_timings else 0.0
         tensor = _prepare_batch(images, self.size, self.input_limits)
+        prepared = time.perf_counter() if self.record_timings else 0.0
         queue = self._make_async_queue()
         set_callback = getattr(queue, "set_callback", None)
         start_async = getattr(queue, "start_async", None)
@@ -269,22 +293,36 @@ class OpenVINOExtractor:
                 userdata=index,
             )
         wait_all()
+        inferred = time.perf_counter() if self.record_timings else 0.0
         if any(value is None for value in outputs):
             raise RuntimeError("OpenVINO async queue completed with missing outputs")
 
-        metadata = {
-            "backend": "openvino",
-            "model_path": self.model_path,
-            "device": self.device,
-            "task": self.task,
-            "async_queue": True,
-            "async_jobs": self.async_jobs or 1,
-        }
-        return [
+        metadata = add_phase_timings(
+            {
+                "backend": "openvino",
+                "model_path": self.model_path,
+                "device": self.device,
+                "task": self.task,
+                "async_queue": True,
+                "async_jobs": self.async_jobs or 1,
+            },
+            self.record_timings,
+            {
+                "preprocess": prepared - started,
+                "inference": inferred - prepared,
+            },
+        )
+        postprocess_started = time.perf_counter() if self.record_timings else 0.0
+        results = [
             _result_from_values(value, 0, 1, self.task, metadata)
             for value in outputs
             if value is not None
         ]
+        if self.record_timings:
+            metadata["timings_seconds"]["postprocess"] = (
+                time.perf_counter() - postprocess_started
+            )
+        return results
 
     def extract_async(self, image: Any) -> SemanticResult:
         """Extract one image through the OpenVINO asynchronous queue."""
@@ -379,6 +417,7 @@ class TensorRTExtractor:
         size: tuple[int, int] | None = None,
         device: str = "cuda",
         input_limits: InputLimits | None = None,
+        record_timings: bool = False,
     ) -> None:
         _validate_options(task, size)
         if (
@@ -387,6 +426,8 @@ class TensorRTExtractor:
             or pool_size < 1
         ):
             raise ValueError("pool_size must be a positive integer")
+        if not isinstance(record_timings, bool):
+            raise TypeError("record_timings must be a boolean")
         configured = sum(
             value is not None for value in (runner, runner_pool, runner_factory)
         )
@@ -408,6 +449,7 @@ class TensorRTExtractor:
         self.size = size
         self.device = device
         self.input_limits = input_limits
+        self.record_timings = record_timings
 
     def _infer(self, tensor: np.ndarray) -> Any:
         if hasattr(self.runner, "infer"):
@@ -418,8 +460,11 @@ class TensorRTExtractor:
         return self.extract_batch([image])[0]
 
     def extract_batch(self, images: Sequence[Any]) -> list[SemanticResult]:
+        started = time.perf_counter() if self.record_timings else 0.0
         tensor = _prepare_batch(images, self.size, self.input_limits)
+        prepared = time.perf_counter() if self.record_timings else 0.0
         outputs = self._infer(tensor)
+        inferred = time.perf_counter() if self.record_timings else 0.0
         if isinstance(outputs, Mapping):
             values = list(outputs.values())
         elif isinstance(outputs, (tuple, list)):
@@ -428,16 +473,29 @@ class TensorRTExtractor:
             values = [outputs]
         if not values:
             raise ValueError("TensorRT runner returned no outputs")
-        metadata = {
-            "backend": "tensorrt",
-            "model_path": self.model_path,
-            "device": self.device,
-            "task": self.task,
-        }
-        return [
+        metadata = add_phase_timings(
+            {
+                "backend": "tensorrt",
+                "model_path": self.model_path,
+                "device": self.device,
+                "task": self.task,
+            },
+            self.record_timings,
+            {
+                "preprocess": prepared - started,
+                "inference": inferred - prepared,
+            },
+        )
+        postprocess_started = time.perf_counter() if self.record_timings else 0.0
+        results = [
             _result_from_values(values, index, len(images), self.task, metadata)
             for index in range(len(images))
         ]
+        if self.record_timings:
+            metadata["timings_seconds"]["postprocess"] = (
+                time.perf_counter() - postprocess_started
+            )
+        return results
 
     def extract_batch_parallel(
         self,
@@ -462,8 +520,11 @@ class TensorRTExtractor:
             raise ValueError("max_workers must be a positive integer")
 
         def extract_one(image: Any) -> SemanticResult:
+            started = time.perf_counter() if self.record_timings else 0.0
             tensor = _prepare_batch([image], self.size, self.input_limits)
+            prepared = time.perf_counter() if self.record_timings else 0.0
             outputs = self._infer(tensor)
+            inferred = time.perf_counter() if self.record_timings else 0.0
             if isinstance(outputs, Mapping):
                 values = list(outputs.values())
             elif isinstance(outputs, (tuple, list)):
@@ -472,14 +533,27 @@ class TensorRTExtractor:
                 values = [outputs]
             if not values:
                 raise ValueError("TensorRT runner returned no outputs")
-            metadata = {
-                "backend": "tensorrt",
-                "model_path": self.model_path,
-                "device": self.device,
-                "task": self.task,
-                "parallel_contexts": True,
-            }
-            return _result_from_values(values, 0, 1, self.task, metadata)
+            metadata = add_phase_timings(
+                {
+                    "backend": "tensorrt",
+                    "model_path": self.model_path,
+                    "device": self.device,
+                    "task": self.task,
+                    "parallel_contexts": True,
+                },
+                self.record_timings,
+                {
+                    "preprocess": prepared - started,
+                    "inference": inferred - prepared,
+                },
+            )
+            postprocess_started = time.perf_counter() if self.record_timings else 0.0
+            result = _result_from_values(values, 0, 1, self.task, metadata)
+            if self.record_timings:
+                metadata["timings_seconds"]["postprocess"] = (
+                    time.perf_counter() - postprocess_started
+                )
+            return result
 
         with ThreadPoolExecutor(max_workers=workers) as executor:
             return list(executor.map(extract_one, images))

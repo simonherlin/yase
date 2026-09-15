@@ -72,6 +72,10 @@ source. File processing can use `--batch-size 8` when the selected backend
 implements `extract_batch`.
 For repeatable local measurements, `yase benchmark image-*.jpg --model onnx
 --model-path model.onnx --warmup 2` reports p50/p95/p99 latency and throughput.
+For phase attribution, construct an ONNX/OpenVINO/TensorRT/TorchScript backend
+with `record_timings=True`; each result then contains JSON-safe
+`metadata["timings_seconds"]` for `preprocess`, `inference`, and `postprocess`,
+and `BenchmarkReport.to_dict()` exports their p50/p95/p99 summaries.
 Use `yase models` to inspect supported model families and license notes without
 loading or downloading any weights.
 
@@ -160,6 +164,11 @@ results = OpenVINOExtractor("model.xml", async_jobs=4).extract_batch_async(image
 
 Install accelerator runtimes separately; Yase never downloads weights or
 imports these frameworks unless their adapters are instantiated.
+
+All four local model adapters accept the opt-in `record_timings=True` flag.
+Instrumentation is disabled by default and reports wall-clock adapter phases;
+provider-specific device transfer or asynchronous kernel timings should be
+validated separately on the target hardware.
 
 The repository pins Python 3.12 in `.python-version` because it is the most
 conservative intersection of the supported vision runtimes.

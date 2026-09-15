@@ -332,7 +332,12 @@ BoT-SORT integrations.
 `MultimodalConsensus` provide model-independent temporal routing, track-level
 memory, and auditable multi-model fusion. `BenchmarkRunner` and
 `BenchmarkReport` provide latency percentiles, throughput, failures, and
-optional quality metrics for comparing backends on identical inputs.
+optional quality metrics for comparing backends on identical inputs. The local
+ONNX, OpenVINO, TensorRT, and TorchScript adapters accept
+`record_timings=True`; this adds `metadata["timings_seconds"]` with
+`preprocess`, `inference`, and `postprocess` wall-clock phases. The benchmark
+report aggregates those phases under `phase_timings` without changing the
+default metadata contract.
 
 `evaluate_detections()` provides a deterministic IoU-based precision, recall,
 F1, and mean-IoU evaluator suitable for small regression datasets. It is not a

@@ -43,9 +43,13 @@ réel sur les petites listes.
 1. Produire les wheels natifs Linux/macOS/Windows et Python 3.10–3.13 dans un
    environnement de release dédié via cibuildwheel. Le dépôt contient déjà la
    configuration ; GitHub Actions ne doit pas être réactivé pour cela.
-2. Ajouter un benchmark reproductible séparant preprocessing, transfert,
-   inférence, post-processing et latence bout-en-bout pour ONNX/OpenVINO/
-   TensorRT/TorchScript.
+2. [partiellement livré] Ajouter un benchmark reproductible séparant
+   preprocessing, inférence, post-processing et latence bout-en-bout pour
+   ONNX/OpenVINO/TensorRT/TorchScript. `record_timings=True` et
+   `BenchmarkReport.phase_timings` couvrent désormais les phases de
+   l’adaptateur ; la clé `phase_timings` des rapports couvre ces phases, tandis
+   que les transferts device explicites et les mesures GPU natives
+   restent à valider sur les machines cibles.
 3. Valider les providers GPU sur des machines compatibles : CUDA EP, TensorRT,
    OpenVINO GPU/NPU. Le poste local Maxwell ne peut pas être la preuve d’un
    TensorRT moderne.

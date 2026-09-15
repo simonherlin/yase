@@ -1361,6 +1361,28 @@ def test_benchmark_runner_reports_latency_and_quality():
     assert report.to_dict()["quality"]["has_tags"] == 1.0
 
 
+def test_benchmark_runner_aggregates_optional_backend_phase_timings():
+    def extractor(_image):
+        return SemanticResult(
+            tags=["ok"],
+            metadata={
+                "timings_seconds": {
+                    "preprocess": 0.01,
+                    "inference": 0.02,
+                    "postprocess": 0.003,
+                }
+            },
+        )
+
+    report = BenchmarkRunner().run(
+        extractor,
+        [np.zeros((1, 1, 3), dtype=np.uint8)] * 2,
+    )
+    assert report.phase_percentile("inference", 95) == pytest.approx(0.02)
+    assert report.to_dict()["phase_timings"]["preprocess"]["samples"] == 2
+    assert report.to_dict()["phase_timings"]["postprocess"]["p99_seconds"] == 0.003
+
+
 def test_bytetrack_lite_uses_low_score_detections_for_existing_tracks():
     tracker = ByteTrackLite(high_threshold=0.7, low_threshold=0.2, iou_threshold=0.1)
     first = tracker.update([Detection("person", 0.9, (0, 0, 10, 10))])
@@ -2472,6 +2494,18 @@ def test_onnx_extract_batch_uses_one_call_and_preserves_order():
     assert [float(item.depth.flat[0]) for item in results] == [0.0, 1.0, 2.0]
 
 
+def test_onnx_record_timings_exposes_three_phases_without_changing_default():
+    image = np.zeros((2, 3, 3), dtype=np.uint8)
+    plain = OnnxRuntimeExtractor("unused.onnx", session=BatchOnnxSession([]))
+    assert "timings_seconds" not in plain.extract(image).metadata
+    timed = OnnxRuntimeExtractor(
+        "unused.onnx", session=BatchOnnxSession([]), record_timings=True
+    )
+    timings = timed.extract(image).metadata["timings_seconds"]
+    assert set(timings) == {"preprocess", "inference", "postprocess"}
+    assert all(isinstance(value, float) and value >= 0 for value in timings.values())
+
+
 def test_onnx_batch_rejects_mismatched_shapes_without_resize():
     backend = OnnxRuntimeExtractor("unused.onnx", session=FakeOnnxSession([]))
     images = [np.zeros((2, 2, 3), dtype=np.uint8), np.zeros((3, 2, 3), dtype=np.uint8)]
@@ -2550,6 +2584,39 @@ def test_openvino_extractor_uses_async_queue_and_restores_input_order():
     assert all(result.metadata["async_queue"] for result in results)
 
 
+def test_openvino_record_timings_covers_async_path():
+    class Port:
+        def get_any_name(self):
+            return "pixels"
+
+    class Request:
+        results = {"depth": np.ones((1, 2, 2), dtype=np.float32)}
+
+    class Queue:
+        def set_callback(self, callback):
+            self.callback = callback
+
+        def start_async(self, _inputs, userdata=None):
+            self.callback(Request(), userdata)
+
+        def wait_all(self):
+            return None
+
+    class CompiledModel:
+        inputs = [Port()]
+
+    result = OpenVINOExtractor(
+        compiled_model=CompiledModel(),
+        async_queue=Queue(),
+        record_timings=True,
+    ).extract_async(np.zeros((2, 2, 3), dtype=np.uint8))
+    assert set(result.metadata["timings_seconds"]) == {
+        "preprocess",
+        "inference",
+        "postprocess",
+    }
+
+
 def test_tensorrt_extractor_accepts_custom_runner():
     class Runner:
         def infer(self, tensor):
@@ -2559,6 +2626,29 @@ def test_tensorrt_extractor_accepts_custom_runner():
     result = backend.extract(np.zeros((2, 2, 3), dtype=np.uint8))
     assert result.depth.shape == (2, 2)
     assert result.metadata["backend"] == "tensorrt"
+
+
+def test_tensorrt_record_timings_covers_batch_and_parallel_paths():
+    class Runner:
+        def infer(self, tensor):
+            return {"depth": np.ones((tensor.shape[0], 2, 2), dtype=np.float32)}
+
+    image = np.zeros((2, 2, 3), dtype=np.uint8)
+    backend = TensorRTExtractor(runner=Runner(), record_timings=True)
+    assert set(backend.extract(image).metadata["timings_seconds"]) == {
+        "preprocess",
+        "inference",
+        "postprocess",
+    }
+    parallel = TensorRTExtractor(
+        runner_pool=TensorRTContextPool(Runner, size=1), record_timings=True
+    )
+    result = parallel.extract_batch_parallel([image])[0]
+    assert set(result.metadata["timings_seconds"]) == {
+        "preprocess",
+        "inference",
+        "postprocess",
+    }
 
 
 def test_tensorrt_context_pool_parallel_extraction_preserves_order_and_closes():
@@ -2691,7 +2781,7 @@ def test_torchscript_batch_uses_one_model_call(monkeypatch):
     monkeypatch.setitem(sys.modules, "torch", FakeTorch)
     from yase.backends import TorchScriptExtractor
 
-    backend = TorchScriptExtractor("local.pt", size=(2, 2))
+    backend = TorchScriptExtractor("local.pt", size=(2, 2), record_timings=True)
     results = backend.extract_batch(
         [
             np.zeros((2, 2, 3), dtype=np.uint8),
@@ -2700,6 +2790,11 @@ def test_torchscript_batch_uses_one_model_call(monkeypatch):
     )
     assert len(results) == 2 and model.calls == 1
     assert results[0].depth.shape == (2, 2)
+    assert set(results[0].metadata["timings_seconds"]) == {
+        "preprocess",
+        "inference",
+        "postprocess",
+    }
 
 
 def test_observation_bundle_keeps_frame_provenance_and_uncertainty():
