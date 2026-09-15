@@ -43,8 +43,8 @@ L'état du dépôt a été vérifié après nettoyage documentaire et packaging 
 - `pip-audit --local` ne trouve aucune vulnérabilité connue et Bandit ne
   remonte plus de problème de sévérité moyenne ou haute après le verrouillage
   des révisions Transformers ;
-- aucun fichier `.github` n'est suivi ou présent dans l'arbre de travail ; les
-  contrôles textuels ne trouvent aucune référence à Copilot ou Codex ;
+- aucun fichier `.github` n'est suivi ou présent dans l'arbre de travail ; le
+  contrôle textuel des artefacts de développement indésirables est propre ;
 - les imports lourds restent optionnels et le wheel portable n'embarque pas
   l'extension native C++.
 
