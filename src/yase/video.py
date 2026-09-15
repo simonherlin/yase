@@ -1,11 +1,11 @@
 """Real-time video iteration utilities."""
 
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, replace
 from typing import Any, Callable, Optional, Union
 
-from .core import SemanticResult, load_image
+from .core import SemanticResult, _normalise_output, load_image
 from .limits import InputLimits
 from .observability import RuntimeMetrics
 
@@ -53,6 +53,7 @@ class VideoStream:
         drop_frames: bool = True,
         color_order: str = "BGR",
         max_frames: Optional[int] = None,
+        batch_size: int = 1,
         on_error: Optional[Callable[[Exception, int], Optional[SemanticResult]]] = None,
         error_policy: str = "raise",
         tracker: Optional[Any] = None,
@@ -71,6 +72,12 @@ class VideoStream:
             raise ValueError("max_fps must be positive")
         if max_frames is not None and max_frames < 0:
             raise ValueError("max_frames must be >= 0")
+        if (
+            isinstance(batch_size, bool)
+            or not isinstance(batch_size, int)
+            or batch_size < 1
+        ):
+            raise ValueError("batch_size must be a positive integer")
         if error_policy not in ("raise", "skip"):
             raise ValueError("error_policy must be raise or skip")
         self.source = source
@@ -80,6 +87,7 @@ class VideoStream:
         self.drop_frames = drop_frames
         self.color_order = color_order
         self.max_frames = max_frames
+        self.batch_size = batch_size
         self.on_error = on_error
         self.error_policy = error_policy
         self.tracker = tracker
@@ -185,6 +193,56 @@ class VideoStream:
         except TypeError:
             return self.memory.update(result)
 
+    @staticmethod
+    def _coerce_output(output: Any, timestamp: float) -> SemanticResult:
+        task = "semantic" if isinstance(output, Mapping) else "depth"
+        return _normalise_output(output, task, timestamp)
+
+    def _extract_batch(
+        self, images: list[Any], indices: list[int], timestamps: list[float]
+    ) -> list[Optional[SemanticResult]]:
+        """Extract a frame batch while keeping per-frame error semantics."""
+        backend = self.extractor
+        try:
+            if hasattr(backend, "extract_batch"):
+                outputs = list(backend.extract_batch(images))
+                if len(outputs) != len(images):
+                    raise ValueError(
+                        "extract_batch must return one result per video frame"
+                    )
+            else:
+                outputs = [
+                    backend.extract(image)
+                    if hasattr(backend, "extract")
+                    else backend(image)
+                    for image in images
+                ]
+            results: list[Optional[SemanticResult]] = []
+            for output, timestamp in zip(outputs, timestamps):
+                results.append(self._coerce_output(output, timestamp))
+            return results
+        except Exception:
+            if self.error_policy == "raise" and self.on_error is None:
+                raise
+
+        # A failed batch must be retried frame by frame: a single corrupt frame
+        # should not discard otherwise valid frames when skip/recovery is used.
+        recovered: list[Optional[SemanticResult]] = []
+        for image, index, timestamp in zip(images, indices, timestamps):
+            try:
+                output = (
+                    backend.extract(image)
+                    if hasattr(backend, "extract")
+                    else backend(image)
+                )
+                recovered.append(self._coerce_output(output, timestamp))
+            except Exception as exc:
+                if self.on_error is not None:
+                    recovered.append(self.on_error(exc, index))
+                else:
+                    recovered.append(None)
+        return recovered
+
     def _emit_observation(
         self, result: SemanticResult, frame_index: int, timestamp: float, image: Any
     ) -> None:
@@ -216,6 +274,64 @@ class VideoStream:
         last_timestamp: Optional[float] = None
         index = 0
         latencies = []
+        pending: list[tuple[int, float, Any]] = []
+
+        def process_pending() -> Iterator[FrameResult]:
+            nonlocal yielded, frames_dropped, frames_processed, last_timestamp
+            if not pending:
+                return
+            batch = list(pending)
+            pending.clear()
+            indices = [item[0] for item in batch]
+            timestamps = [item[1] for item in batch]
+            raw_frames = [item[2] for item in batch]
+            images: list[Optional[Any]] = [None] * len(batch)
+            results: list[Optional[SemanticResult]] = [None] * len(batch)
+            valid_positions = []
+            for position, frame in enumerate(raw_frames):
+                try:
+                    images[position] = load_image(
+                        frame,
+                        color_order=self.color_order,
+                        limits=self.input_limits,
+                    )
+                    valid_positions.append(position)
+                except Exception as exc:
+                    if self.on_error is not None:
+                        results[position] = self.on_error(exc, indices[position])
+                    elif self.error_policy == "skip":
+                        continue
+                    else:
+                        raise
+            started = time.perf_counter()
+            if valid_positions:
+                extracted = self._extract_batch(
+                    [images[position] for position in valid_positions],
+                    [indices[position] for position in valid_positions],
+                    [timestamps[position] for position in valid_positions],
+                )
+                for position, result in zip(valid_positions, extracted):
+                    results[position] = result
+            batch_latency = time.perf_counter() - started
+            per_frame_latency = batch_latency / max(1, len(valid_positions))
+            for position, (index, timestamp, image, result) in enumerate(
+                zip(indices, timestamps, images, results)
+            ):
+                if result is None:
+                    frames_dropped += 1
+                    continue
+                result = self._track(result, timestamp)
+                result = self._memory(result, timestamp)
+                result = self._identity(result, timestamp)
+                result = self._events(result, timestamp)
+                if image is not None:
+                    self._emit_observation(result, index, timestamp, image)
+                latencies.append(per_frame_latency)
+                yield FrameResult(index, timestamp, result, per_frame_latency)
+                last_timestamp = timestamp
+                yielded += 1
+                frames_processed += 1
+
         try:
             while self.max_frames is None or yielded < self.max_frames:
                 ok, frame = capture.read()
@@ -227,55 +343,23 @@ class VideoStream:
                     index += 1
                     continue
                 timestamp = self._timestamp(capture, index)
+                pacing_timestamp = pending[-1][1] if pending else last_timestamp
                 if (
                     self.max_fps is not None
-                    and last_timestamp is not None
-                    and timestamp - last_timestamp < 1.0 / self.max_fps
+                    and pacing_timestamp is not None
+                    and timestamp - pacing_timestamp < 1.0 / self.max_fps
                 ):
                     frames_dropped += 1
                     index += 1
                     continue
-                started = time.perf_counter()
-                try:
-                    image = load_image(
-                        frame,
-                        color_order=self.color_order,
-                        limits=self.input_limits,
-                    )
-                    backend = self.extractor
-                    if hasattr(backend, "extract"):
-                        result = backend.extract(image, timestamp=timestamp)
-                    else:
-                        result = backend(image)
-                except Exception as exc:
-                    if self.on_error is not None:
-                        result = self.on_error(exc, index)
-                        if result is None:
-                            frames_dropped += 1
-                            index += 1
-                            continue
-                    elif self.error_policy == "skip":
-                        frames_dropped += 1
-                        index += 1
-                        continue
-                    else:
-                        raise
-                if not isinstance(result, SemanticResult):
-                    result = SemanticResult(depth=result, timestamp=timestamp)
-                else:
-                    result = result.with_timestamp(timestamp)
-                result = self._track(result, timestamp)
-                result = self._memory(result, timestamp)
-                result = self._identity(result, timestamp)
-                result = self._events(result, timestamp)
-                self._emit_observation(result, index, timestamp, image)
-                latency = time.perf_counter() - started
-                latencies.append(latency)
-                yield FrameResult(index, timestamp, result, latency)
-                last_timestamp = timestamp
-                yielded += 1
-                frames_processed += 1
+                pending.append((index, timestamp, frame))
                 index += 1
+                if len(pending) >= self.batch_size or (
+                    self.max_frames is not None
+                    and yielded + len(pending) >= self.max_frames
+                ):
+                    yield from process_pending()
+            yield from process_pending()
         finally:
             elapsed = time.perf_counter() - started_at
             output_fps = frames_processed / elapsed if elapsed else 0.0

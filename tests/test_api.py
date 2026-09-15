@@ -215,6 +215,54 @@ def test_video_stride_one_processes_every_frame_and_emits_observations():
     assert sink.observations[0].frame.source_id == "camera-7"
 
 
+def test_video_batch_backend_preserves_order_and_respects_max_frames():
+    class BatchBackend:
+        def __init__(self):
+            self.calls = []
+
+        def extract_batch(self, images):
+            self.calls.append(len(images))
+            return [{"depth": image[..., 0].astype(np.float32)} for image in images]
+
+    backend = BatchBackend()
+    stream = VideoStream(FakeCapture(6), backend, batch_size=2, max_frames=5)
+    frames = list(stream)
+    assert [item.frame_index for item in frames] == [0, 1, 2, 3, 4]
+    assert [int(item.result.depth[0, 0]) for item in frames] == [0, 1, 2, 3, 4]
+    assert backend.calls == [2, 2, 1]
+    assert stream.stats.frames_processed == 5
+
+
+def test_video_batch_failure_recovers_frame_by_frame_when_skipping():
+    class FailingBatch:
+        def __init__(self):
+            self.batch_calls = 0
+            self.single_calls = 0
+
+        def extract_batch(self, images):
+            self.batch_calls += 1
+            raise RuntimeError("batch unavailable")
+
+        def extract(self, image):
+            self.single_calls += 1
+            if int(image[0, 0, 0]) == 1:
+                raise ValueError("bad frame")
+            return {"depth": image[..., 0]}
+
+    backend = FailingBatch()
+    stream = VideoStream(FakeCapture(3), backend, batch_size=3, error_policy="skip")
+    frames = list(stream)
+    assert [item.frame_index for item in frames] == [0, 2]
+    assert backend.batch_calls == 1
+    assert backend.single_calls == 3
+    assert stream.stats.frames_dropped == 1
+
+
+def test_video_rejects_invalid_batch_size():
+    with pytest.raises(ValueError, match="batch_size"):
+        VideoStream(FakeCapture(1), lambda image: image, batch_size=0)
+
+
 def test_video_max_frames_and_metadata():
     capture = FakeCapture(4)
     stream = VideoStream(capture, lambda image: np.zeros(image.shape[:2]))

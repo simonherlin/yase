@@ -502,6 +502,16 @@ Result: version 0.40.0, pending final validation.
 
 Result: version 0.41.0, pending final validation.
 
+## Cycle 51 — batched video extraction
+
+- [x] Add an opt-in `VideoStream(batch_size=...)` path for batch-capable backends.
+- [x] Preserve frame order and causal tracker/memory/identity/event processing.
+- [x] Keep per-frame skip/recovery behavior when a batch call fails.
+- [x] Enforce `max_frames` without over-processing a final partial batch.
+- [x] Apply input limits before batching and retain legacy callable/mapping outputs.
+
+Result: version 0.42.0, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

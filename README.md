@@ -135,7 +135,8 @@ embeddings from independent model backends into one `SemanticResult`.
 
 VideoStream yields typed FrameResult values with frame index, source timestamp,
 processing duration, and SemanticResult. It supports frame stride, max output
-FPS, and bounded output count.
+FPS, bounded output count, and optional `batch_size` acceleration for backends
+implementing `extract_batch`; post-processing remains in frame order.
 
 ~~~python
 from yase import RealtimeVideoStream, Yase

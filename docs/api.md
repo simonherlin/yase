@@ -140,11 +140,14 @@ downloading or caching weights.
 
 ## VideoStream and RealtimeVideoStream
 
-VideoStream(source, extractor, stride=1, max_fps=None, max_frames=None) yields
-FrameResult sequentially. RealtimeVideoStream uses a worker and one-item
-latest-frame buffer; drop_frames=True overwrites stale frames, while False
-applies backpressure. Both expose stats with read/processed/dropped counts,
-source/output FPS, elapsed time, and mean/max inference latency.
+VideoStream(source, extractor, stride=1, max_fps=None, max_frames=None,
+batch_size=1) yields FrameResult sequentially. When the extractor implements
+`extract_batch`, selected frames are grouped without changing output order;
+tracking, memory, identity, events, and sinks still run causally one frame at a
+time. RealtimeVideoStream uses a worker and one-item latest-frame buffer;
+drop_frames=True overwrites stale frames, while False applies backpressure.
+Both expose stats with read/processed/dropped counts, source/output FPS,
+elapsed time, and mean/max inference latency.
 
 Use error_policy=skip to discard failed frames, or pass
 on_error(exception, frame_index) to return a recovery SemanticResult.
