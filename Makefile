@@ -41,7 +41,7 @@ check: lint
 	uv run pytest --cov=yase --cov-report=term-missing
 
 check-dist: build
-	uv run python -c "import pathlib, zipfile; wheels = sorted(pathlib.Path('dist').glob('yase-*.whl'), key=lambda path: path.stat().st_mtime); assert wheels, 'no Yase wheel found'; wheel = wheels[-1]; names = zipfile.ZipFile(wheel).namelist(); assert 'yase/__init__.py' in names; assert wheel.name.endswith('py3-none-any.whl'), wheel; assert not any('/_native' in name for name in names); print(wheel)"
+	uv run python tools/check_distribution.py
 
 clean:
 	rm -rf .pytest_cache .ruff_cache htmlcov .coverage dist

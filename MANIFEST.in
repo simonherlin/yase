@@ -1,7 +1,7 @@
 include LICENSE NOTICE.md README.md pyproject.toml uv.lock
 include native/README.md native/yase_native.cpp
-include tools/build_native.py tools/build_package.py tools/runtime_smoke.py
-include tools/build_wheels.py
+include tools/build_native.py tools/build_package.py tools/build_wheels.py
+include tools/check_distribution.py tools/runtime_smoke.py
 recursive-include src/yase *.py py.typed
 recursive-include tests *.py
 recursive-include examples *.py
