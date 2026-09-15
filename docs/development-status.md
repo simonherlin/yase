@@ -900,6 +900,17 @@ downloading model weights or making heavy providers part of the base package.
 Result: RF-DETR resolution now fails early for an unsupported dependency mix
 instead of failing later during model construction.
 
+## Cycle 83 — batch tracing
+
+- [x] Add a `yase.extract_batch` span around native backend batch execution.
+- [x] Include task, selected model, batch size, and backend class attributes.
+- [x] Preserve raw tracer compatibility by applying attributes when the caller
+  provides `start_as_current_span` directly.
+- [x] Add deterministic regression coverage for ordered batch tracing.
+
+Result: batch inference now has the same minimum observability contract as
+single-image extraction and DAG stages.
+
 ## Exit criteria
 
 The package is considered ready for a first public release when the core and

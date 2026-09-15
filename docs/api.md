@@ -13,6 +13,9 @@
   valid images still use native batching; failed positions contain None.
 - `extract_many(..., max_workers=N)` can run non-batch backends concurrently
   with bounded workers while preserving result order; the default is serial.
+- When a tracer is configured, native backend batches emit one
+  `yase.extract_batch` span with task, model, backend, and batch-size
+  attributes.
 - The `extract` CLI command exposes this as `--max-workers`; benchmark
   execution remains serial by default for reproducible latency comparisons.
 - run_inference and __call__ are compatibility aliases.

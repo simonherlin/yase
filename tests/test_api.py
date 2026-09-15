@@ -452,6 +452,48 @@ def test_yase_records_direct_extraction_metrics_on_success_and_failure():
     assert "image_test_extraction_attempts_total 2" in metrics.prometheus_text()
 
 
+def test_yase_batch_extraction_emits_batch_span():
+    class Span:
+        def __init__(self):
+            self.attributes = {}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def set_attribute(self, key, value):
+            self.attributes[key] = value
+
+    class Tracer:
+        def __init__(self):
+            self.spans = []
+
+        def start_as_current_span(self, name):
+            span = Span()
+            self.spans.append((name, span))
+            return span
+
+    class BatchBackend:
+        def extract_batch(self, images):
+            return [SemanticResult(depth=image[..., 0]) for image in images]
+
+    tracer = Tracer()
+    api = Yase(extractor=BatchBackend(), tracer=tracer)
+    api.extract_many(
+        [np.zeros((2, 2, 3), dtype=np.uint8), np.ones((2, 2, 3), dtype=np.uint8)]
+    )
+    batch_spans = [span for name, span in tracer.spans if name == "yase.extract_batch"]
+    assert len(batch_spans) == 1
+    assert batch_spans[0].attributes == {
+        "yase.task": "depth",
+        "yase.model": "custom",
+        "yase.batch_size": 2,
+        "yase.backend": "BatchBackend",
+    }
+
+
 def test_opentelemetry_tracer_instruments_yase_and_records_errors():
     class Span:
         def __init__(self):

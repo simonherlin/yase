@@ -7,7 +7,7 @@ weights or requires PyTorch.
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Protocol
@@ -240,22 +240,33 @@ class Yase:
                 )
         return self._extractor
 
+    def _trace_span(self, name: str, attributes: Mapping[str, Any]) -> Any:
+        """Return a compatible tracing context without importing telemetry."""
+        if self.tracer is None:
+            return nullcontext()
+        if hasattr(self.tracer, "span"):
+            return self.tracer.span(name, attributes)
+
+        @contextmanager
+        def raw_span():
+            with self.tracer.start_as_current_span(name) as span:
+                setter = getattr(span, "set_attribute", None)
+                if callable(setter):
+                    for key, value in attributes.items():
+                        setter(str(key), value)
+                yield span
+
+        return raw_span()
+
     def extract(
         self, image: ImageInput, timestamp: float | None = None
     ) -> SemanticResult:
         """Extract semantics from one image."""
         started = time.perf_counter()
-        span = nullcontext()
-        if self.tracer is not None:
-            attributes = {
-                "yase.task": self.task,
-                "yase.model": self.model,
-            }
-            if hasattr(self.tracer, "span"):
-                span = self.tracer.span("yase.extract", attributes)
-            else:
-                span = self.tracer.start_as_current_span("yase.extract")
-        with span:
+        with self._trace_span(
+            "yase.extract",
+            {"yase.task": self.task, "yase.model": self.model},
+        ):
             try:
                 rgb = load_image(
                     image, color_order=self.color_order, limits=self.input_limits
@@ -362,7 +373,16 @@ class Yase:
 
             try:
                 batch_started = time.perf_counter()
-                outputs = list(backend.extract_batch(arrays))
+                with self._trace_span(
+                    "yase.extract_batch",
+                    {
+                        "yase.task": self.task,
+                        "yase.model": self.model,
+                        "yase.batch_size": len(arrays),
+                        "yase.backend": type(backend).__name__,
+                    },
+                ):
+                    outputs = list(backend.extract_batch(arrays))
                 if len(outputs) != len(arrays):
                     raise ValueError(
                         "extract_batch must return one result per valid input image"
