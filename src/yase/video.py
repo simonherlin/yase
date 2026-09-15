@@ -569,8 +569,10 @@ class RealtimeVideoStream(VideoStream):
                     if self.on_error is not None:
                         result = self.on_error(exc, index)
                         if result is None:
+                            self._drop_count += 1
                             continue
                     elif self.error_policy == "skip":
+                        self._drop_count += 1
                         continue
                     else:
                         raise

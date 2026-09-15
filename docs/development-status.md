@@ -596,6 +596,14 @@ Result: version 0.50.0, pending final validation.
 
 Result: version 0.51.0, pending final validation.
 
+## Cycle 61 — realtime loss accounting
+
+- [x] Count realtime backend failures as dropped frames under skip policy.
+- [x] Count input-limit/preprocessing failures in the same metric.
+- [x] Cover deterministic backpressure-mode error accounting.
+
+Result: version 0.52.0, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

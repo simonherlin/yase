@@ -511,6 +511,31 @@ def test_realtime_worker_exception_is_propagated_and_closed():
     stream.close()
 
 
+def test_realtime_skip_errors_are_counted_as_dropped_frames():
+    def failing(_image):
+        raise RuntimeError("inference failed")
+
+    stream = RealtimeVideoStream(
+        FakeCapture(3), failing, drop_frames=False, error_policy="skip"
+    )
+    assert list(stream) == []
+    assert stream.stats.frames_read == 3
+    assert stream.stats.frames_processed == 0
+    assert stream.stats.frames_dropped == 3
+
+
+def test_realtime_input_limit_errors_are_counted_as_dropped_frames():
+    stream = RealtimeVideoStream(
+        FakeCapture(2),
+        lambda image: image,
+        drop_frames=False,
+        error_policy="skip",
+        input_limits=InputLimits(max_width=2),
+    )
+    assert list(stream) == []
+    assert stream.stats.frames_dropped == 2
+
+
 def test_rich_schema_and_pipeline_preserve_semantic_fields():
     box = BoundingBox.from_xywh(1, 2, 3, 4)
     result = SemanticPipeline(

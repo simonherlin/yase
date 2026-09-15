@@ -154,6 +154,8 @@ time. RealtimeVideoStream uses a worker and one-item latest-frame buffer;
 drop_frames=True overwrites stale frames, while False applies backpressure.
 Both expose stats with read/processed/dropped counts, source/output FPS,
 elapsed time, and mean/max inference latency.
+Frames rejected by `error_policy="skip"` or a recovery callback returning
+`None` are included in `frames_dropped`, including in the realtime worker.
 
 Use error_policy=skip to discard failed frames, or pass
 on_error(exception, frame_index) to return a recovery SemanticResult.
