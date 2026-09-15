@@ -24,7 +24,7 @@ Yase is split into a lightweight core and optional capability layers:
 12. `observation.py` defines the versioned `FrameRef`, `ObservationBundle`,
     `ModelProvenance`, `Uncertainty`, and `EmbeddingRecord` contracts.
 13. `stages.py` defines the declarative `StageSpec`/`StageContext` protocol and
-    validates ordered dependencies before the future DAG scheduler runs.
+    validates ordered dependencies before the DAG scheduler executes.
 14. `scheduler.py` executes contracted stages as a topological graph with
     bounded caching, cancellation, deadlines, async entry points, and stage
     telemetry.

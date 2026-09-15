@@ -272,14 +272,17 @@ yase artifact model.onnx --verify <sha256-digest>
 
 ~~~bash
 uv sync --dev
-uv run pytest
-uv run ruff check src tests
-uv run ruff format --check src tests
-uv build
+make check                 # lock, lint, format, tests and coverage
+make runtime-smoke         # optional ONNX/OpenVINO runtime probes
+make build                 # portable sdist + py3-none-any wheel
+make build-native          # ABI-specific wheel with C++ acceleration
 ~~~
 
-The test suite uses fake backends and captures, so it never downloads model
-weights. See docs/devguide for release and quality guidance.
+GitHub Actions are intentionally disabled to avoid consuming hosted-runner
+credits. The test suite uses fake backends and captures, so it never downloads
+model weights; `make runtime-smoke` only probes runtimes already installed on
+the local machine. See [`docs/README.md`](docs/README.md) for the architecture,
+API, release audits, and local quality gates.
 
 ## Composable semantic pipelines
 
