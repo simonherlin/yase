@@ -462,6 +462,14 @@ Result: version 0.36.0, pending final validation.
 
 Result: version 0.37.0, pending final validation.
 
+## Cycle 46 — complete built-in backend registry
+
+- [x] Register image embeddings and VLMs with capability metadata.
+- [x] Register Tesseract and PaddleOCR behind their explicit extras.
+- [x] Keep all newly registered frameworks lazy-loaded.
+
+Result: version 0.38.0, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

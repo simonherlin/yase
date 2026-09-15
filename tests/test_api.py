@@ -1074,6 +1074,15 @@ def test_cli_models_lists_filtered_model_cards(capsys):
 def test_default_registry_exposes_modern_optional_backends():
     names = default_registry().names()
     assert {"rf-detr", "sam3", "sam3-video", "grounding-dino"}.issubset(names)
+    assert default_registry().get("vlm").capabilities == (
+        "caption",
+        "question-answering",
+        "structured-output",
+        "image",
+    )
+    assert default_registry().get("image-embedding").extra == "transformers"
+    assert default_registry().get("tesseract").extra == "ocr"
+    assert default_registry().get("paddleocr").extra == "paddle"
 
 
 def test_zone_and_line_event_rules_emit_geometry_events():

@@ -184,6 +184,9 @@ stream class to activate them.
 `BackendRegistry` and `default_registry()` provide explicit named factories for
 optional model adapters. Applications can register their own backends and
 record capabilities and the optional installation extra they require.
+The built-in registry includes `image-embedding`, `vlm`, `tesseract`, and
+`paddleocr` in addition to the detection, segmentation, and accelerator
+backends; all remain lazy until `create()` or `Yase` actually instantiates one.
 
 Optional adapters include `TesseractExtractor`, `PaddleOCRExtractor`,
 `TransformersImageEmbeddingExtractor`, and `TransformersVLMExtractor`. They

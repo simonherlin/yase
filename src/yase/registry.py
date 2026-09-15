@@ -106,10 +106,14 @@ class BackendRegistry:
 def default_registry(*, include_plugins: bool = False) -> BackendRegistry:
     """Return built-ins, optionally extended by explicit plugin discovery."""
     from .adapters import (
+        PaddleOCRExtractor,
         RFDETRExtractor,
+        TesseractExtractor,
         TransformersGroundingDinoExtractor,
+        TransformersImageEmbeddingExtractor,
         TransformersSAM3Extractor,
         TransformersSAM3VideoExtractor,
+        TransformersVLMExtractor,
     )
     from .backends import OnnxRuntimeExtractor, TorchScriptExtractor
     from .runtimes import OpenVINOExtractor, TensorRTExtractor
@@ -169,6 +173,30 @@ def default_registry(*, include_plugins: bool = False) -> BackendRegistry:
         capabilities=("detection", "open-vocabulary", "text-prompt"),
         extra="transformers",
         metadata={"license": "verify upstream checkpoint and code license"},
+    )
+    registry.register(
+        "image-embedding",
+        TransformersImageEmbeddingExtractor,
+        capabilities=("embedding", "retrieval", "batch", "image"),
+        extra="transformers",
+    )
+    registry.register(
+        "vlm",
+        TransformersVLMExtractor,
+        capabilities=("caption", "question-answering", "structured-output", "image"),
+        extra="transformers",
+    )
+    registry.register(
+        "tesseract",
+        TesseractExtractor,
+        capabilities=("ocr", "text-detection", "image"),
+        extra="ocr",
+    )
+    registry.register(
+        "paddleocr",
+        PaddleOCRExtractor,
+        capabilities=("ocr", "text-detection", "image"),
+        extra="paddle",
     )
     if include_plugins:
         registry.discover_entry_points()
