@@ -1353,6 +1353,7 @@ def test_stream_checkpoint_atomically_restores_all_state_components(tmp_path):
             memory=memory,
             identity_store=identity_store,
             metadata={"job_id": "demo", "frame": 1},
+            model_fingerprint={"model_id": "tracker-v1", "revision": "abc"},
         )
         == checkpoint
     )
@@ -1370,9 +1371,20 @@ def test_stream_checkpoint_atomically_restores_all_state_components(tmp_path):
         identity_store=restored_identity,
     )
     assert restored["metadata"]["job_id"] == "demo"
+    assert restored["model_fingerprint"]["revision"] == "abc"
     assert restored_tracker.active_ids == tracker.active_ids
     assert restored_memory.states == memory.states
     assert tuple(restored_identity.identities) == tuple(identity_store.identities)
+    verified = load_stream_checkpoint(
+        checkpoint,
+        expected_model_fingerprint={"model_id": "tracker-v1", "revision": "abc"},
+    )
+    assert verified["version"] == 1
+    with pytest.raises(ValueError, match="fingerprint"):
+        load_stream_checkpoint(
+            checkpoint,
+            expected_model_fingerprint={"model_id": "other", "revision": "abc"},
+        )
 
 
 def test_stream_checkpoint_validates_components_and_versions(tmp_path):

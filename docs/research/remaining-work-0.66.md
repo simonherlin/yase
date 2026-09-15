@@ -79,8 +79,11 @@ réel sur les petites listes.
    sûre des images sont désormais implémentés. L’authentification, le
    rate-limit global et les quotas par tenant restent idéalement au proxy ou à
    la plateforme.
-4. Enrichir les checkpoints avec une politique de migration et une empreinte
-   du modèle/configuration qui a produit l’état.
+4. [partiellement livré] Enrichir les checkpoints avec une politique de
+   migration et une empreinte du modèle/configuration qui a produit l’état.
+   `model_fingerprint` est maintenant écrit et vérifiable au chargement ; le
+   calcul automatique d’empreinte depuis tous les formats d’artefacts reste
+   optionnel et dépendant du modèle.
 5. Ajouter une file multi-étages optionnelle pour les flux temps réel lorsque
    le modèle, l’OCR et le VLM ont des cadences différentes.
 6. Ajouter un index local HNSW/FAISS optionnel derrière le contrat actuel,

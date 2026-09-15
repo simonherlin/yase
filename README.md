@@ -209,7 +209,8 @@ configuration using `load_config("yase.toml")`; only names registered in
 Serialized `SemanticResult` payloads include a `schema_version` and can be
 restored with `result_from_dict()` when arrays were exported explicitly.
 `migrate_result_payload()` handles legacy `mask`, `text`, and `poses` aliases;
-stream checkpoints expose the analogous `migrate_stream_checkpoint()` helper.
+stream checkpoints expose the analogous `migrate_stream_checkpoint()` helper
+and can carry a model/configuration fingerprint to prevent unsafe resumption.
 The ASGI service also exposes `/extract/batch` for ordered base64 image lots.
 Synchronous model calls run in a bounded worker pool; call `app.close()` when
 the host shuts down.

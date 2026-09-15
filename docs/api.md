@@ -255,7 +255,9 @@ atomic and fsyncs its temporary file before replacement, making it suitable
 for worker failover and scheduled recovery jobs. Unversioned checkpoints with
 an explicit `components` mapping are migrated to version 1; ambiguous or newer
 versions are rejected. `migrate_stream_checkpoint()` exposes the same boundary
-for applications that validate before loading.
+for applications that validate before loading. Pass `model_fingerprint={...}`
+when writing and `expected_model_fingerprint={...}` when loading to reject
+resumption with a different model revision or configuration.
 
 `Tracker` is the common online tracking protocol. `IoUTracker` adds stable
 stream-local `track_id` values to typed detections, and both built-in trackers

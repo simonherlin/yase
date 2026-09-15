@@ -29,10 +29,13 @@ def make_stream_checkpoint(
     memory: Any | None = None,
     identity_store: Any | None = None,
     metadata: Mapping[str, Any] | None = None,
+    model_fingerprint: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a JSON-compatible checkpoint for stream state components."""
     if metadata is not None and not isinstance(metadata, Mapping):
         raise TypeError("metadata must be a mapping")
+    if model_fingerprint is not None and not isinstance(model_fingerprint, Mapping):
+        raise TypeError("model_fingerprint must be a mapping")
     components = {}
     for name, component in (
         ("tracker", tracker),
@@ -45,6 +48,7 @@ def make_stream_checkpoint(
     payload = {
         "version": CHECKPOINT_VERSION,
         "metadata": dict(metadata or {}),
+        "model_fingerprint": dict(model_fingerprint or {}),
         "components": components,
     }
     # Validate numpy-free JSON compatibility before returning the payload.
@@ -62,6 +66,9 @@ def _validate_checkpoint(payload: Any) -> Mapping[str, Any]:
         raise TypeError("stream checkpoint metadata must be a mapping")
     if not isinstance(components, Mapping):
         raise TypeError("stream checkpoint components must be a mapping")
+    fingerprint = payload.get("model_fingerprint", {})
+    if not isinstance(fingerprint, Mapping):
+        raise TypeError("stream checkpoint model_fingerprint must be a mapping")
     unknown = set(components) - set(_COMPONENTS)
     if unknown:
         raise ValueError(f"unknown stream checkpoint components: {sorted(unknown)}")
@@ -92,6 +99,7 @@ def save_stream_checkpoint(
     memory: Any | None = None,
     identity_store: Any | None = None,
     metadata: Mapping[str, Any] | None = None,
+    model_fingerprint: Mapping[str, Any] | None = None,
 ) -> Path:
     """Atomically write a stream checkpoint and return its path.
 
@@ -104,6 +112,7 @@ def save_stream_checkpoint(
         memory=memory,
         identity_store=identity_store,
         metadata=metadata,
+        model_fingerprint=model_fingerprint,
     )
     temporary = None
     try:
@@ -133,6 +142,7 @@ def load_stream_checkpoint(
     tracker: Any | None = None,
     memory: Any | None = None,
     identity_store: Any | None = None,
+    expected_model_fingerprint: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Load and optionally restore a stream checkpoint.
 
@@ -141,6 +151,13 @@ def load_stream_checkpoint(
     """
     with Path(source).open("r", encoding="utf-8") as handle:
         payload = _validate_checkpoint(json.load(handle))
+    if expected_model_fingerprint is not None:
+        if not isinstance(expected_model_fingerprint, Mapping):
+            raise TypeError("expected_model_fingerprint must be a mapping")
+        actual = dict(payload.get("model_fingerprint", {}))
+        expected = dict(expected_model_fingerprint)
+        if actual != expected:
+            raise ValueError("checkpoint model fingerprint mismatch")
     components = payload["components"]
     for name, component in (
         ("tracker", tracker),
