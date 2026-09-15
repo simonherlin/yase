@@ -37,6 +37,7 @@ jobs:
         run: |
           uv run python - <<'PY'
           import pathlib
+          import tarfile
           import zipfile
 
           artifacts = sorted(pathlib.Path("dist").iterdir())
@@ -53,6 +54,11 @@ jobs:
           }
           missing = required - names
           assert not missing, sorted(missing)
+          source = next(path for path in artifacts if path.suffixes[-2:] == [".tar", ".gz"])
+          with tarfile.open(source) as archive:
+              source_names = set(archive.getnames())
+          assert any(name.endswith("native/yase_native.cpp") for name in source_names)
+          assert any(name.endswith("tools/build_native.py") for name in source_names)
           PY
       - run: uv run yase diagnostics --require numpy
 
