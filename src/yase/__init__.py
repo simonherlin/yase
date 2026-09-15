@@ -27,6 +27,7 @@ from .checkpoints import (
     CHECKPOINT_VERSION,
     load_stream_checkpoint,
     make_stream_checkpoint,
+    migrate_stream_checkpoint,
     save_stream_checkpoint,
 )
 from .config import build_from_config, load_config
@@ -124,6 +125,7 @@ from .schema import (
 )
 from .serialization import (
     RESULT_SCHEMA_VERSION,
+    migrate_result_payload,
     result_from_dict,
     result_to_dict,
     result_to_json,
@@ -296,6 +298,8 @@ __all__ = [
     "load_config",
     "load_stream_checkpoint",
     "make_stream_checkpoint",
+    "migrate_stream_checkpoint",
+    "migrate_result_payload",
     "load_coco_dataset",
     "load_coco_predictions",
     "normalise_detections",

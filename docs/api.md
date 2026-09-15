@@ -82,8 +82,11 @@ descriptors are rejected during reconstruction because they do not contain
 the tensor values.
 Standalone `result_to_dict()` payloads now carry `schema_version="1.0"`; use
 `result_from_dict()` to restore payloads containing real array values. Legacy
-payloads without a version remain accepted, while shape/dtype summaries are
-intentionally rejected during reconstruction.
+payloads without a version remain accepted, and legacy `mask`, `text`, and
+`poses` aliases are migrated to the current field names. Shape/dtype summaries
+are intentionally rejected during reconstruction. `migrate_result_payload()`
+is available when an application wants to normalize records before storing
+them.
 
 `StageSpec`, `StageContext`, and the `Stage` protocol provide a migration path
 from independent named stages to a validated execution graph. Attach a
@@ -247,7 +250,10 @@ startup, and `ensure_payload_index()` can add one later.
 `load_stream_checkpoint()` provide one versioned JSON checkpoint for the
 tracker, `SemanticTrackMemory`, and `GlobalIdentityStore`. The file writer is
 atomic and fsyncs its temporary file before replacement, making it suitable
-for worker failover and scheduled recovery jobs.
+for worker failover and scheduled recovery jobs. Unversioned checkpoints with
+an explicit `components` mapping are migrated to version 1; ambiguous or newer
+versions are rejected. `migrate_stream_checkpoint()` exposes the same boundary
+for applications that validate before loading.
 
 `Tracker` is the common online tracking protocol. `IoUTracker` adds stable
 stream-local `track_id` values to typed detections, and both built-in trackers

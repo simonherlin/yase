@@ -55,8 +55,11 @@ réel sur les petites listes.
    TensorRT moderne.
 4. Publier une matrice de compatibilité par OS, Python, runtime, architecture
    CPU/GPU et licence de checkpoint.
-5. Ajouter une procédure de migration pour les versions futures de résultats,
-   bundles et checkpoints, avec fixtures de versions précédentes.
+5. [partiellement livré] Ajouter une procédure de migration pour les versions
+   futures de résultats, bundles et checkpoints, avec fixtures de versions
+   précédentes. Les aliases de résultats et checkpoints non versionnés sont
+   maintenant migrés explicitement ; les migrations de versions majeures et
+   fixtures historiques réelles restent à publier.
 
 ## Tâches P1 — production et exploitation
 

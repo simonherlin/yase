@@ -66,6 +66,27 @@ def result_to_dict(result: SemanticResult, include_arrays: bool = False) -> dict
     return payload
 
 
+def migrate_result_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Normalize legacy result aliases into the current versioned shape."""
+    if not isinstance(payload, Mapping):
+        raise TypeError("payload must be a mapping")
+    migrated = dict(payload)
+    version = migrated.get("schema_version", RESULT_SCHEMA_VERSION)
+    if version in (1, "1"):
+        version = RESULT_SCHEMA_VERSION
+    if version != RESULT_SCHEMA_VERSION:
+        raise ValueError(f"unsupported result schema version: {version}")
+    for legacy, current in (
+        ("mask", "segmentation"),
+        ("text", "ocr"),
+        ("poses", "keypoints"),
+    ):
+        if current not in migrated and legacy in migrated:
+            migrated[current] = migrated[legacy]
+    migrated["schema_version"] = RESULT_SCHEMA_VERSION
+    return migrated
+
+
 def result_from_dict(payload: Mapping[str, Any]) -> SemanticResult:
     """Reconstruct a semantic result from a JSON-compatible mapping.
 
@@ -73,11 +94,7 @@ def result_from_dict(payload: Mapping[str, Any]) -> SemanticResult:
     Shape/dtype-only array summaries cannot be losslessly reconstructed and
     are rejected instead of silently producing incorrect tensors.
     """
-    if not isinstance(payload, Mapping):
-        raise TypeError("payload must be a mapping")
-    version = payload.get("schema_version", RESULT_SCHEMA_VERSION)
-    if version != RESULT_SCHEMA_VERSION:
-        raise ValueError(f"unsupported result schema version: {version}")
+    payload = migrate_result_payload(payload)
     values = {key: payload[key] for key in _RESULT_FIELDS if key in payload}
     for field in ("depth", "segmentation", "embeddings"):
         value = values.get(field)
@@ -130,6 +147,7 @@ def write_jsonl(
 
 __all__ = [
     "RESULT_SCHEMA_VERSION",
+    "migrate_result_payload",
     "result_from_dict",
     "result_to_dict",
     "result_to_json",

@@ -117,6 +117,8 @@ from yase import (
     load_mot_sequence,
     load_stream_checkpoint,
     make_stream_checkpoint,
+    migrate_result_payload,
+    migrate_stream_checkpoint,
     nms_indices,
     non_maximum_suppression,
     normalise_detections,
@@ -1380,6 +1382,13 @@ def test_stream_checkpoint_validates_components_and_versions(tmp_path):
     path.write_text(json.dumps({"version": 2}), encoding="utf-8")
     with pytest.raises(ValueError, match="version"):
         load_stream_checkpoint(path)
+    legacy_path = tmp_path / "legacy.json"
+    legacy_path.write_text(
+        json.dumps({"components": {}, "metadata": {"legacy": True}}),
+        encoding="utf-8",
+    )
+    assert load_stream_checkpoint(legacy_path)["version"] == 1
+    assert migrate_stream_checkpoint({"components": {}})["version"] == 1
 
 
 def test_multimodal_consensus_fuses_boxes_and_audits_evidence():
@@ -3047,6 +3056,10 @@ def test_semantic_result_serialization_is_versioned_and_reconstructable():
     legacy = dict(payload)
     legacy.pop("schema_version")
     assert result_from_dict(legacy).timestamp == 3.5
+    aliases = migrate_result_payload(
+        {"schema_version": 1, "mask": [[1]], "text": [{"value": "ok"}]}
+    )
+    assert aliases["segmentation"] == [[1]] and aliases["ocr"] == [{"value": "ok"}]
     summarized = result_to_dict(original)
     with pytest.raises(ValueError, match="shape/dtype"):
         result_from_dict(summarized)

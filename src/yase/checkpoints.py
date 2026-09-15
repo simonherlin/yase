@@ -53,7 +53,8 @@ def make_stream_checkpoint(
 
 
 def _validate_checkpoint(payload: Any) -> Mapping[str, Any]:
-    if not isinstance(payload, Mapping) or payload.get("version") != CHECKPOINT_VERSION:
+    payload = migrate_stream_checkpoint(payload)
+    if payload.get("version") != CHECKPOINT_VERSION:
         raise ValueError("unsupported stream checkpoint version")
     metadata = payload.get("metadata", {})
     components = payload.get("components", {})
@@ -65,6 +66,23 @@ def _validate_checkpoint(payload: Any) -> Mapping[str, Any]:
     if unknown:
         raise ValueError(f"unknown stream checkpoint components: {sorted(unknown)}")
     return payload
+
+
+def migrate_stream_checkpoint(payload: Any) -> dict[str, Any]:
+    """Normalize unversioned legacy checkpoints with an unambiguous shape."""
+    if not isinstance(payload, Mapping):
+        raise TypeError("stream checkpoint must be a mapping")
+    migrated = dict(payload)
+    version = migrated.get("version")
+    if version is None:
+        if "components" not in migrated:
+            raise ValueError("unsupported stream checkpoint version")
+        migrated["version"] = CHECKPOINT_VERSION
+    if migrated.get("version") != CHECKPOINT_VERSION:
+        raise ValueError("unsupported stream checkpoint version")
+    migrated.setdefault("metadata", {})
+    migrated.setdefault("components", {})
+    return migrated
 
 
 def save_stream_checkpoint(
@@ -144,5 +162,6 @@ __all__ = [
     "CHECKPOINT_VERSION",
     "load_stream_checkpoint",
     "make_stream_checkpoint",
+    "migrate_stream_checkpoint",
     "save_stream_checkpoint",
 ]
