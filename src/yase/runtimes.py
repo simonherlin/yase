@@ -96,15 +96,25 @@ class OpenVINOExtractor:
         compiled_model: Any = None,
         core: Any = None,
         input_limits: Optional[InputLimits] = None,
+        async_queue: Any = None,
+        async_jobs: int = 0,
     ) -> None:
         _validate_options(task, size)
         if compiled_model is None and model_path is None:
             raise ValueError("model_path or compiled_model is required")
+        if (
+            isinstance(async_jobs, bool)
+            or not isinstance(async_jobs, int)
+            or async_jobs < 0
+        ):
+            raise ValueError("async_jobs must be a non-negative integer")
         self.model_path = str(model_path) if model_path is not None else None
         self.device = device
         self.task = task
         self.size = size
         self.input_limits = input_limits
+        self.async_queue = async_queue
+        self.async_jobs = async_jobs
         self.output_names = tuple(output_names) if output_names is not None else None
         if compiled_model is None:
             try:
@@ -185,6 +195,98 @@ class OpenVINOExtractor:
             _result_from_values(outputs, index, len(images), self.task, metadata)
             for index in range(len(images))
         ]
+
+    def _async_outputs(self, request: Any) -> list[Any]:
+        """Read outputs from one completed OpenVINO infer request."""
+        for attribute in ("results", "outputs"):
+            value = getattr(request, attribute, None)
+            if callable(value):
+                value = value()
+            if value is not None:
+                return self._ordered_outputs(value)
+
+        getter = getattr(request, "get_output_tensor", None)
+        if callable(getter):
+            ports = list(getattr(self.compiled_model, "outputs", []))
+            count = len(ports) or len(self.output_names or ()) or 1
+            values = []
+            for index in range(count):
+                tensor = getter(index)
+                values.append(getattr(tensor, "data", tensor))
+            return values
+        raise TypeError(
+            "OpenVINO async request must expose results, outputs, or get_output_tensor"
+        )
+
+    def _make_async_queue(self) -> Any:
+        if self.async_queue is not None:
+            return self.async_queue
+        try:
+            import openvino as ov
+        except ImportError as exc:
+            raise ImportError(
+                "install the openvino extra to use OpenVINO async extraction"
+            ) from exc
+        jobs = self.async_jobs or 1
+        return ov.AsyncInferQueue(self.compiled_model, jobs)
+
+    def extract_batch_async(self, images: Sequence[Any]) -> list[SemanticResult]:
+        """Infer one image per OpenVINO ``AsyncInferQueue`` request.
+
+        The method waits for all submitted requests before returning, but lets
+        OpenVINO overlap host submission and device execution. Results are
+        reconstructed by userdata index, so provider completion order cannot
+        reorder the public batch contract.
+        """
+        tensor = _prepare_batch(images, self.size, self.input_limits)
+        queue = self._make_async_queue()
+        set_callback = getattr(queue, "set_callback", None)
+        start_async = getattr(queue, "start_async", None)
+        wait_all = getattr(queue, "wait_all", None)
+        if (
+            not callable(set_callback)
+            or not callable(start_async)
+            or not callable(wait_all)
+        ):
+            raise TypeError(
+                "OpenVINO async queue must expose set_callback, start_async, and "
+                "wait_all"
+            )
+
+        outputs: list[Optional[list[Any]]] = [None] * len(images)
+
+        def callback(request: Any, userdata: Any = None) -> None:
+            if not isinstance(userdata, int) or not 0 <= userdata < len(images):
+                raise ValueError("OpenVINO async callback returned an invalid index")
+            outputs[userdata] = self._async_outputs(request)
+
+        set_callback(callback)
+        for index in range(len(images)):
+            start_async(
+                {self._input: tensor[index : index + 1]},
+                userdata=index,
+            )
+        wait_all()
+        if any(value is None for value in outputs):
+            raise RuntimeError("OpenVINO async queue completed with missing outputs")
+
+        metadata = {
+            "backend": "openvino",
+            "model_path": self.model_path,
+            "device": self.device,
+            "task": self.task,
+            "async_queue": True,
+            "async_jobs": self.async_jobs or 1,
+        }
+        return [
+            _result_from_values(value, 0, 1, self.task, metadata)
+            for value in outputs
+            if value is not None
+        ]
+
+    def extract_async(self, image: Any) -> SemanticResult:
+        """Extract one image through the OpenVINO asynchronous queue."""
+        return self.extract_batch_async([image])[0]
 
 
 class _TorchTensorRTRunner:

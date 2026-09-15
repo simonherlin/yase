@@ -115,6 +115,10 @@ from yase import OpenVINOExtractor, TensorRTExtractor
 
 depth = OpenVINOExtractor("model.xml", device="AUTO").extract("photo.jpg")
 depth = TensorRTExtractor("model.plan").extract("photo.jpg")
+
+# OpenVINO asynchronous queue (one request per image, ordered results):
+images = ["one.jpg", "two.jpg"]
+results = OpenVINOExtractor("model.xml", async_jobs=4).extract_batch_async(images)
 ~~~
 
 Install accelerator runtimes separately; Yase never downloads weights or

@@ -628,6 +628,20 @@ Result: package-wide roadmap refreshed for the `0.52.0` release line.
 
 Result: version `0.53.0`, pending final validation.
 
+## Cycle 64 — OpenVINO asynchronous inference queue
+
+- [x] Add an injectable `AsyncInferQueue` boundary without importing OpenVINO
+  on base-package import.
+- [x] Submit one request per image and reconstruct results using callback
+  userdata, preserving public input order independent of completion order.
+- [x] Support OpenVINO request `results`, `outputs`, and
+  `get_output_tensor()` result surfaces.
+- [x] Expose `extract_batch_async()` and `extract_async()` with explicit queue
+  validation and metadata.
+- [x] Add deterministic fake-queue tests that run without accelerator hardware.
+
+Result: version `0.54.0`, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

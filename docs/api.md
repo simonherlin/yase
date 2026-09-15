@@ -139,6 +139,11 @@ per-image fallback.
 contract when available and binds outputs on CPU for portable post-processing;
 the CLI exposes this as `--io-binding`.
 
+`OpenVINOExtractor.extract_batch_async()` uses OpenVINO's `AsyncInferQueue` to
+overlap per-image submissions while restoring input order from callback
+userdata. Inject `async_queue=` in tests or managed runtimes; otherwise the
+adapter lazily constructs the queue from the installed OpenVINO package.
+
 `normalise_detections()` converts common detector mappings, columnar outputs,
 numeric ``(x1, y1, x2, y2, score, class_id)`` rows, and normalized coordinates
 into typed `Detection` objects. `inspect_artifact()`, `sha256_file()`, and

@@ -2203,6 +2203,56 @@ def test_openvino_extractor_uses_injected_compiled_model():
     assert results[0].metadata["backend"] == "openvino"
 
 
+def test_openvino_extractor_uses_async_queue_and_restores_input_order():
+    class Port:
+        def get_any_name(self):
+            return "pixels"
+
+    class Request:
+        def __init__(self, tensor):
+            self.results = {
+                "depth": tensor[:, 0, :, :].astype(np.float32),
+            }
+
+    class Queue:
+        def __init__(self):
+            self.callback = None
+            self.started = []
+            self.waited = False
+
+        def set_callback(self, callback):
+            self.callback = callback
+
+        def start_async(self, inputs, userdata=None):
+            self.started.append(userdata)
+            tensor = next(iter(inputs.values()))
+            self.callback(Request(tensor), userdata)
+
+        def wait_all(self):
+            self.waited = True
+
+    class CompiledModel:
+        inputs = [Port()]
+
+    queue = Queue()
+    backend = OpenVINOExtractor(
+        compiled_model=CompiledModel(), async_queue=queue, async_jobs=3
+    )
+    results = backend.extract_batch_async(
+        [
+            np.full((2, 2, 3), 1, dtype=np.uint8),
+            np.full((2, 2, 3), 2, dtype=np.uint8),
+        ]
+    )
+
+    assert queue.started == [0, 1]
+    assert queue.waited
+    assert [float(result.depth[0, 0]) for result in results] == pytest.approx(
+        [1 / 255, 2 / 255]
+    )
+    assert all(result.metadata["async_queue"] for result in results)
+
+
 def test_tensorrt_extractor_accepts_custom_runner():
     class Runner:
         def infer(self, tensor):
