@@ -34,4 +34,5 @@ supported OS/Python matrix rather than copying a local `.so` between machines.
 The builder needs the matching Python development headers (`Python.h`). On
 Ubuntu install `python3-dev` or the exact interpreter package such as
 `python3.12-dev`. For non-system interpreters, set
-`YASE_PYTHON_INCLUDE_DIR` to the directory containing `Python.h`.
+`YASE_PYTHON_INCLUDE_DIR` to the directory containing `Python.h`; the variable
+is honored by both the in-place builder and the wheel builder.

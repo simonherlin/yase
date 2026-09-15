@@ -25,11 +25,18 @@ def _native_extensions() -> list[Extension]:
     if not _native_requested():
         return []
     compile_args = ["/std:c++17"] if sys.platform == "win32" else ["-std=c++17"]
+    include_dirs = []
+    configured_include = os.environ.get("YASE_PYTHON_INCLUDE_DIR")
+    if configured_include:
+        include_dirs.extend(
+            [configured_include, os.path.dirname(os.path.normpath(configured_include))]
+        )
     return [
         Extension(
             "yase._native",
             sources=["native/yase_native.cpp"],
             language="c++",
+            include_dirs=include_dirs,
             extra_compile_args=compile_args,
         )
     ]
