@@ -208,6 +208,9 @@ queries before they reach the collection.
 Its `search()` and `search_record()` methods also support `min_score`; when a
 space is bound, all searches automatically add the corresponding payload
 filter.
+For multi-modal collections, pass `vector_name="image"` to use a Qdrant named
+vector; `payload_indexes={"camera_id": "keyword"}` creates filter indexes at
+startup, and `ensure_payload_index()` can add one later.
 
 `make_stream_checkpoint()`, `save_stream_checkpoint()`, and
 `load_stream_checkpoint()` provide one versioned JSON checkpoint for the

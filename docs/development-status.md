@@ -654,6 +654,21 @@ Result: version `0.54.0`, pending final validation.
 
 Result: version `0.55.0`, pending final validation.
 
+## Cycle 66 — scalable Qdrant retrieval
+
+- [x] Add optional Qdrant named-vector collection configuration through
+  `vector_name=` while preserving legacy unnamed vectors.
+- [x] Query named vectors through both modern `query_points(using=...)` and
+  legacy `search(query_vector=(name, vector))` client surfaces.
+- [x] Add explicit `payload_indexes=` bootstrap and public
+  `ensure_payload_index()` for high-cardinality filtered fields.
+- [x] Preserve embedding-space provenance checks and normalized cosine vectors
+  across both collection layouts.
+- [x] Add fake-client regression coverage for collection, point, query, and
+  payload-index contracts.
+
+Result: version `0.56.0`, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

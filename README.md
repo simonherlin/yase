@@ -132,6 +132,10 @@ from yase import OpenTelemetryTracer, Yase
 model = Yase(extractor=my_backend, tracer=OpenTelemetryTracer())
 ~~~
 
+Qdrant deployments can keep multiple embedding spaces in one collection with
+`QdrantVectorIndex(..., vector_name="image")`; pass `payload_indexes=` for
+fields used frequently in filtered search.
+
 ## Batch extraction
 
 `extract_many` preserves input order and timestamps. Backends that implement

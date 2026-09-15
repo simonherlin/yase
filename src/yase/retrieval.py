@@ -26,11 +26,23 @@ class QdrantVectorIndex:
         path: Optional[str] = None,
         models: Optional[Any] = None,
         space: Optional[str] = None,
+        vector_name: Optional[str] = None,
+        payload_indexes: Optional[Any] = None,
     ) -> None:
         if not collection:
             raise ValueError("collection must not be empty")
         if space is not None and not space:
             raise ValueError("space must not be empty when provided")
+        if vector_name is not None and not vector_name:
+            raise ValueError("vector_name must not be empty when provided")
+        if payload_indexes is None:
+            index_specs = {}
+        elif isinstance(payload_indexes, Mapping):
+            index_specs = dict(payload_indexes)
+        else:
+            index_specs = {str(field): None for field in payload_indexes}
+        if any(not isinstance(field, str) or not field for field in index_specs):
+            raise ValueError("payload index fields must be non-empty strings")
         if client is None or models is None:
             try:
                 from qdrant_client import QdrantClient
@@ -47,18 +59,41 @@ class QdrantVectorIndex:
         self.client = client
         self.models = models
         self.space = space
+        self.vector_name = vector_name
+        self.payload_indexes = index_specs
         if self.dimension is not None:
             self._ensure_collection()
 
     def _ensure_collection(self) -> None:
         exists = self.client.collection_exists(self.collection)
         if not exists:
+            vector_params = self.models.VectorParams(
+                size=self.dimension, distance=self.models.Distance.COSINE
+            )
             self.client.create_collection(
                 collection_name=self.collection,
-                vectors_config=self.models.VectorParams(
-                    size=self.dimension, distance=self.models.Distance.COSINE
+                vectors_config=(
+                    {self.vector_name: vector_params}
+                    if self.vector_name is not None
+                    else vector_params
                 ),
             )
+        for field, schema in self.payload_indexes.items():
+            self.ensure_payload_index(field, schema)
+
+    def ensure_payload_index(self, field: str, field_schema: Any = None) -> None:
+        """Create a Qdrant payload index when the client supports it."""
+        if not isinstance(field, str) or not field:
+            raise ValueError("field must be a non-empty string")
+        create = getattr(self.client, "create_payload_index", None)
+        if not callable(create):
+            raise TypeError(
+                "Qdrant client must expose create_payload_index for payload indexes"
+            )
+        kwargs = {"collection_name": self.collection, "field_name": field}
+        if field_schema is not None:
+            kwargs["field_schema"] = field_schema
+        create(**kwargs)
 
     def add(
         self,
@@ -86,7 +121,11 @@ class QdrantVectorIndex:
                 raise ValueError(f"expected embeddings from space {self.space}")
         point = self.models.PointStruct(
             id=item_id,
-            vector=(value / norm).tolist(),
+            vector=(
+                {self.vector_name: (value / norm).tolist()}
+                if self.vector_name is not None
+                else (value / norm).tolist()
+            ),
             payload=payload,
         )
         self.client.upsert(collection_name=self.collection, points=[point])
@@ -148,6 +187,7 @@ class QdrantVectorIndex:
             response = self.client.query_points(
                 collection_name=self.collection,
                 query=query,
+                **({"using": self.vector_name} if self.vector_name else {}),
                 query_filter=query_filter,
                 limit=limit,
                 score_threshold=min_score,
@@ -157,7 +197,9 @@ class QdrantVectorIndex:
         else:
             points = self.client.search(
                 collection_name=self.collection,
-                query_vector=query,
+                query_vector=(
+                    (self.vector_name, query) if self.vector_name is not None else query
+                ),
                 query_filter=query_filter,
                 limit=limit,
                 score_threshold=min_score,

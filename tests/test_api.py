@@ -916,6 +916,69 @@ def test_qdrant_adapter_enforces_embedding_spaces():
         )
 
 
+def test_qdrant_adapter_supports_named_vectors_and_payload_indexes():
+    from types import SimpleNamespace
+
+    class FakeModels:
+        class Distance:
+            COSINE = "cosine"
+
+        VectorParams = staticmethod(lambda **kwargs: kwargs)
+        PointStruct = staticmethod(lambda **kwargs: SimpleNamespace(**kwargs))
+        Filter = staticmethod(lambda **kwargs: kwargs)
+        FieldCondition = staticmethod(lambda **kwargs: kwargs)
+        MatchValue = staticmethod(lambda **kwargs: kwargs)
+
+    class FakeClient:
+        def __init__(self):
+            self.created = None
+            self.indexes = []
+            self.points = []
+            self.query = None
+
+        def collection_exists(self, _name):
+            return False
+
+        def create_collection(self, **kwargs):
+            self.created = kwargs
+
+        def create_payload_index(self, **kwargs):
+            self.indexes.append(kwargs)
+
+        def upsert(self, points, **_kwargs):
+            self.points.extend(points)
+
+        def query_points(self, **kwargs):
+            self.query = kwargs
+            return SimpleNamespace(
+                points=[SimpleNamespace(id="a", score=0.9, payload={})]
+            )
+
+    client = FakeClient()
+    index = QdrantVectorIndex(
+        "multimodal",
+        dimension=2,
+        client=client,
+        models=FakeModels,
+        vector_name="image",
+        payload_indexes={"camera_id": "keyword"},
+    )
+    index.add("a", [1.0, 0.0], {"camera_id": "cam-1"})
+    hits = index.search([1.0, 0.0], where={"camera_id": "cam-1"})
+
+    assert client.created["vectors_config"]["image"]["size"] == 2
+    assert client.indexes == [
+        {
+            "collection_name": "multimodal",
+            "field_name": "camera_id",
+            "field_schema": "keyword",
+        }
+    ]
+    assert client.points[0].vector == {"image": [1.0, 0.0]}
+    assert client.query["using"] == "image"
+    assert hits[0].item_id == "a"
+
+
 def test_video_tracker_and_event_engine_integration():
     capture = FakeCapture(3)
     detection = Detection("person", 0.9, (0, 0, 2, 2))
