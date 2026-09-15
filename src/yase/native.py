@@ -19,7 +19,10 @@ def _box_values(box: Any) -> tuple[float, float, float, float]:
     values = box.as_xyxy() if hasattr(box, "as_xyxy") else box
     if len(values) < 4:
         raise ValueError("box must contain at least four values")
-    return tuple(float(value) for value in values[:4])  # type: ignore[return-value]
+    normalized = tuple(float(value) for value in values[:4])
+    if not all(math.isfinite(value) for value in normalized):
+        raise ValueError("box coordinates must be finite")
+    return normalized  # type: ignore[return-value]
 
 
 def _python_iou_matrix(

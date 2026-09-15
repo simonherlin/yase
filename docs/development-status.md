@@ -429,6 +429,14 @@ Result: version 0.35.0, pending final validation.
 
 Result: version 0.35.1, pending final validation.
 
+## Cycle 42 — native input validation
+
+- [x] Reject non-finite raw box coordinates before native or fallback execution.
+- [x] Keep direct low-level APIs aligned with typed `BoundingBox` invariants.
+- [x] Add a regression test for `NaN` input.
+
+Result: version 0.35.2, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

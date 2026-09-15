@@ -610,6 +610,8 @@ def test_nms_indices_handles_empty_and_deterministic_boundary_cases():
         nms_indices([], [], -0.1)
     with pytest.raises(ValueError, match="class_ids"):
         nms_indices([], [], class_ids=[1])
+    with pytest.raises(ValueError, match="finite"):
+        nms_indices([(0, 0, float("nan"), 1)], [0.5])
 
 
 def test_typed_non_maximum_suppression_preserves_detection_payload():
