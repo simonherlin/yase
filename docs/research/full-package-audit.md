@@ -1,7 +1,7 @@
 # Yase — audit complet du package et plan de production
 
 Date de l'audit : 2026-09-15  
-État inspecté : `0.58.0`
+État inspecté : `0.62.0`
 
 Ce document est la référence de pilotage technique. Il distingue ce qui est
 déjà livré, ce qui est contractuellement couvert mais non testé sur matériel,
@@ -47,14 +47,16 @@ polluer `SemanticResult`, `ObservationBundle` ni les contrats de tracking.
 | VLM | Transformers, JSON schema subset, batch | livré | streaming tokens, vidéo native, contraintes JSON avancées |
 | Runtime ONNX | batch, providers, graph options, I/O binding optionnel | livré | vraie validation GPU/EP en CI |
 | Runtime OpenVINO | sync CPU/GPU/NPU/AUTO, `AsyncInferQueue` ordonné | livré | vraie validation hardware en CI |
-| Runtime TensorRT | plan et runner custom | livré | buffers CUDA réutilisables, context pools, shapes dynamiques |
+| Runtime TensorRT | plan, runner custom, pool de contexts injectable | livré | buffers CUDA réutilisables et smoke test hardware |
 | Retrieval local | index NumPy, NPZ, namespace d'embedding | livré | HNSW/FAISS local optionnel |
 | Retrieval Qdrant | upsert/query, filtres, namespace, named vectors, payload indexes | livré | migration de schémas multi-vecteurs |
 | Observabilité | métriques thread-safe, JSON, Prometheus text, OpenTelemetry spans | livré | propagation de trace dans tous les stages |
 | Packaging | wheel pure portable, sdist C++/builder, extras lazy | livré | matrice OS/Python/accélérateur à publier |
 | Native C++ | IoU/NMS hot paths, fallback Python | livré | ABI/build wheels spécialisés non distribués |
-| CLI | image, vidéo, benchmark, diagnostics, catalogues, évaluations | livré | config déclarative et gRPC éventuels |
-| Service | ASGI borné, health/readiness, métriques, extraction base64 | livré | auth/rate-limit laissés à l'infrastructure |
+| CLI | image, vidéo, benchmark, diagnostics, catalogues, évaluations | livré | config CLI déclarative éventuelle |
+| Service | ASGI borné, health/readiness, métriques, extraction simple/batch base64 | livré | auth/rate-limit laissés à l'infrastructure |
+| Configuration | JSON/TOML, registry-only, facade/pipeline | livré | schémas de configuration à stabiliser |
+| Contrats JSON | résultat `1.0`, bundle versionné, reconstruction sûre | livré | migrations futures major/minor |
 | Documentation | README/API/architecture/recherche/status/release readiness | livré | guides d'intégration runtime à enrichir |
 
 ## 3. Recherche technologique vérifiée
@@ -143,11 +145,11 @@ et leurs performances doivent être mesurées sur le matériel cible.
 
 ### P1 — fonctionnalités de plateforme
 
-1. Étendre TensorRT avec pool de contexts, buffers réutilisables et streams.
-2. Propager les contextes OpenTelemetry dans les stages, batches et backends.
-3. Ajouter un format de configuration déclaratif (TOML/YAML optionnel) qui
+1. Propager les contextes OpenTelemetry dans les stages, batches et backends.
+2. Ajouter un format de configuration déclaratif plus complet (TOML/YAML
+   optionnel) qui
    instancie registry, pipeline, limites, sinks et checkpoints.
-4. Ajouter une stratégie keyframe/VLM pour éviter d'appeler un VLM lourd à
+3. Ajouter une stratégie keyframe/VLM pour éviter d'appeler un VLM lourd à
    chaque frame vidéo.
 
 ### P2 — extension mondiale
@@ -172,6 +174,10 @@ et leurs performances doivent être mesurées sur le matériel cible.
 - OpenTelemetry optionnel et service ASGI borné.
 - Qdrant named vectors et indexes payload explicites.
 - Pipeline batch tolérant aux erreurs partielles.
+- Pool TensorRT de runners indépendants et extraction parallèle ordonnée.
+- Configuration JSON/TOML contrôlée par registry.
+- Schéma versionné et reconstruction sûre des résultats.
+- Endpoint ASGI batch borné.
 - Wheel pure portable et sources natives conservées dans le sdist.
 
 ## 6. Critères de sortie d'une release 1.x
@@ -195,9 +201,10 @@ Les tâches suivantes sont les plus rentables et doivent être implémentées da
 cet ordre :
 
 1. tester les extras sur les runtimes et matériels réellement supportés ;
-2. ajouter un pool TensorRT de contexts et buffers réutilisables ;
-3. versionner/migrer explicitement les schémas `SemanticResult` et checkpoints ;
-4. produire une configuration déclarative et une stratégie keyframe/VLM ;
+2. propager les traces OpenTelemetry dans les sous-stages et lots ;
+3. ajouter des migrations de schéma et checkpoints réellement rétrocompatibles ;
+4. produire une stratégie keyframe/VLM et une configuration de déploiement plus
+   riche ;
 5. publier des benchmarks séparant preprocessing, transferts, kernels et
    post-traitement.
 

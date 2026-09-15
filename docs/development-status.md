@@ -766,6 +766,18 @@ Result: version `0.61.0`, pending final validation.
 
 Result: version `0.62.0`, pending final validation.
 
+## Cycle 73 — second full package audit
+
+- [x] Re-audit all public surfaces after the TensorRT pool, declarative config,
+  versioned results, and ASGI batch work.
+- [x] Reconcile the roadmap with official TensorRT, Transformers, ONNX Runtime,
+  OpenVINO, and Qdrant runtime constraints.
+- [x] Separate delivered platform capabilities from hardware-gated work still
+  requiring live provider CI.
+- [x] Update the full audit and release checklist to the 0.62.0 state.
+
+Result: architecture roadmap synchronized; pending final 0.62.0 validation.
+
 ## Exit criteria
 
 The package is considered ready for a first public release when the core and
