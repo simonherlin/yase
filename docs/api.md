@@ -164,6 +164,8 @@ label-history, and exponentially smoothed confidence metadata.
 from appearance embeddings stored in detection attributes.
 `GlobalIdentityStore.state_dict()` and `load_state_dict()` make those
 cross-camera identities resumable across worker restarts.
+`SemanticTrackMemory` exposes the same checkpoint contract for confidence EMA,
+label history, lifetime counters, and missed-frame state.
 
 See examples/image.py, examples/batch.py, examples/composite.py,
 examples/onnx.py, and examples/video.py for runnable adapters.

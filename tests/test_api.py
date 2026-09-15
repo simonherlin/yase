@@ -795,6 +795,25 @@ def test_semantic_track_memory_adds_stable_attributes_and_expires():
     assert not memory.states
 
 
+def test_semantic_track_memory_round_trips_json_checkpoint():
+    memory = SemanticTrackMemory(decay=0.5)
+    detection = Detection("person", 0.8, (0, 0, 2, 2), track_id=4)
+    memory.update(SemanticResult(detections=[detection]), timestamp=1.0)
+    memory.update(
+        SemanticResult(detections=[Detection("person", 0.6, (0, 0, 2, 2), track_id=4)]),
+        timestamp=2.0,
+    )
+    restored = SemanticTrackMemory()
+    restored.load_state_dict(json.loads(json.dumps(memory.state_dict())))
+    result = restored.update(
+        SemanticResult(detections=[Detection("person", 0.9, (0, 0, 2, 2), track_id=4)]),
+        timestamp=3.0,
+    )
+    assert result.detections[0].attributes["seen_count"] == 3
+    with pytest.raises(ValueError, match="state version"):
+        restored.load_state_dict({"version": 2})
+
+
 def test_multimodal_consensus_fuses_boxes_and_audits_evidence():
     box_a = Detection("car", 0.8, (0, 0, 10, 10))
     box_b = Detection("car", 0.9, (1, 1, 11, 11))

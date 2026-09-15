@@ -1,8 +1,10 @@
 """Temporal semantic memory for tracked objects."""
 
+import math
 from collections import Counter
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Optional
+from typing import Any, Optional
 
 from .core import SemanticResult
 from .schema import Detection
@@ -48,6 +50,95 @@ class SemanticTrackMemory:
         self._states.clear()
         self._missed.clear()
         self._frame = 0
+
+    def state_dict(self) -> dict[str, Any]:
+        """Return a JSON-compatible checkpoint of semantic track memory."""
+        return {
+            "version": 1,
+            "frame": self._frame,
+            "states": [
+                {
+                    "track_id": state.track_id,
+                    "first_seen": state.first_seen,
+                    "last_seen": state.last_seen,
+                    "seen_count": state.seen_count,
+                    "label": state.label,
+                    "score_ema": state.score_ema,
+                    "labels": list(state.labels),
+                    "missed": self._missed[state.track_id],
+                }
+                for state in sorted(
+                    self._states.values(), key=lambda value: value.track_id
+                )
+            ],
+        }
+
+    def load_state_dict(self, state: Mapping[str, Any]) -> None:
+        """Restore a checkpoint produced by :meth:`state_dict`."""
+        if not isinstance(state, Mapping) or state.get("version") != 1:
+            raise ValueError("unsupported SemanticTrackMemory state version")
+        frame = state.get("frame", 0)
+        if isinstance(frame, bool) or not isinstance(frame, int) or frame < 0:
+            raise ValueError("memory state frame must be a non-negative integer")
+        values = state.get("states", ())
+        if not isinstance(values, Sequence) or isinstance(values, (str, bytes)):
+            raise TypeError("memory state states must be a sequence")
+        restored: dict[int, TrackMemoryState] = {}
+        missed_values: dict[int, int] = {}
+        for item in values:
+            if not isinstance(item, Mapping):
+                raise TypeError("each memory state entry must be a mapping")
+            track_id = item.get("track_id")
+            if (
+                isinstance(track_id, bool)
+                or not isinstance(track_id, int)
+                or track_id in restored
+            ):
+                raise ValueError(
+                    "memory state contains an invalid or duplicate track_id"
+                )
+            label = item.get("label")
+            labels = item.get("labels", ())
+            if not isinstance(label, str) or not label:
+                raise ValueError("memory state labels must be non-empty strings")
+            if not isinstance(labels, Sequence) or isinstance(labels, (str, bytes)):
+                raise TypeError("memory state labels must be a sequence")
+            if any(not isinstance(value, str) or not value for value in labels):
+                raise ValueError("memory state labels must be non-empty strings")
+            seen_count = item.get("seen_count", 1)
+            missed = item.get("missed", 0)
+            if (
+                isinstance(seen_count, bool)
+                or not isinstance(seen_count, int)
+                or seen_count < 1
+                or isinstance(missed, bool)
+                or not isinstance(missed, int)
+                or missed < 0
+            ):
+                raise ValueError("memory state counters are invalid")
+            first_seen = float(item.get("first_seen", 0.0))
+            last_seen = float(item.get("last_seen", first_seen))
+            score_ema = float(item.get("score_ema", 0.0))
+            if (
+                not math.isfinite(first_seen)
+                or not math.isfinite(last_seen)
+                or not math.isfinite(score_ema)
+                or not 0 <= score_ema <= 1
+            ):
+                raise ValueError("memory state values must be finite and valid")
+            restored[track_id] = TrackMemoryState(
+                track_id=track_id,
+                first_seen=first_seen,
+                last_seen=last_seen,
+                seen_count=seen_count,
+                label=label,
+                score_ema=score_ema,
+                labels=tuple(labels),
+            )
+            missed_values[track_id] = missed
+        self._frame = frame
+        self._states = restored
+        self._missed = missed_values
 
     def update(
         self, result: SemanticResult, timestamp: Optional[float] = None

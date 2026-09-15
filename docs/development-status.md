@@ -494,6 +494,14 @@ Result: version 0.39.0, pending final validation.
 
 Result: version 0.40.0, pending final validation.
 
+## Cycle 50 — resumable semantic memory
+
+- [x] Add versioned checkpoints to `SemanticTrackMemory`.
+- [x] Preserve EMA confidence, label history, lifetime, missed frames, and frame counter.
+- [x] Add restart/recovery regression coverage.
+
+Result: version 0.41.0, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full
