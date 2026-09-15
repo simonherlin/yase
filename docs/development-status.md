@@ -976,11 +976,12 @@ Python range; heavy provider combinations remain separately matrixed.
 - [x] Add an ABI-specific native wheel profile with `YASE_BUILD_NATIVE=1`.
 - [x] Verify a native wheel built from the source distribution on Python 3.13.
 - [x] Split CPU/GPU ONNX extras and document complete stack profiles.
-- [x] Align the CI native job with wheel-content verification.
+- [x] Align the local native release gate with wheel-content verification.
 
 Result: version 0.66.0 has one coherent source tree, one portable install path,
-and one explicit optimized distribution path. C++ remains a focused accelerator
-instead of duplicating model runtimes.
+and one explicit optimized distribution path. The former hosted CI checks are
+archived as local release gates because GitHub Actions is intentionally disabled.
+C++ remains a focused accelerator instead of duplicating model runtimes.
 
 ## Exit criteria
 
