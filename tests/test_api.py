@@ -64,6 +64,7 @@ from yase import (
     RealtimeVideoStream,
     Relation,
     RFDETRExtractor,
+    RuntimeCache,
     RuntimeInfo,
     RuntimeMetrics,
     SchedulerConfig,
@@ -2285,6 +2286,38 @@ def test_artifact_helpers_are_reproducible(tmp_path):
         verify_artifact(str(path), "0" * 64)
 
 
+def test_runtime_cache_is_bounded_lru_and_closes_owned_resources():
+    class Resource:
+        def __init__(self, name):
+            self.name = name
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    created = []
+    cache = RuntimeCache(capacity=1)
+
+    def make(name):
+        resource = Resource(name)
+        created.append(resource)
+        return resource
+
+    first = cache.get_or_create({"model": "a", "options": [1, 2]}, lambda: make("a"))
+    assert (
+        cache.get_or_create(
+            {"options": [1, 2], "model": "a"}, lambda: make("duplicate")
+        )
+        is first
+    )
+    second = cache.get_or_create(("model", "b"), lambda: make("b"))
+    assert first.closed
+    assert cache.info() == {"size": 1, "capacity": 1}
+    cache.clear()
+    assert second.closed
+    assert len(created) == 2
+
+
 def test_composite_merges_fields_and_preserves_timestamp():
     composite = CompositeExtractor(
         {
@@ -2504,6 +2537,29 @@ def test_onnx_record_timings_exposes_three_phases_without_changing_default():
     timings = timed.extract(image).metadata["timings_seconds"]
     assert set(timings) == {"preprocess", "inference", "postprocess"}
     assert all(isinstance(value, float) and value >= 0 for value in timings.values())
+
+
+def test_onnx_runtime_cache_reuses_one_session(monkeypatch):
+    from types import SimpleNamespace
+
+    created = []
+
+    def make_session(path, **_kwargs):
+        session = FakeOnnxSession([np.ones((1, 2, 2), dtype=np.float32)])
+        created.append((path, session))
+        return session
+
+    monkeypatch.setitem(
+        sys.modules,
+        "onnxruntime",
+        SimpleNamespace(InferenceSession=make_session),
+    )
+    cache = RuntimeCache(capacity=2)
+    first = OnnxRuntimeExtractor("cached.onnx", cache=cache)
+    second = OnnxRuntimeExtractor("cached.onnx", cache=cache)
+    assert first.session is second.session
+    assert len(created) == 1
+    assert cache.info() == {"size": 1, "capacity": 2}
 
 
 def test_onnx_batch_rejects_mismatched_shapes_without_resize():

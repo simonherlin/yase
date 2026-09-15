@@ -10,6 +10,7 @@ from typing import Any
 
 import numpy as np
 
+from ._cache import RuntimeCache, freeze_cache_key
 from ._timing import add_phase_timings
 from .core import SemanticResult, _normalise_output, load_image
 from .errors import BackendError
@@ -67,6 +68,7 @@ class TorchScriptExtractor:
         size: tuple | None = None,
         input_limits: InputLimits | None = None,
         record_timings: bool = False,
+        cache: RuntimeCache[Any] | None = None,
     ) -> None:
         if task not in ("depth", "segmentation", "both"):
             raise ValueError("task must be depth, segmentation, or both")
@@ -85,7 +87,19 @@ class TorchScriptExtractor:
         self.device = torch.device(
             device or ("cuda" if torch.cuda.is_available() else "cpu")
         )
-        self.model = torch.jit.load(model_path, map_location=self.device).eval()
+        self.cache = cache
+
+        def load_model() -> Any:
+            return torch.jit.load(model_path, map_location=self.device).eval()
+
+        self.model = (
+            cache.get_or_create(
+                freeze_cache_key(("torchscript", self.model_path, str(self.device))),
+                load_model,
+            )
+            if cache is not None
+            else load_model()
+        )
         self.task = task
         self.size = size
         self.input_limits = input_limits
@@ -203,6 +217,7 @@ class OnnxRuntimeExtractor:
         use_io_binding: bool = False,
         input_limits: InputLimits | None = None,
         record_timings: bool = False,
+        cache: RuntimeCache[Any] | None = None,
     ) -> None:
         if task not in ("depth", "segmentation", "both"):
             raise ValueError("task must be depth, segmentation, or both")
@@ -245,7 +260,26 @@ class OnnxRuntimeExtractor:
                 kwargs["provider_options"] = [dict(item) for item in provider_options]
             if session_options is not None:
                 kwargs["sess_options"] = session_options
-            session = ort.InferenceSession(model_path, **kwargs)
+
+            def create_session() -> Any:
+                return ort.InferenceSession(model_path, **kwargs)
+
+            cache_key = freeze_cache_key(
+                (
+                    "onnxruntime",
+                    str(model_path),
+                    providers,
+                    provider_options,
+                    graph_optimization_level,
+                    enable_profiling,
+                    id(session_options) if session_options is not None else None,
+                )
+            )
+            session = (
+                cache.get_or_create(cache_key, create_session)
+                if cache is not None
+                else create_session()
+            )
         self.session = session
         self.model_path = str(model_path)
         self.providers = providers
@@ -256,6 +290,7 @@ class OnnxRuntimeExtractor:
         self.input_limits = input_limits
         self.use_io_binding = use_io_binding
         self.record_timings = record_timings
+        self.cache = cache
         inputs = session.get_inputs()
         if not inputs:
             raise ValueError("ONNX session has no inputs")

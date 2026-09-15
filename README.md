@@ -170,6 +170,13 @@ Instrumentation is disabled by default and reports wall-clock adapter phases;
 provider-specific device transfer or asynchronous kernel timings should be
 validated separately on the target hardware.
 
+For long-lived services, pass a shared bounded `RuntimeCache(capacity=8)` to
+TorchScript, ONNX Runtime, or OpenVINO adapters to reuse model/session
+resources. The cache never downloads artifacts, exposes `info()`, and closes
+owned resources on eviction or `clear()`; call `cache.close()` during service
+shutdown. TensorRT contexts should generally be supplied through an explicit
+`TensorRTContextPool` when concurrent inference is required.
+
 The repository pins Python 3.12 in `.python-version` because it is the most
 conservative intersection of the supported vision runtimes.
 

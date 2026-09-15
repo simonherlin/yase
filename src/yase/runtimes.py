@@ -14,6 +14,7 @@ from typing import Any
 
 import numpy as np
 
+from ._cache import RuntimeCache, freeze_cache_key
 from ._timing import add_phase_timings
 from .core import SemanticResult, load_image
 from .limits import InputLimits
@@ -103,6 +104,7 @@ class OpenVINOExtractor:
         async_queue: Any = None,
         async_jobs: int = 0,
         record_timings: bool = False,
+        cache: RuntimeCache[Any] | None = None,
     ) -> None:
         _validate_options(task, size)
         if compiled_model is None and model_path is None:
@@ -123,6 +125,7 @@ class OpenVINOExtractor:
         self.async_queue = async_queue
         self.async_jobs = async_jobs
         self.record_timings = record_timings
+        self.cache = cache
         self.output_names = tuple(output_names) if output_names is not None else None
         if compiled_model is None:
             try:
@@ -132,7 +135,16 @@ class OpenVINOExtractor:
                     "install the openvino extra to use OpenVINOExtractor"
                 ) from exc
             runtime_core = core or ov.Core()
-            compiled_model = runtime_core.compile_model(self.model_path, device)
+
+            def compile_model() -> Any:
+                return runtime_core.compile_model(self.model_path, device)
+
+            cache_key = freeze_cache_key(("openvino", self.model_path, device))
+            compiled_model = (
+                cache.get_or_create(cache_key, compile_model)
+                if cache is not None
+                else compile_model()
+            )
         self.compiled_model = compiled_model
         self._input = self._resolve_input(input_name)
         self.input_name = self._port_name(self._input)
@@ -418,6 +430,7 @@ class TensorRTExtractor:
         device: str = "cuda",
         input_limits: InputLimits | None = None,
         record_timings: bool = False,
+        cache: RuntimeCache[Any] | None = None,
     ) -> None:
         _validate_options(task, size)
         if (
@@ -440,7 +453,13 @@ class TensorRTExtractor:
         if runner is None:
             if model_path is None:
                 raise ValueError("model_path or runner is required")
-            runner = _TorchTensorRTRunner(model_path)
+            if cache is not None:
+                runner = cache.get_or_create(
+                    freeze_cache_key(("tensorrt", str(model_path), device)),
+                    lambda: _TorchTensorRTRunner(model_path),
+                )
+            else:
+                runner = _TorchTensorRTRunner(model_path)
         if not callable(runner) and not hasattr(runner, "infer"):
             raise TypeError("runner must be callable or expose infer")
         self.model_path = str(model_path) if model_path is not None else None
@@ -450,6 +469,7 @@ class TensorRTExtractor:
         self.device = device
         self.input_limits = input_limits
         self.record_timings = record_timings
+        self.cache = cache
 
     def _infer(self, tensor: np.ndarray) -> Any:
         if hasattr(self.runner, "infer"):

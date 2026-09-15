@@ -337,7 +337,10 @@ ONNX, OpenVINO, TensorRT, and TorchScript adapters accept
 `record_timings=True`; this adds `metadata["timings_seconds"]` with
 `preprocess`, `inference`, and `postprocess` wall-clock phases. The benchmark
 report aggregates those phases under `phase_timings` without changing the
-default metadata contract.
+default metadata contract. `RuntimeCache(capacity=N)` is an explicit,
+thread-safe LRU for reusing heavyweight TorchScript models, ONNX sessions,
+OpenVINO compiled models, or application-owned runtime resources; it closes
+evicted values exposing `close()` and must be closed by the service owner.
 
 `evaluate_detections()` provides a deterministic IoU-based precision, recall,
 F1, and mean-IoU evaluator suitable for small regression datasets. It is not a

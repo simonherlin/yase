@@ -60,9 +60,12 @@ réel sur les petites listes.
 
 ## Tâches P1 — production et exploitation
 
-1. Ajouter une stratégie de cache explicite pour modèles et sessions, avec
-   cycle de vie, fermeture et limites mémoire ; ne jamais télécharger sans
-   action explicite de l’application.
+1. [partiellement livré] Ajouter une stratégie de cache explicite pour modèles
+   et sessions, avec cycle de vie, fermeture et limites mémoire ;
+   `RuntimeCache` fournit désormais un LRU borné thread-safe, réutilisable par
+   TorchScript/ONNX/OpenVINO et par les ressources applicatives. Il ne
+   télécharge rien et se ferme explicitement. La télémétrie mémoire détaillée
+   et le partage optimisé des contextes TensorRT restent à traiter.
 2. Propager les contextes de trace dans les sinks, batches et appels de
    backends afin de relier une frame à ses stages.
 3. Ajouter timeouts, quotas et annulation au boundary ASGI ; l’authentification

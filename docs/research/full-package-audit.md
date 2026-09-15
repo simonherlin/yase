@@ -220,6 +220,8 @@ Le benchmark local fournit désormais l’attribution opt-in des phases
 prétraitement/inférence/post-traitement pour les quatre adaptateurs de modèles
 principaux. Le transfert device détaillé et la synchronisation GPU restent une
 validation hardware de release, car ils dépendent du provider réellement actif.
+Les modèles et sessions peuvent aussi être réutilisés via `RuntimeCache`, avec
+capacité bornée et fermeture explicite des ressources évincées.
 
 ## 7. Décision immédiate
 

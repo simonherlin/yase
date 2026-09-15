@@ -1,5 +1,6 @@
 """Yase: semantic extraction for images and real-time video."""
 
+from ._cache import RuntimeCache, freeze_cache_key
 from .adapters import (
     PaddleOCRExtractor,
     PromptableSegmentationExtractor,
@@ -219,6 +220,8 @@ __all__ = [
     "RESULT_SCHEMA_VERSION",
     "OpenTelemetryTracer",
     "RFDETRExtractor",
+    "RuntimeCache",
+    "freeze_cache_key",
     "SearchHit",
     "SemanticEvent",
     "SemanticTrackMemory",
