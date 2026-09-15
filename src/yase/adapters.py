@@ -96,7 +96,9 @@ class PaddleOCRExtractor:
                 from paddleocr import PaddleOCR
             except ImportError as exc:
                 raise ImportError(
-                    "install the paddle extra to use PaddleOCRExtractor"
+                    "install the paddle extra and a PaddlePaddle engine "
+                    "(paddlepaddle or paddlepaddle-gpu) to use "
+                    "PaddleOCRExtractor"
                 ) from exc
             engine = PaddleOCR(lang=language, **options)
         if not hasattr(engine, "predict") and not hasattr(engine, "ocr"):

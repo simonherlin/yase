@@ -61,6 +61,11 @@ backbone API is not compatible with every older Transformers release.
 
 The CLI exposes the same check through `yase diagnostics`; repeat
 `--require PACKAGE` to make optional runtime packages readiness requirements.
+The default report distinguishes `paddleocr` from its required `paddle` engine,
+and also reports the optional `qdrant_client` and `opentelemetry` integrations.
+Distribution names such as `paddlepaddle`, `qdrant-client`, and
+`opentelemetry-api` are accepted by `--require` as aliases for their Python
+import names.
 Add `--providers` for an explicit probe of installed ONNX Runtime providers,
 OpenVINO devices, PyTorch CUDA, and TensorRT. The probe imports and initializes
 those optional runtimes only when requested. The JSON report also includes

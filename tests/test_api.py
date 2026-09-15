@@ -3343,6 +3343,12 @@ def test_runtime_diagnostics_are_lazy_and_machine_readable():
     assert degraded.ready is False
     assert degraded.to_dict()["checks"]["extractor_interface"] is False
 
+    default_runtime = collect_runtime_info()
+    assert "paddleocr" in default_runtime.optional_packages
+    assert "paddle" in default_runtime.optional_packages
+    assert "qdrant_client" in default_runtime.optional_packages
+    assert "opentelemetry" in default_runtime.optional_packages
+
 
 def test_runtime_diagnostics_can_probe_optional_providers(monkeypatch):
     class FakeOpenVINOCore:

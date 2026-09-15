@@ -172,6 +172,9 @@ def collect_runtime_info(
         "torch",
         "transformers",
         "paddleocr",
+        "paddle",
+        "qdrant_client",
+        "opentelemetry",
         "yase._native",
     ),
     *,
@@ -187,6 +190,9 @@ def collect_runtime_info(
     }
     distribution_names = {
         "cv2": ("opencv-python", "opencv-python-headless"),
+        "opentelemetry": ("opentelemetry-api",),
+        "paddle": ("paddlepaddle", "paddlepaddle-gpu"),
+        "qdrant_client": ("qdrant-client",),
         "yase._native": ("yase",),
     }
     versions: dict[str, str] = {}
