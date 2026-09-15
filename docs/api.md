@@ -19,6 +19,9 @@
 - The `extract` CLI command exposes this as `--max-workers`; benchmark
   execution remains serial by default for reproducible latency comparisons.
 - run_inference and __call__ are compatibility aliases.
+- `close()` delegates to a backend lifecycle hook when present and is
+  idempotent; `Yase` is also a context manager and rejects extraction after
+  closure.
 - extract_bundle(image, ...) returns an `ObservationBundle` that binds the
   result to a `FrameRef` and accepts explicit model provenance and uncertainty.
 - `InputLimits(max_pixels=..., max_width=..., max_height=..., max_channels=...,

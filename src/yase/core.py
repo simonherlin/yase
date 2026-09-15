@@ -214,9 +214,12 @@ class Yase:
         self.tracer = tracer
         self._extractor = extractor
         self._backend_options = backend_options
+        self._closed = False
 
     @property
     def extractor(self) -> Any:
+        if self._closed:
+            raise RuntimeError("Yase is closed")
         if self._extractor is None:
             if self.registry is not None and self.model in self.registry.names():
                 self._extractor = self.registry.create(
@@ -245,6 +248,23 @@ class Yase:
                     "with a local artifact"
                 )
         return self._extractor
+
+    def close(self) -> None:
+        """Close an owned backend when it exposes a lifecycle hook."""
+        if self._closed:
+            return
+        self._closed = True
+        close = getattr(self._extractor, "close", None)
+        if callable(close):
+            close()
+
+    def __enter__(self) -> "Yase":
+        if self._closed:
+            raise RuntimeError("Yase is closed")
+        return self
+
+    def __exit__(self, *_: Any) -> None:
+        self.close()
 
     def _trace_span(self, name: str, attributes: Mapping[str, Any]) -> Any:
         """Return a compatible tracing context without importing telemetry."""

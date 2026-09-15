@@ -205,6 +205,8 @@ app = create_asgi_app(api, max_concurrency=4, timeout_seconds=10.0)
 Deployments can also construct the same facade from a checked-in JSON/TOML
 configuration using `load_config("yase.toml")`; only names registered in
 `BackendRegistry` are allowed.
+Use `with Yase(...) as api:` or call `api.close()` when a backend owns runtime
+contexts that must be released at shutdown.
 
 Serialized `SemanticResult` payloads include a `schema_version` and can be
 restored with `result_from_dict()` when arrays were exported explicitly.

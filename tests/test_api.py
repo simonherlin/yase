@@ -2527,6 +2527,30 @@ def test_extract_many_uses_native_batch_and_preserves_order():
     assert [result.timestamp for result in results] == [0.1, 0.2, 0.3]
 
 
+def test_yase_closes_owned_backend_idempotently_and_rejects_reuse():
+    class Backend:
+        def __init__(self):
+            self.closed = 0
+
+        def extract(self, image):
+            return image[..., 0]
+
+        def close(self):
+            self.closed += 1
+
+    backend = Backend()
+    api = Yase(extractor=backend)
+    assert api.extract(np.zeros((1, 1, 3), dtype=np.uint8)).depth.shape == (1, 1)
+    api.close()
+    api.close()
+    assert backend.closed == 1
+    with pytest.raises(RuntimeError, match="closed"):
+        api.extract(np.zeros((1, 1, 3), dtype=np.uint8))
+
+    with Yase(extractor=Backend()) as managed:
+        managed.extract(np.zeros((1, 1, 3), dtype=np.uint8))
+
+
 def test_extract_many_batch_skip_handles_invalid_image_and_records_metrics():
     backend = NativeBatchBackend()
     metrics = RuntimeMetrics(namespace="batch_test")

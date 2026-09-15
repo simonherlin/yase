@@ -72,6 +72,7 @@ réel sur les petites listes.
    TorchScript/ONNX/OpenVINO et par les ressources applicatives. Il ne
    télécharge rien et se ferme explicitement. La télémétrie mémoire détaillée
    et le partage optimisé des contextes TensorRT restent à traiter.
+   `Yase.close()` relaie maintenant la fermeture des backends possédés.
 2. Propager les contextes de trace dans les sinks, batches et appels de
    backends afin de relier une frame à ses stages.
 3. [partiellement livré] Ajouter timeouts, quotas et annulation au boundary ASGI
