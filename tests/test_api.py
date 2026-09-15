@@ -3399,6 +3399,27 @@ def test_cli_diagnostics_reports_readiness(capsys):
 
     args = _parser().parse_args(["diagnostics", "--providers"])
     assert args.providers is True
+    required = _parser().parse_args(
+        ["diagnostics", "--require-provider", "CUDAExecutionProvider"]
+    )
+    assert required.require_provider == ["CUDAExecutionProvider"]
+
+
+def test_health_check_can_require_an_onnx_provider(monkeypatch):
+    monkeypatch.setattr(
+        "yase.diagnostics.collect_provider_info",
+        lambda: {
+            "onnxruntime": {
+                "available_providers": ["CPUExecutionProvider"],
+            }
+        },
+    )
+    report = health_check(
+        required_providers=("CUDAExecutionProvider",),
+    )
+    assert report.status == "degraded"
+    assert report.checks["provider:CUDAExecutionProvider"] is False
+    assert "not available" in report.details["provider:CUDAExecutionProvider"]
 
 
 def test_cli_processing_commands_parse_input_limits():

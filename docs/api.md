@@ -72,6 +72,8 @@ model-specific and should be documented in backend metadata.
 The `extract`, `video`, and `benchmark` commands accept repeated
 `--provider NAME` flags for ONNX Runtime. Combine them with
 `--strict-providers` when a CPU fallback must be treated as a deployment error.
+Use repeatable `--require-provider NAME` flags with `yase diagnostics` to turn
+provider availability into a readiness check and non-zero process exit.
 The same commands accept `--device CPU|GPU|cuda` for the TorchScript,
 OpenVINO, and TensorRT adapters.
 

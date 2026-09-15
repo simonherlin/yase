@@ -196,16 +196,29 @@ def health_check(
     *,
     required_packages: tuple[str, ...] = (),
     probe_providers: bool = False,
+    required_providers: tuple[str, ...] = (),
 ) -> HealthReport:
     """Return readiness without downloading weights or invoking inference."""
     checks = {"numpy": True}
     details: dict[str, str] = {}
-    runtime = collect_runtime_info(probe_providers=probe_providers)
+    runtime = collect_runtime_info(
+        probe_providers=probe_providers or bool(required_providers)
+    )
     for package in required_packages:
         available = importlib.util.find_spec(package) is not None
         checks[f"package:{package}"] = available
         if not available:
             details[f"package:{package}"] = "not installed"
+
+    onnx_info = runtime.provider_info.get("onnxruntime", {})
+    available_providers = set(onnx_info.get("available_providers", ()))
+    for provider in required_providers:
+        available = provider in available_providers
+        checks[f"provider:{provider}"] = available
+        if not available:
+            details[f"provider:{provider}"] = (
+                "not available in the installed ONNX Runtime build"
+            )
 
     if extractor is not None:
         usable = any(

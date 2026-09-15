@@ -65,6 +65,9 @@ providers, OpenVINO devices, and optional CUDA/TensorRT availability. Run
 execute the deterministic smoke graph on every discovered OpenVINO device;
 for ONNX GPU validation, add `--onnx-provider CUDAExecutionProvider` so a CPU
 fallback fails loudly.
+For a startup gate, use `yase diagnostics --require-provider
+CUDAExecutionProvider`; the command then exits non-zero if that provider is not
+available in the installed ONNX Runtime build.
 The extraction CLI exposes the same control with repeated
 `--provider CUDAExecutionProvider --strict-providers` flags.
 Use `--device GPU` for OpenVINO or `--device cuda` for TorchScript/TensorRT
