@@ -23,6 +23,7 @@ def _validate_hub_revision(local_files_only: bool, revision: str | None) -> None
             "or a trusted immutable model revision"
         )
 
+
 class TesseractExtractor:
     """Extract text regions through an injected or local Tesseract engine."""
 
