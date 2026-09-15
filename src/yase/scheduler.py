@@ -504,8 +504,10 @@ class ObservationScheduler:
     ) -> list[SchedulerReport]:
         """Run an ordered batch while preserving one report per input."""
         items = list(images)
-        frame_items = [None] * len(items) if frames is None else list(frames)
-        field_items = (
+        frame_items: list[FrameRef | None] = (
+            [None] * len(items) if frames is None else list(frames)
+        )
+        field_items: list[Mapping[str, Any] | None] = (
             [None] * len(items) if initial_fields is None else list(initial_fields)
         )
         if len(frame_items) != len(items):

@@ -129,8 +129,8 @@ class MultimodalConsensus:
             )
 
         metadata: dict[str, Any] = {"consensus": ledger}
-        tags = []
-        ocr = []
+        tags: list[Any] = []
+        ocr: list[Any] = []
         embeddings = []
         for _, result in items:
             tags.extend(result.tags or [])

@@ -3,7 +3,7 @@
 from collections.abc import Callable, Iterable
 from pathlib import Path
 from queue import Full, Queue
-from typing import Any, Protocol, TextIO
+from typing import Any, Protocol, TextIO, cast
 
 from .observation import ObservationBundle, observation_to_json
 
@@ -65,12 +65,14 @@ class JsonlObservationSink:
     ) -> None:
         self.include_arrays = include_arrays
         self.flush_each = flush_each
-        self._owns_handle = isinstance(destination, (str, Path))
-        self._handle = (
-            open(destination, "w", encoding="utf-8")
-            if self._owns_handle
-            else destination
-        )
+        if isinstance(destination, (str, Path)):
+            self._owns_handle = True
+            self._handle: TextIO = cast(
+                TextIO, open(str(destination), "w", encoding="utf-8")
+            )
+        else:
+            self._owns_handle = False
+            self._handle = destination
         self._closed = False
 
     def emit(self, observation: ObservationBundle) -> bool:
@@ -106,7 +108,7 @@ class QueueSink:
             raise ValueError("maxsize must be positive")
         if on_full not in ("block", "drop"):
             raise ValueError("on_full must be 'block' or 'drop'")
-        self.queue = Queue(maxsize=maxsize)
+        self.queue: Queue[ObservationBundle] = Queue(maxsize=maxsize)
         self.on_full = on_full
         self.dropped = 0
         self._closed = False

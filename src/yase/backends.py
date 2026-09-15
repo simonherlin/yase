@@ -443,8 +443,10 @@ class OnnxRuntimeExtractor:
         bind_cpu_input = getattr(binding, "bind_cpu_input", None)
         bind_output = getattr(binding, "bind_output", None)
         copy_outputs = getattr(binding, "copy_outputs_to_cpu", None)
-        if not all(
-            callable(item) for item in (bind_cpu_input, bind_output, copy_outputs)
+        if (
+            not callable(bind_cpu_input)
+            or not callable(bind_output)
+            or not callable(copy_outputs)
         ):
             raise RuntimeError("ONNX I/O binding object is incomplete")
         bind_cpu_input(self.input_name, tensor)
@@ -578,7 +580,7 @@ class CompositeExtractor:
     def _merge_results(
         self, values: Sequence[tuple[str, SemanticResult]]
     ) -> SemanticResult:
-        merged = {}
+        merged: dict[str, Any] = {}
         metadata = {}
         timestamp = None
         for source, result in values:

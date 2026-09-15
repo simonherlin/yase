@@ -81,10 +81,11 @@ class BackendRegistry:
         if not group:
             raise ValueError("entry-point group must not be empty")
         discovered = metadata.entry_points()
+        entries: Any
         if hasattr(discovered, "select"):
             entries = discovered.select(group=group)
         else:  # pragma: no cover - Python 3.9 compatibility branch
-            entries = discovered.get(group, ())
+            entries = getattr(discovered, "get", lambda *_args: ())(group, ())
         loaded: list[BackendSpec] = []
         for entry in entries:
             try:

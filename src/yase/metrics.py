@@ -137,11 +137,11 @@ def _as_detection_frames(
     values: Iterable[Iterable[Detection]],
 ) -> list[list[Detection]]:
     """Materialize either one frame of detections or aligned detection frames."""
-    materialized = list(values)
+    materialized: list[Any] = list(values)
     if not materialized:
         return []
     if all(isinstance(item, Detection) for item in materialized):
-        return [materialized]
+        return [list(materialized)]
     return [list(frame) for frame in materialized]
 
 
@@ -453,6 +453,7 @@ def evaluate_masks(
         for index, target in enumerate(expected):
             if index in used or (class_aware and detection.label != target.label):
                 continue
+            assert detection.mask is not None and target.mask is not None
             overlap = mask_iou(detection.mask, target.mask)
             if overlap >= best_overlap:
                 best_overlap = overlap

@@ -4,6 +4,7 @@ import argparse
 import json
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 from . import (
     BenchmarkRunner,
@@ -267,7 +268,7 @@ def _models(args: argparse.Namespace) -> int:
 
 def _make_extractor(args: argparse.Namespace) -> Yase:
     """Build a CLI extractor while keeping optional dependencies lazy."""
-    options = {"input_limits": _input_limits(args)}
+    options: dict[str, Any] = {"input_limits": _input_limits(args)}
     if args.provider or args.strict_providers:
         if args.model not in {"onnx", "auto"}:
             raise ValueError(

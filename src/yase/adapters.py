@@ -752,11 +752,12 @@ class TransformersSAM3Extractor:
             model = model or AutoModel.from_pretrained(model_id, **options)
         if torch_module is None:
             try:
-                import torch as torch_module
+                import torch as imported_torch
             except ImportError as exc:
                 raise ImportError(
                     "install the transformers extra to use TransformersSAM3Extractor"
                 ) from exc
+            torch_module = imported_torch
         self._torch = torch_module
         self.model_id = model_id
         self.prompt = prompt
@@ -794,8 +795,9 @@ class TransformersSAM3Extractor:
             if isinstance(inputs, Mapping)
             else getattr(inputs, "original_sizes", None)
         )
-        if hasattr(original_sizes, "tolist"):
-            original_sizes = original_sizes.tolist()
+        tolist = getattr(original_sizes, "tolist", None)
+        if callable(tolist):
+            original_sizes = tolist()
         processed = self.processor.post_process_instance_segmentation(
             outputs,
             threshold=self.threshold,
@@ -891,11 +893,12 @@ class TransformersSAM3VideoExtractor:
             model = model or Sam3VideoModel.from_pretrained(model_id, **options)
         if torch_module is None:
             try:
-                import torch as torch_module
+                import torch as imported_torch
             except ImportError as exc:
                 raise ImportError(
                     "install the transformers extra to use SAM3 video"
                 ) from exc
+            torch_module = imported_torch
         self._torch = torch_module
         self.model_id = model_id
         self.prompt = prompt
@@ -963,8 +966,9 @@ class TransformersSAM3VideoExtractor:
                 )
             )
         frame_index = processed.get("frame_idx")
-        if hasattr(frame_index, "item"):
-            frame_index = frame_index.item()
+        item = getattr(frame_index, "item", None)
+        if callable(item):
+            frame_index = item()
         return SemanticResult(
             segmentation=masks,
             detections=detections,

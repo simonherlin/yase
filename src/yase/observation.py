@@ -312,6 +312,7 @@ def write_observation_jsonl(
 ) -> int:
     """Write ordered observation bundles to JSON Lines and return the count."""
     close = False
+    handle: TextIO
     if isinstance(destination, (str, Path)):
         handle = open(destination, "w", encoding="utf-8")
         close = True

@@ -80,6 +80,7 @@ dev = [
   "pytest>=7",
   "pytest-cov>=4",
   "ruff>=0.6",
+  "mypy>=1.11",
   "build>=1.2",
 ]
 runtime-test = [

@@ -92,7 +92,10 @@ def load_image(
         return limits.validate(array) if limits is not None else array
     if hasattr(image, "convert") and hasattr(image, "size"):
         if limits is not None:
-            width, height = image.size
+            size = getattr(image, "size", None)
+            if not isinstance(size, (tuple, list)) or len(size) < 2:
+                raise ValueError("image size must contain width and height")
+            width, height = int(size[0]), int(size[1])
             limits.validate_shape(width=width, height=height, channels=3)
         array = np.asarray(image.convert("RGB"))
         return limits.validate(array) if limits is not None else array
@@ -354,7 +357,9 @@ class Yase:
         ):
             raise ValueError("max_workers must be a positive integer")
         items = list(images)
-        stamps = [None] * len(items) if timestamps is None else list(timestamps)
+        stamps: list[float | None] = (
+            [None] * len(items) if timestamps is None else list(timestamps)
+        )
         if len(stamps) != len(items):
             raise ValueError("timestamps must have the same length as images")
 

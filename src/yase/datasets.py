@@ -248,10 +248,10 @@ def load_coco_dataset(
         annotation_records, Sequence
     ):
         raise ValueError("COCO images and annotations must be arrays")
-    images = []
+    images: list[CocoImage] = []
     image_by_id: dict[int, CocoImage] = {}
     for raw in image_records:
-        image = CocoImage(
+        coco_image = CocoImage(
             image_id=int(raw["id"]),
             file_name=str(raw.get("file_name", "")),
             width=int(raw["width"]),
@@ -262,16 +262,16 @@ def load_coco_dataset(
                 if key not in {"id", "file_name", "width", "height"}
             },
         )
-        images.append(image)
-        image_by_id[image.image_id] = image
+        images.append(coco_image)
+        image_by_id[coco_image.image_id] = coco_image
     categories = {
         int(raw["id"]): str(raw.get("name", raw["id"])) for raw in category_records
     }
     parsed: dict[int, list[Detection]] = {image.image_id: [] for image in images}
     for annotation in annotation_records:
         image_id = int(annotation["image_id"])
-        image = image_by_id.get(image_id)
-        if image is None:
+        image_record = image_by_id.get(image_id)
+        if image_record is None:
             raise ValueError(f"COCO annotation references unknown image {image_id}")
         if annotation.get("iscrowd", 0) and not include_crowd:
             continue
@@ -279,13 +279,15 @@ def load_coco_dataset(
             continue
         mask = (
             _decode_coco_segmentation(
-                annotation.get("segmentation"), image.width, image.height
+                annotation.get("segmentation"),
+                image_record.width,
+                image_record.height,
             )
             if include_masks
             else None
         )
         category_id = int(annotation["category_id"])
-        attributes = {
+        attributes: dict[str, Any] = {
             "annotation_id": int(annotation.get("id", -1)),
             "category_id": category_id,
             "iscrowd": bool(annotation.get("iscrowd", 0)),

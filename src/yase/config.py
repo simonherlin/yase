@@ -1,5 +1,6 @@
 """Declarative construction of Yase facades and semantic pipelines."""
 
+import importlib
 import json
 from collections.abc import Mapping
 from pathlib import Path
@@ -149,15 +150,15 @@ def load_config(
         parsed = json.loads(text)
     elif path.suffix.lower() in (".toml", ".tml"):
         try:
-            import tomllib
+            toml_loader = importlib.import_module("tomllib")
         except ImportError:
             try:
-                import tomli as tomllib
+                toml_loader = importlib.import_module("tomli")
             except ImportError as exc:
                 raise ImportError(
                     "TOML loading on Python < 3.11 requires the tomli package"
                 ) from exc
-        parsed = tomllib.loads(text)
+        parsed = toml_loader.loads(text)
     else:
         raise ValueError("config path must use .json, .toml, or .tml")
     return build_from_config(

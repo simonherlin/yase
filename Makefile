@@ -1,9 +1,9 @@
 PROJECT_NAME := yase
 
-.PHONY: help sync test lint format native build build-isolated build-native wheels runtime-smoke check check-dist clean
+.PHONY: help sync test lint typecheck format native build build-isolated build-native wheels runtime-smoke check check-dist clean
 
 help:
-	@echo "Targets: sync test lint format native build build-isolated build-native wheels runtime-smoke check check-dist clean"
+	@echo "Targets: sync test lint typecheck format native build build-isolated build-native wheels runtime-smoke check check-dist clean"
 
 sync:
 	uv sync --dev
@@ -16,6 +16,9 @@ runtime-smoke:
 
 lint:
 	uv run ruff check src tests tools
+
+typecheck:
+	uv run mypy --ignore-missing-imports src/yase
 
 format:
 	uv run ruff format src tests tools
@@ -35,7 +38,7 @@ build-native:
 wheels:
 	uv run python tools/build_wheels.py --platform auto
 
-check: lint
+check: lint typecheck
 	uv lock --check
 	uv run ruff format --check src tests tools
 	uv run pytest --cov=yase --cov-report=term-missing

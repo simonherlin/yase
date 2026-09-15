@@ -101,7 +101,9 @@ class SemanticPipeline:
         if error_policy not in ("raise", "skip"):
             raise ValueError("error_policy must be raise or skip")
         items = list(images)
-        stamps = [None] * len(items) if timestamps is None else list(timestamps)
+        stamps: list[float | None] = (
+            [None] * len(items) if timestamps is None else list(timestamps)
+        )
         if len(stamps) != len(items):
             raise ValueError("timestamps must have the same length as images")
         active = self.active_stages

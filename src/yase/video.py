@@ -1,8 +1,10 @@
 """Real-time video iteration utilities."""
 
+import threading
 import time
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, replace
+from threading import Thread
 from typing import Any
 
 from .core import SemanticResult, _normalise_output, load_image
@@ -99,8 +101,10 @@ class VideoStream:
         self.source_id = str(source_id)
         self.input_limits = input_limits
         self.metrics = metrics
-        self._capture = None
+        self._capture: Any | None = None
         self._fps = 0.0
+        self._worker: Thread | None = None
+        self._latest: tuple[int, float, Any] | None = None
         self._stats = VideoStats(0, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
     @property
@@ -129,7 +133,9 @@ class VideoStream:
         try:
             import cv2
 
-            self._fps = float(capture.get(cv2.CAP_PROP_FPS) or 0.0)
+            get_property = getattr(capture, "get", None)
+            if callable(get_property):
+                self._fps = float(get_property(cv2.CAP_PROP_FPS) or 0.0)
         except (ImportError, AttributeError):
             self._fps = 0.0
         self._capture = capture
@@ -518,21 +524,20 @@ class RealtimeVideoStream(VideoStream):
 
     def __iter__(self) -> Iterator[FrameResult]:
         capture = self._open()
-        import threading
-
         self._stop_event.clear()
         self._reader_done = False
         self._reader_error = None
         self._read_count = 0
         self._drop_count = 0
         self._latest = None
-        self._worker = threading.Thread(
+        worker = threading.Thread(
             target=self._reader, args=(capture,), name="yase-capture", daemon=True
         )
-        self._worker.start()
+        self._worker = worker
+        worker.start()
         started_at = time.perf_counter()
         frames_processed = 0
-        latencies = []
+        latencies: list[float] = []
         try:
             while self.max_frames is None or frames_processed < self.max_frames:
                 with self._condition:

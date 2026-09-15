@@ -247,7 +247,7 @@ class YaseASGI:
                 include_arrays = request.get("include_arrays", False)
                 if not isinstance(include_arrays, bool):
                     raise ValueError("include_arrays must be boolean")
-                images = []
+                images: list[Any] = []
                 try:
                     images.extend(self._decode_image(item) for item in encoded_images)
                     extract_many = getattr(self.extractor, "extract_many", None)

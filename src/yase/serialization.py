@@ -2,7 +2,7 @@
 
 import json
 from collections.abc import Iterable, Mapping
-from dataclasses import asdict, is_dataclass
+from dataclasses import asdict, fields, is_dataclass
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -35,10 +35,10 @@ def _json_value(value: Any, include_arrays: bool) -> Any:
         if include_arrays:
             return value.tolist()
         return {"dtype": str(value.dtype), "shape": list(value.shape)}
-    if is_dataclass(value):
+    if is_dataclass(value) and not isinstance(value, type):
         return {
-            key: _json_value(item, include_arrays)
-            for key, item in asdict(value).items()
+            item.name: _json_value(getattr(value, item.name), include_arrays)
+            for item in fields(value)
         }
     if isinstance(value, dict):
         return {
@@ -129,6 +129,7 @@ def write_jsonl(
 ) -> int:
     """Write ordered results to JSON Lines and return the number written."""
     close = False
+    handle: TextIO
     if isinstance(destination, (str, Path)):
         handle = open(destination, "w", encoding="utf-8")
         close = True
