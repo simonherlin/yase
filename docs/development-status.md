@@ -876,6 +876,18 @@ step when they exceed configured dimensions, reducing decompression-bomb risk.
 Result: deployments can now distinguish an installed package from an actual
 provider/device exposed by the host.
 
+## Cycle 81 — reproducible provider smoke tests
+
+- [x] Add a non-published `runtime-test` dependency group for provider CI.
+- [x] Add a real ONNX graph smoke script covering batch execution and I/O
+  binding.
+- [x] Add a real OpenVINO graph smoke script covering CPU batch execution and
+  `AsyncInferQueue` ordering.
+- [x] Add a dedicated Linux/Python 3.12 runtime-smoke CI job.
+
+Result: optional runtime regressions now have a reproducible CI path without
+downloading model weights or making heavy providers part of the base package.
+
 ## Exit criteria
 
 The package is considered ready for a first public release when the core and

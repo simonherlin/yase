@@ -65,6 +65,12 @@ dev = [
   "ruff>=0.6",
   "build>=1.2",
 ]
+runtime-test = [
+  "onnx>=1.17",
+  "onnxruntime>=1.17",
+  "openvino>=2024.0",
+  "opentelemetry-api>=1.30",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
