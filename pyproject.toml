@@ -55,6 +55,7 @@ exclude = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/yase"]
+artifacts = ["src/yase/*.so", "src/yase/*.pyd", "src/yase/*.dylib"]
 
 [dependency-groups]
 dev = [

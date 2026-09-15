@@ -377,6 +377,7 @@ Result: version 0.29.0, 108 deterministic tests passing before final validation.
 - [x] Integrate the native matrix into `IoUTracker` without changing contracts.
 - [x] Provide a portable Python fallback and explicit in-place build script.
 - [x] Add native compilation CI and benchmark the measured hot-path speedup.
+- [x] Include compiled `.so`, `.pyd`, and `.dylib` artifacts in native wheels.
 
 Result: version 0.30.0, 109 tests passing with native code enabled locally.
 
