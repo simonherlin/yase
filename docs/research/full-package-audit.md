@@ -1,7 +1,7 @@
 # Yase — audit complet du package et plan de production
 
 Date de l'audit : 2026-09-15  
-État inspecté : `0.62.0`
+État inspecté : `0.63.0`
 
 Ce document est la référence de pilotage technique. Il distingue ce qui est
 déjà livré, ce qui est contractuellement couvert mais non testé sur matériel,
@@ -50,7 +50,7 @@ polluer `SemanticResult`, `ObservationBundle` ni les contrats de tracking.
 | Runtime TensorRT | plan, runner custom, pool de contexts injectable | livré | buffers CUDA réutilisables et smoke test hardware |
 | Retrieval local | index NumPy, NPZ, namespace d'embedding | livré | HNSW/FAISS local optionnel |
 | Retrieval Qdrant | upsert/query, filtres, namespace, named vectors, payload indexes | livré | migration de schémas multi-vecteurs |
-| Observabilité | métriques thread-safe, JSON, Prometheus text, OpenTelemetry spans | livré | propagation de trace dans tous les stages |
+| Observabilité | métriques thread-safe, JSON, Prometheus text, spans facade/stages | livré | propagation de trace dans sinks et transports |
 | Packaging | wheel pure portable, sdist C++/builder, extras lazy | livré | matrice OS/Python/accélérateur à publier |
 | Native C++ | IoU/NMS hot paths, fallback Python | livré | ABI/build wheels spécialisés non distribués |
 | CLI | image, vidéo, benchmark, diagnostics, catalogues, évaluations | livré | config CLI déclarative éventuelle |

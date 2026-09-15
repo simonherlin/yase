@@ -802,6 +802,18 @@ next operational requirement.
 
 Result: version `0.63.0`, pending final validation.
 
+## Cycle 76 — 0.63.0 release validation
+
+- [x] Run 143 tests and lint/format checks on Python 3.12.
+- [x] Run the coverage gate on Python 3.9: 82.38% total coverage.
+- [x] Build and inspect exact 0.63.0 wheel and sdist artifacts.
+- [x] Install the wheel in a fresh Python 3.9 environment and run extraction
+  plus versioned-result serialization smoke tests.
+- [x] Record live-provider limits and remaining operational roadmap.
+
+Result: version `0.63.0` release gates passed; provider-specific CI remains
+the next operational requirement.
+
 ## Exit criteria
 
 The package is considered ready for a first public release when the core and
