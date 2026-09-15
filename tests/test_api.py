@@ -569,6 +569,14 @@ def test_asgi_service_exposes_health_metrics_and_safe_image_extraction():
     health = asyncio.run(request(app, "GET", "/health"))
     assert health[0]["status"] == 200
     assert json.loads(health[1]["body"])["status"] == "ok"
+    ready = asyncio.run(request(app, "GET", "/ready"))
+    assert ready[0]["status"] == 200
+    assert json.loads(ready[1]["body"])["checks"]["extractor_interface"] is True
+    app.extractor = object()
+    not_ready = asyncio.run(request(app, "GET", "/ready"))
+    assert not_ready[0]["status"] == 503
+    assert json.loads(not_ready[1]["body"])["ready"] is False
+    app.extractor = api
 
     response = asyncio.run(
         request(

@@ -111,7 +111,15 @@ class YaseASGI:
         method = scope.get("method", "GET").upper()
         path = scope.get("path", "/")
         if method == "GET" and path in ("/health", "/ready"):
-            await self._send(send, 200, health_check().to_dict(), "application/json")
+            report = health_check(
+                self.extractor if path == "/ready" else None,
+            )
+            await self._send(
+                send,
+                200 if report.ready else 503,
+                report.to_dict(),
+                "application/json",
+            )
             return
         if method == "GET" and path == "/metrics":
             metrics = getattr(self.extractor, "metrics", None)
