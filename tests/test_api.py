@@ -527,6 +527,24 @@ def test_asgi_service_exposes_health_metrics_and_safe_image_extraction():
     assert payload["result"]["depth"] == {"dtype": "uint8", "shape": [1, 1]}
     assert payload["result"]["timestamp"] == 12.5
 
+    batch_response = asyncio.run(
+        request(
+            app,
+            "POST",
+            "/extract/batch",
+            json.dumps(
+                {
+                    "images_base64": [encoded, encoded],
+                    "timestamps": [1.0, 2.0],
+                    "error_policy": "skip",
+                }
+            ).encode("utf-8"),
+        )
+    )
+    batch_payload = json.loads(batch_response[1]["body"])
+    assert batch_response[0]["status"] == 200
+    assert [item["timestamp"] for item in batch_payload["results"]] == [1.0, 2.0]
+
     invalid = asyncio.run(
         request(app, "POST", "/extract", b'{"image_base64":"not-base64"}')
     )
@@ -537,6 +555,15 @@ def test_asgi_service_exposes_health_metrics_and_safe_image_extraction():
         request(create_asgi_app(api, max_body_bytes=2), "POST", "/extract", b"123")
     )
     assert too_large[0]["status"] == 413
+    too_many = asyncio.run(
+        request(
+            create_asgi_app(api, max_batch_size=1),
+            "POST",
+            "/extract/batch",
+            json.dumps({"images_base64": [encoded, encoded]}).encode("utf-8"),
+        )
+    )
+    assert too_many[0]["status"] == 400
 
 
 def test_normalise_tuple_and_result_timestamp():

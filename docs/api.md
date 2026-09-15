@@ -260,7 +260,10 @@ the latest-frame realtime worker, whose purpose is latency control.
 hosts such as Uvicorn: `/health` and `/ready` return readiness JSON,
 `/metrics` exposes the facade's Prometheus text when metrics are attached, and
 POST `/extract` accepts `{ "image_base64": "...", "timestamp": ... }` without
-ever accepting a server-side path. The body limit defaults to 16 MiB.
+ever accepting a server-side path. POST `/extract/batch` accepts
+`{ "images_base64": [...], "timestamps": [...], "error_policy": "skip" }`
+and returns aligned results; the body limit defaults to 16 MiB and the batch
+limit defaults to 64 images.
 
 Optional adapters include `TesseractExtractor`, `PaddleOCRExtractor`,
 `TransformersImageEmbeddingExtractor`, and `TransformersVLMExtractor`. They

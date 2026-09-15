@@ -19,7 +19,13 @@ from .serialization import result_to_dict
 class YaseASGI:
     """Expose health, Prometheus metrics, and one-image extraction over ASGI."""
 
-    def __init__(self, extractor: Any, *, max_body_bytes: int = 16 * 1024 * 1024):
+    def __init__(
+        self,
+        extractor: Any,
+        *,
+        max_body_bytes: int = 16 * 1024 * 1024,
+        max_batch_size: int = 64,
+    ):
         if not hasattr(extractor, "extract"):
             raise TypeError("extractor must expose the Yase extract(image) API")
         if (
@@ -28,8 +34,26 @@ class YaseASGI:
             or max_body_bytes < 1
         ):
             raise ValueError("max_body_bytes must be a positive integer")
+        if (
+            isinstance(max_batch_size, bool)
+            or not isinstance(max_batch_size, int)
+            or max_batch_size < 1
+        ):
+            raise ValueError("max_batch_size must be a positive integer")
         self.extractor = extractor
         self.max_body_bytes = max_body_bytes
+        self.max_batch_size = max_batch_size
+
+    @staticmethod
+    def _decode_image(encoded: Any) -> Any:
+        if not isinstance(encoded, str) or not encoded:
+            raise ValueError("image_base64 must be a non-empty string")
+        image_bytes = base64.b64decode(encoded, validate=True)
+        if not image_bytes:
+            raise ValueError("image_base64 decoded to empty bytes")
+        from PIL import Image
+
+        return Image.open(BytesIO(image_bytes))
 
     @staticmethod
     async def _read_body(receive: Any, limit: int) -> bytes:
@@ -81,7 +105,7 @@ class YaseASGI:
             text = metrics.prometheus_text() if metrics is not None else ""
             await self._send(send, 200, text, "text/plain; version=0.0.4")
             return
-        if method != "POST" or path != "/extract":
+        if method != "POST" or path not in ("/extract", "/extract/batch"):
             await self._send(
                 send,
                 404,
@@ -106,24 +130,78 @@ class YaseASGI:
             request = json.loads(body.decode("utf-8"))
             if not isinstance(request, dict):
                 raise ValueError("request body must be a JSON object")
+            if path == "/extract/batch":
+                encoded_images = request.get("images_base64")
+                if not isinstance(encoded_images, list) or not encoded_images:
+                    raise ValueError("images_base64 must be a non-empty list")
+                if len(encoded_images) > self.max_batch_size:
+                    raise ValueError(
+                        f"batch exceeds max_batch_size: {len(encoded_images)} > "
+                        f"{self.max_batch_size}"
+                    )
+                timestamps = request.get("timestamps")
+                if timestamps is not None:
+                    if not isinstance(timestamps, list) or len(timestamps) != len(
+                        encoded_images
+                    ):
+                        raise ValueError(
+                            "timestamps must be a list with one value per image"
+                        )
+                error_policy = request.get("error_policy", "raise")
+                if error_policy not in ("raise", "skip"):
+                    raise ValueError("error_policy must be raise or skip")
+                include_arrays = request.get("include_arrays", False)
+                if not isinstance(include_arrays, bool):
+                    raise ValueError("include_arrays must be boolean")
+                images = []
+                try:
+                    images.extend(self._decode_image(item) for item in encoded_images)
+                    extract_many = getattr(self.extractor, "extract_many", None)
+                    if not callable(extract_many):
+                        raise TypeError(
+                            "batch extraction requires a Yase facade with "
+                            "extract_many()"
+                        )
+                    results = extract_many(
+                        images,
+                        timestamps=timestamps,
+                        error_policy=error_policy,
+                    )
+                finally:
+                    for image in images:
+                        image.close()
+                await self._send(
+                    send,
+                    200,
+                    {
+                        "results": [
+                            None
+                            if result is None
+                            else result_to_dict(result, include_arrays=include_arrays)
+                            for result in results
+                        ]
+                    },
+                    "application/json",
+                )
+                return
             encoded = request.get("image_base64")
-            if not isinstance(encoded, str) or not encoded:
-                raise ValueError("image_base64 must be a non-empty string")
-            image_bytes = base64.b64decode(encoded, validate=True)
-            if not image_bytes:
-                raise ValueError("image_base64 decoded to empty bytes")
             timestamp = request.get("timestamp")
             include_arrays = request.get("include_arrays", False)
             if not isinstance(include_arrays, bool):
                 raise ValueError("include_arrays must be boolean")
-            from PIL import Image
-
-            with Image.open(BytesIO(image_bytes)) as image:
+            with self._decode_image(encoded) as image:
                 result = self.extractor.extract(image, timestamp=timestamp)
             await self._send(
                 send,
                 200,
                 {"result": result_to_dict(result, include_arrays=include_arrays)},
+                "application/json",
+            )
+        except KeyError as exc:
+            await self._send(
+                send,
+                400,
+                {"error": {"type": "invalid_request", "message": str(exc)}},
                 "application/json",
             )
         except (

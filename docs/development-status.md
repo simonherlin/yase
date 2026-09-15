@@ -752,6 +752,20 @@ Result: version `0.60.0`, pending final validation.
 
 Result: version `0.61.0`, pending final validation.
 
+## Cycle 72 — ASGI batch extraction
+
+- [x] Add POST `/extract/batch` with ordered base64 images and aligned
+  timestamps.
+- [x] Reuse `Yase.extract_many()` so native backend batching and `skip/raise`
+  behavior remain identical between Python and HTTP clients.
+- [x] Enforce a configurable `max_batch_size` and close all decoded images on
+  success or failure.
+- [x] Return JSON-safe per-item results, including aligned `null` values for
+  skip-tolerated inference failures.
+- [x] Add end-to-end ASGI tests for successful batches and size rejection.
+
+Result: version `0.62.0`, pending final validation.
+
 ## Exit criteria
 
 The package is considered ready for a first public release when the core and
