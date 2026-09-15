@@ -33,7 +33,7 @@ build-isolated:
 	uv run python tools/build_package.py
 
 build-native:
-	YASE_BUILD_NATIVE=1 uv run python tools/build_package.py --native
+	YASE_BUILD_NATIVE=1 uv run python tools/build_package.py --native --no-isolation
 
 wheels:
 	uv run python tools/build_wheels.py --platform auto
