@@ -829,7 +829,26 @@ the next operational requirement.
   GPUs; OpenVINO CPU and ONNX CPU remain valid local targets.
 
 Result: version `0.64.0`; Python 3.12 is the recommended Yase environment,
-pending runtime installation and provider smoke tests.
+and the provider smoke matrix is recorded in
+`docs/research/runtime-matrix-0.64.md`.
+
+## Cycle 78 — live runtime matrix
+
+- [x] Recreate the project environment with Python 3.12.3 through `uv` without
+  changing the system Python installation.
+- [x] Install and execute OpenVINO 2026.3.1 on CPU, GPU, and AUTO with both
+  synchronous and `AsyncInferQueue` extraction paths.
+- [x] Install and execute ONNX Runtime 1.30.0 on CPU with normal execution and
+  I/O binding, including a real temporary ONNX graph.
+- [x] Instantiate the OpenTelemetry bridge against the installed API.
+- [x] Inspect NVIDIA/CUDA capabilities and explicitly classify TensorRT as
+  hardware-gated on the local Quadro M3000M (compute 5.2).
+- [x] Publish exact versions, provider lists, commands, and limitations in the
+  runtime matrix report.
+
+Result: version `0.64.0` has validated CPU and OpenVINO GPU/AUTO execution
+paths; TensorRT remains ready for supported deployment hosts but cannot be
+truthfully validated on this Maxwell workstation.
 
 ## Exit criteria
 

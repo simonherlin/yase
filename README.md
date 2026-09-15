@@ -29,6 +29,8 @@ make native
 The package can also be installed from a built wheel with
 uv pip install dist/yase-*.whl. Python 3.10–3.13 are supported; Python 3.12
 is the recommended development and deployment baseline.
+The provider results for the reference workstation are recorded in
+[`docs/research/runtime-matrix-0.64.md`](docs/research/runtime-matrix-0.64.md).
 
 The CLI reports available local adapters with `yase info`. Extraction from a
 local ONNX model is available with `yase extract image.jpg --model onnx

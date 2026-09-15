@@ -2067,7 +2067,7 @@ def test_onnx_both_outputs_and_named_io():
     assert session.calls[0][0] == ["depth", "mask"]
 
 
-def test_onnx_validates_task_size_outputs_and_optional_dependency():
+def test_onnx_validates_task_size_outputs_and_optional_dependency(monkeypatch):
     with pytest.raises(ValueError, match="task"):
         OnnxRuntimeExtractor("x", session=FakeOnnxSession([]), task="bad")
     with pytest.raises(ValueError, match="size"):
@@ -2076,6 +2076,7 @@ def test_onnx_validates_task_size_outputs_and_optional_dependency():
         OnnxRuntimeExtractor(
             "x", session=FakeOnnxSession([np.zeros((1, 1))]), task="both"
         ).extract(np.zeros((2, 2, 3)))
+    monkeypatch.setitem(sys.modules, "onnxruntime", None)
     with pytest.raises(ImportError, match="onnx"):
         OnnxRuntimeExtractor("missing.onnx")
 
