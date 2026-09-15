@@ -86,7 +86,7 @@ des choix de déploiement visibles dans `yase diagnostics --providers`.
 
 1. Les wheels natifs multi-OS ne sont pas encore publiés ; un environnement de
    release dédié doit lancer cibuildwheel avant une publication PyPI avec
-   accélération. GitHub Actions reste volontairement désactivé et la release
+   accélération. La CI hébergée reste volontairement désactivée et la release
    doit être exécutée depuis un poste/runner externe contrôlé.
 2. Le micro-benchmark C++/fallback est validé sur les kernels ; il reste à
    mesurer l’impact end-to-end avec des lots, résolutions et modèles réels.

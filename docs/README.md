@@ -10,4 +10,4 @@
 - [0.65.0 release readiness report](research/release-readiness-0.65.md)
 - [0.66.0 release readiness report](research/release-readiness-0.66.md)
 - [Remaining work and execution plan](research/remaining-work-0.66.md)
-- [Autonomous development status](development-status.md)
+- [Development status](development-status.md)

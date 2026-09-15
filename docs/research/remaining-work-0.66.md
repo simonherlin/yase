@@ -137,6 +137,6 @@ make build-native        # headers Python + compilateur C++17 requis
 ```
 
 Le prochain lot recommandé est le benchmark reproductible, puis la procédure
-de release cibuildwheel hors GitHub Actions. Les tâches P1 ne doivent être
+de release cibuildwheel hors CI hébergée. Les tâches P1 ne doivent être
 implémentées qu’après avoir gardé les contrats image/batch/vidéo et la
 compatibilité du wheel portable.

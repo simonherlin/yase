@@ -1,4 +1,4 @@
-# Yase autonomous development status
+# Yase development status
 
 This file is the execution ledger for the project. Each cycle ends with tests,
 lint, packaging, and a short gap analysis before the next action list is
@@ -980,7 +980,7 @@ Python range; heavy provider combinations remain separately matrixed.
 
 Result: version 0.66.0 has one coherent source tree, one portable install path,
 and one explicit optimized distribution path. The former hosted CI checks are
-archived as local release gates because GitHub Actions is intentionally disabled.
+archived as local release gates because hosted CI is intentionally disabled.
 C++ remains a focused accelerator instead of duplicating model runtimes.
 
 ## Cycle 90 — hardware-adaptive runtime selection

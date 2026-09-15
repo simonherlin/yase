@@ -363,11 +363,11 @@ make build                 # portable sdist + py3-none-any wheel
 make build-native          # ABI-specific wheel with C++ acceleration
 ~~~
 
-GitHub Actions are intentionally disabled to avoid consuming hosted-runner
-credits. The test suite uses fake backends and captures, so it never downloads
-model weights; `make runtime-smoke` only probes runtimes already installed on
-the local machine. See [`docs/README.md`](docs/README.md) for the architecture,
-API, release audits, and local quality gates.
+Quality gates are intentionally local and do not download model weights; the
+test suite uses fake backends and captures, while `make runtime-smoke` only
+probes runtimes already installed on the local machine. See
+[`docs/README.md`](docs/README.md) for the architecture, API, release audits,
+and local quality gates.
 
 ## Composable semantic pipelines
 

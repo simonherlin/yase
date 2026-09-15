@@ -107,13 +107,6 @@ omit = [
   "*/yase/adapters.py",
   "*/yase/cli.py",
   "*/yase/retrieval.py",
-  "*/yase/data_load.py",
-  "*/yase/features.py",
-  "*/yase/models/*",
-  "*/yase/preprocess.py",
-  "*/yase/tests/*",
-  "*/yase/utils/*",
-  "*/yase/visualize.py",
 ]
 
 [tool.coverage.report]
