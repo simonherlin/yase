@@ -481,12 +481,31 @@ class TransformersVLMExtractor:
     def _generate_text(
         self, image: Any, prompt: str, max_new_tokens: Optional[int] = None
     ) -> str:
+        return self._generate_text_batch(
+            [image], [prompt], max_new_tokens=max_new_tokens
+        )[0]
+
+    def _generate_text_batch(
+        self,
+        images: Sequence[Any],
+        prompts: Sequence[str],
+        max_new_tokens: Optional[int] = None,
+    ) -> list[str]:
         from PIL import Image
 
-        rgb = load_image(image)
-        text = self._prompt(prompt)
+        if not images:
+            raise ValueError("images must contain at least one item")
+        if len(images) != len(prompts):
+            raise ValueError("images and prompts must have the same length")
+        if any(not isinstance(prompt, str) or not prompt for prompt in prompts):
+            raise ValueError("prompts must contain non-empty strings")
+        arrays = [load_image(image) for image in images]
+        texts = [self._prompt(prompt) for prompt in prompts]
         inputs = self.processor(
-            text=[text], images=[Image.fromarray(rgb)], return_tensors="pt"
+            text=texts,
+            images=[Image.fromarray(array) for array in arrays],
+            return_tensors="pt",
+            padding=True,
         )
         inputs = {
             key: value.to(self.device) if hasattr(value, "to") else value
@@ -499,10 +518,10 @@ class TransformersVLMExtractor:
         generated_text = generated
         if "input_ids" in inputs and generated.shape[1] > inputs["input_ids"].shape[1]:
             generated_text = generated[:, inputs["input_ids"].shape[1] :]
-        decoded = self.processor.batch_decode(generated_text, skip_special_tokens=True)[
-            0
-        ]
-        return decoded.strip()
+        decoded = self.processor.batch_decode(generated_text, skip_special_tokens=True)
+        if len(decoded) != len(images):
+            raise ValueError("VLM processor must return one answer per image")
+        return [str(value).strip() for value in decoded]
 
     def ask(self, image: Any, prompt: Optional[str] = None) -> SemanticResult:
         actual_prompt = prompt or self.default_prompt
@@ -512,6 +531,27 @@ class TransformersVLMExtractor:
             scene={"prompt": actual_prompt},
             metadata={"backend": "transformers-vlm", "model_id": self.model_id},
         )
+
+    def ask_batch(
+        self, images: Sequence[Any], prompts: Optional[Sequence[str]] = None
+    ) -> list[SemanticResult]:
+        """Generate ordered answers for a batch of images in one model call."""
+        actual_prompts = (
+            [self.default_prompt] * len(images) if prompts is None else list(prompts)
+        )
+        decoded = self._generate_text_batch(images, actual_prompts)
+        return [
+            SemanticResult(
+                caption=answer,
+                scene={"prompt": prompt},
+                metadata={"backend": "transformers-vlm", "model_id": self.model_id},
+            )
+            for answer, prompt in zip(decoded, actual_prompts)
+        ]
+
+    def extract_batch(self, images: Sequence[Any]) -> list[SemanticResult]:
+        """Use the native batched generation path for video and image batches."""
+        return self.ask_batch(images)
 
     def ask_structured(self, image: Any, query: StructuredQuery) -> SemanticResult:
         """Generate and validate a JSON answer for a structured query."""
@@ -529,6 +569,29 @@ class TransformersVLMExtractor:
                 "query": query.to_dict(),
             },
         )
+
+    def ask_structured_batch(
+        self, images: Sequence[Any], query: StructuredQuery
+    ) -> list[SemanticResult]:
+        """Generate and validate one structured answer per image."""
+        if not isinstance(query, StructuredQuery):
+            raise TypeError("query must be a StructuredQuery")
+        raw_answers = self._generate_text_batch(
+            images, [query.prompt] * len(images), query.max_new_tokens
+        )
+        return [
+            SemanticResult(
+                caption=raw,
+                scene=parse_structured_output(raw, query.schema),
+                metadata={
+                    "backend": "transformers-vlm",
+                    "model_id": self.model_id,
+                    "structured": True,
+                    "query": query.to_dict(),
+                },
+            )
+            for raw in raw_answers
+        ]
 
     def extract(self, image: Any) -> SemanticResult:
         return self.ask(image)

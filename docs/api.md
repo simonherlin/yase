@@ -223,6 +223,9 @@ Transformers model loading.
 schema validation for VLM answers. `TransformersVLMExtractor.ask_structured()`
 preserves the raw answer as `caption`, returns the parsed object as `scene`,
 and records the prompt/schema in metadata.
+`ask_batch()`/`extract_batch()` perform one processor/model generation for an
+ordered image batch; `ask_structured_batch()` validates each JSON answer while
+retaining the same provenance metadata.
 
 `RFDETRExtractor` adapts an externally installed RF-DETR model and normalizes
 its detections. `ByteTrackLite` is a dependency-free two-stage tracker for

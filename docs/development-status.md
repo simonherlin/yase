@@ -558,6 +558,16 @@ Result: version 0.46.0, pending final validation.
 
 Result: version 0.47.0, pending final validation.
 
+## Cycle 57 — native batched VLM generation
+
+- [x] Add one-call VLM caption/question answering for ordered image batches.
+- [x] Add one-call structured JSON extraction with per-answer validation.
+- [x] Reuse the path from `VideoStream(batch_size=...)` automatically.
+- [x] Preserve raw captions, prompts, schemas, and backend provenance.
+- [x] Add deterministic injected processor/model coverage.
+
+Result: version 0.48.0, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

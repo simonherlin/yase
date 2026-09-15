@@ -1197,6 +1197,88 @@ def test_transformers_vlm_supports_injected_structured_generation():
     assert result.metadata["structured"] is True
 
 
+def test_transformers_vlm_batches_caption_and_structured_generation():
+    class FakeTorch:
+        class cuda:
+            @staticmethod
+            def is_available():
+                return False
+
+        @staticmethod
+        def device(name):
+            return name
+
+        @staticmethod
+        @contextmanager
+        def inference_mode():
+            yield
+
+    class InputValue:
+        shape = (2, 1)
+
+        def to(self, _device):
+            return self
+
+    class Processor:
+        def __init__(self):
+            self.calls = 0
+
+        def __call__(self, **kwargs):
+            assert len(kwargs["images"]) == 2
+            assert kwargs["padding"] is True
+            self.calls += 1
+            return {"input_ids": InputValue()}
+
+        def batch_decode(self, _generated, skip_special_tokens):
+            assert skip_special_tokens is True
+            return ['{"label":"car","score":0.9}', '{"label":"person","score":0.8}']
+
+    class Model:
+        def __init__(self):
+            self.calls = 0
+
+        def to(self, _device):
+            return self
+
+        def eval(self):
+            return self
+
+        def generate(self, **kwargs):
+            self.calls += 1
+            assert kwargs["max_new_tokens"] == 128
+            return np.asarray([[1, 2], [3, 4]])
+
+    processor = Processor()
+    model = Model()
+    extractor = TransformersVLMExtractor(
+        model_id="fake",
+        processor=processor,
+        model=model,
+        torch_module=FakeTorch,
+    )
+    images = [np.zeros((2, 2, 3), dtype=np.uint8)] * 2
+    results = extractor.extract_batch(images)
+    assert [result.caption for result in results] == [
+        '{"label":"car","score":0.9}',
+        '{"label":"person","score":0.8}',
+    ]
+    assert processor.calls == model.calls == 1
+    query = StructuredQuery(
+        "Return the object",
+        {
+            "type": "object",
+            "required": ["label", "score"],
+            "properties": {
+                "label": {"type": "string"},
+                "score": {"type": "number"},
+            },
+        },
+    )
+    structured = extractor.ask_structured_batch(images, query)
+    assert structured[1].scene["label"] == "person"
+    assert model.calls == 2
+
+
 def test_transformers_sam3_video_adapter_preserves_object_ids():
     class FakeTorch:
         class cuda:
