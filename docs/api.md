@@ -333,7 +333,9 @@ addition to the facade-level extraction span.
 Optional adapters include `TesseractExtractor`, `PaddleOCRExtractor`,
 `TransformersImageEmbeddingExtractor`, and `TransformersVLMExtractor`. They
 load their heavy dependencies only when instantiated and default to local-only
-Transformers model loading.
+Transformers model loading. If Hub access is explicitly enabled with
+`local_files_only=False`, pass an immutable `revision` (preferably a commit
+hash); the adapters reject unpinned remote model loading.
 
 `StructuredQuery` and `parse_structured_output()` provide dependency-free JSON
 schema validation for VLM answers. `TransformersVLMExtractor.ask_structured()`

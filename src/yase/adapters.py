@@ -15,6 +15,14 @@ from .schema import BoundingBox, Detection, TextRegion
 from .structured import StructuredQuery, parse_structured_output
 
 
+def _validate_hub_revision(local_files_only: bool, revision: str | None) -> None:
+    """Require immutable model provenance whenever Hub access is enabled."""
+    if not local_files_only and not revision:
+        raise ValueError(
+            "revision is required when local_files_only=False; pin a commit "
+            "or a trusted immutable model revision"
+        )
+
 class TesseractExtractor:
     """Extract text regions through an injected or local Tesseract engine."""
 
@@ -175,6 +183,7 @@ class TransformersImageEmbeddingExtractor:
         device: str | None = None,
         normalize: bool = True,
         local_files_only: bool = True,
+        revision: str | None = None,
         processor: Any | None = None,
         model: Any | None = None,
     ) -> None:
@@ -187,6 +196,7 @@ class TransformersImageEmbeddingExtractor:
                 "install the transformers extra to use this adapter"
             ) from exc
         if processor is None or model is None:
+            _validate_hub_revision(local_files_only, revision)
             try:
                 from transformers import AutoImageProcessor, AutoModel
             except ImportError as exc:
@@ -195,9 +205,11 @@ class TransformersImageEmbeddingExtractor:
                 ) from exc
             options = {"local_files_only": local_files_only}
             processor = processor or AutoImageProcessor.from_pretrained(
-                model_id, **options
+                model_id, revision=revision, **options
             )
-            model = model or AutoModel.from_pretrained(model_id, **options)
+            model = model or AutoModel.from_pretrained(
+                model_id, revision=revision, **options
+            )
         self._torch = torch
         self.model_id = model_id
         self.normalize = normalize
@@ -252,6 +264,7 @@ class TransformersObjectDetectionExtractor:
         device: str | None = None,
         threshold: float = 0.5,
         local_files_only: bool = True,
+        revision: str | None = None,
         processor: Any | None = None,
         model: Any | None = None,
     ) -> None:
@@ -266,6 +279,7 @@ class TransformersObjectDetectionExtractor:
                 "install the transformers extra to use this adapter"
             ) from exc
         if processor is None or model is None:
+            _validate_hub_revision(local_files_only, revision)
             try:
                 from transformers import AutoImageProcessor, AutoModelForObjectDetection
             except ImportError as exc:
@@ -274,10 +288,10 @@ class TransformersObjectDetectionExtractor:
                 ) from exc
             options = {"local_files_only": local_files_only}
             processor = processor or AutoImageProcessor.from_pretrained(
-                model_id, **options
+                model_id, revision=revision, **options
             )
             model = model or AutoModelForObjectDetection.from_pretrained(
-                model_id, **options
+                model_id, revision=revision, **options
             )
         self._torch = torch
         self.model_id = model_id
@@ -350,13 +364,15 @@ class TransformersGroundingDinoExtractor(TransformersObjectDetectionExtractor):
                 "install the transformers extra to use this adapter"
             ) from exc
         local_files_only = kwargs.pop("local_files_only", True)
+        revision = kwargs.pop("revision", None)
+        _validate_hub_revision(local_files_only, revision)
         processor = kwargs.pop("processor", None) or AutoProcessor.from_pretrained(
-            model_id, local_files_only=local_files_only
+            model_id, local_files_only=local_files_only, revision=revision
         )
         model = kwargs.pop(
             "model", None
         ) or AutoModelForZeroShotObjectDetection.from_pretrained(
-            model_id, local_files_only=local_files_only
+            model_id, local_files_only=local_files_only, revision=revision
         )
         super().__init__(
             model_id,
@@ -427,6 +443,7 @@ class TransformersVLMExtractor:
         default_prompt: str = "Describe the image concisely.",
         max_new_tokens: int = 128,
         local_files_only: bool = True,
+        revision: str | None = None,
         processor: Any | None = None,
         model: Any | None = None,
         torch_module: Any | None = None,
@@ -444,6 +461,7 @@ class TransformersVLMExtractor:
                 ) from exc
             torch_module = torch
         if processor is None or model is None:
+            _validate_hub_revision(local_files_only, revision)
             try:
                 from transformers import AutoModelForImageTextToText, AutoProcessor
             except ImportError as exc:
@@ -451,9 +469,11 @@ class TransformersVLMExtractor:
                     "install the transformers extra to use this adapter"
                 ) from exc
             options = {"local_files_only": local_files_only}
-            processor = processor or AutoProcessor.from_pretrained(model_id, **options)
+            processor = processor or AutoProcessor.from_pretrained(
+                model_id, revision=revision, **options
+            )
             model = model or AutoModelForImageTextToText.from_pretrained(
-                model_id, **options
+                model_id, revision=revision, **options
             )
         self._torch = torch_module
         self.model_id = model_id
@@ -732,6 +752,7 @@ class TransformersSAM3Extractor:
         threshold: float = 0.5,
         mask_threshold: float = 0.5,
         local_files_only: bool = True,
+        revision: str | None = None,
         processor: Any | None = None,
         model: Any | None = None,
         torch_module: Any | None = None,
@@ -741,6 +762,7 @@ class TransformersSAM3Extractor:
         if not 0 <= threshold <= 1 or not 0 <= mask_threshold <= 1:
             raise ValueError("thresholds must be in [0, 1]")
         if processor is None or model is None:
+            _validate_hub_revision(local_files_only, revision)
             try:
                 from transformers import AutoModel, AutoProcessor
             except ImportError as exc:
@@ -748,8 +770,12 @@ class TransformersSAM3Extractor:
                     "install the transformers extra to use TransformersSAM3Extractor"
                 ) from exc
             options = {"local_files_only": local_files_only}
-            processor = processor or AutoProcessor.from_pretrained(model_id, **options)
-            model = model or AutoModel.from_pretrained(model_id, **options)
+            processor = processor or AutoProcessor.from_pretrained(
+                model_id, revision=revision, **options
+            )
+            model = model or AutoModel.from_pretrained(
+                model_id, revision=revision, **options
+            )
         if torch_module is None:
             try:
                 import torch as imported_torch
@@ -872,6 +898,7 @@ class TransformersSAM3VideoExtractor:
         prompt: str | None = None,
         device: str | None = None,
         local_files_only: bool = True,
+        revision: str | None = None,
         processing_device: str = "cpu",
         model: Any | None = None,
         processor: Any | None = None,
@@ -880,6 +907,7 @@ class TransformersSAM3VideoExtractor:
         if not model_id and model is None:
             raise ValueError("model_id is required")
         if model is None or processor is None:
+            _validate_hub_revision(local_files_only, revision)
             try:
                 from transformers import Sam3VideoModel, Sam3VideoProcessor
             except ImportError as exc:
@@ -888,9 +916,11 @@ class TransformersSAM3VideoExtractor:
                 ) from exc
             options = {"local_files_only": local_files_only}
             processor = processor or Sam3VideoProcessor.from_pretrained(
-                model_id, **options
+                model_id, revision=revision, **options
             )
-            model = model or Sam3VideoModel.from_pretrained(model_id, **options)
+            model = model or Sam3VideoModel.from_pretrained(
+                model_id, revision=revision, **options
+            )
         if torch_module is None:
             try:
                 import torch as imported_torch

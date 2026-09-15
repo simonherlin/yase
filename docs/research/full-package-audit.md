@@ -29,6 +29,29 @@ et placer chaque capacité coûteuse derrière un adaptateur explicite. Les
 optimisations doivent être ajoutées au niveau du runtime ou du batch, sans
 polluer `SemanticResult`, `ObservationBundle` ni les contrats de tracking.
 
+## 1.1 Vérifications reproductibles du 15 septembre 2026
+
+L'état du dépôt a été vérifié après nettoyage documentaire et packaging :
+
+- 163 tests passent, avec 82,19 % de couverture globale ;
+- Ruff (lint et format), verrou `uv.lock`, compilation Python et `mypy
+  --ignore-missing-imports` passent sur les 43 modules source ;
+- la wheel portable `py3-none-any` et le sdist sont validés depuis les
+  artefacts construits localement ;
+- les smoke tests réels locaux ONNX Runtime 1.30.0 et OpenVINO 2026.3.1
+  passent sur CPU ; OpenVINO détecte également le GPU disponible ;
+- `pip-audit --local` ne trouve aucune vulnérabilité connue et Bandit ne
+  remonte plus de problème de sévérité moyenne ou haute après le verrouillage
+  des révisions Transformers ;
+- aucun fichier `.github` n'est suivi ou présent dans l'arbre de travail ; les
+  contrôles textuels ne trouvent aucune référence à Copilot ou Codex ;
+- les imports lourds restent optionnels et le wheel portable n'embarque pas
+  l'extension native C++.
+
+Cette validation est une preuve de cohérence locale, pas une promesse de
+compatibilité universelle : les providers CUDA/TensorRT, les pilotes et les
+modèles propriétaires doivent encore être validés sur les machines cibles.
+
 ## 2. Inventaire par sous-système
 
 | Sous-système | État actuel | Niveau | Risque restant |

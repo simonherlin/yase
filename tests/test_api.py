@@ -1592,6 +1592,14 @@ def test_transformers_sam3_adapter_normalizes_masks_boxes_and_scores():
     assert result.detections[0].label == "person"
 
 
+def test_transformers_hub_access_requires_an_immutable_revision():
+    with pytest.raises(ValueError, match="revision is required"):
+        TransformersSAM3Extractor(
+            prompt="person",
+            local_files_only=False,
+        )
+
+
 def test_model_catalog_and_detection_metrics_are_serializable():
     catalog = default_model_catalog()
     assert "sam3" in catalog.names()

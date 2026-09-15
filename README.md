@@ -97,7 +97,8 @@ The same commands also accept registered semantic backends such as `vlm`,
 `image-embedding`, `sam3`, `rf-detr`, `tesseract`, and `paddleocr`; use
 `--model-path` for a local/Hugging Face model identifier, `--prompt` for VLM
 or SAM3, and `--labels` for Grounding DINO. Optional dependencies remain
-lazy.
+lazy. The Python Transformers adapters are local-only by default; remote Hub
+loading must be explicitly enabled and pinned to an immutable `revision`.
 For ONNX accelerator sessions, add `--io-binding` to reduce host/device copy
 overhead when the installed execution provider supports it.
 The same interface supports `yase video input.mp4 --model onnx
@@ -358,6 +359,7 @@ yase artifact model.onnx --verify <sha256-digest>
 ~~~bash
 uv sync --dev
 make check                 # lock, lint, format, tests and coverage
+make typecheck             # mypy with optional runtime imports ignored
 make runtime-smoke         # optional ONNX/OpenVINO runtime probes
 make build                 # portable sdist + py3-none-any wheel
 make build-native          # ABI-specific wheel with C++ acceleration
