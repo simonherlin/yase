@@ -591,9 +591,11 @@ def test_nms_indices_is_class_aware_and_has_a_portable_fallback():
     native._native_nms_indices = None
     try:
         fallback = native.nms_indices(boxes, scores, 0.5, [1, 1, 2])
+        fallback_without_classes = native.nms_indices(boxes, scores, 0.5)
     finally:
         native._native_nms_indices = compiled
     assert fallback == [1, 2]
+    assert fallback_without_classes == [1]
     with pytest.raises(ValueError, match="same length"):
         nms_indices(boxes, scores[:2])
 

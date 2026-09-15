@@ -65,8 +65,7 @@ def _python_nms_indices(
     kept: list[int] = []
     for index in order:
         if all(
-            class_ids is None
-            or class_ids[index] != class_ids[other]
+            (class_ids is not None and class_ids[index] != class_ids[other])
             or _python_iou(boxes[index], boxes[other]) <= iou_threshold
             for other in kept
         ):

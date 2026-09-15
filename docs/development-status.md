@@ -421,6 +421,14 @@ Result: version 0.34.0, pending final validation.
 
 Result: version 0.35.0, pending final validation.
 
+## Cycle 41 — portable NMS parity fix
+
+- [x] Treat omitted class IDs as one shared suppression class in the fallback.
+- [x] Add an installed-wheel regression for Python-only NMS behavior.
+- [x] Release the correction as version 0.35.1.
+
+Result: version 0.35.1, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full
