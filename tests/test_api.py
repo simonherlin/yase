@@ -2864,13 +2864,27 @@ def test_runtime_diagnostics_are_lazy_and_machine_readable():
     assert degraded.to_dict()["checks"]["extractor_interface"] is False
 
 
+def test_runtime_diagnostics_can_probe_optional_providers():
+    runtime = collect_runtime_info(
+        optional_packages=("package_that_is_missing",), probe_providers=True
+    )
+    assert isinstance(runtime.provider_info, dict)
+    assert "onnxruntime" in runtime.provider_info
+    assert "openvino" in runtime.provider_info
+    assert "tensorrt" in runtime.provider_info
+    assert runtime.to_dict()["provider_info"] == runtime.provider_info
+
+
 def test_cli_diagnostics_reports_readiness(capsys):
-    from yase.cli import main
+    from yase.cli import _parser, main
 
     assert main(["diagnostics"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "ok"
     assert "runtime" in payload
+
+    args = _parser().parse_args(["diagnostics", "--providers"])
+    assert args.providers is True
 
 
 def test_cli_processing_commands_parse_input_limits():

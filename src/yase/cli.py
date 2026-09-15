@@ -115,6 +115,11 @@ def _parser() -> argparse.ArgumentParser:
         metavar="PACKAGE",
         help="optional package that must be installed (repeatable)",
     )
+    diagnostics.add_argument(
+        "--providers",
+        action="store_true",
+        help="probe installed ONNX/OpenVINO/Torch/TensorRT providers",
+    )
     diagnostics.set_defaults(handler=_diagnostics)
 
     artifact = subparsers.add_parser(
@@ -196,7 +201,9 @@ def _info(_args: argparse.Namespace) -> int:
 
 
 def _diagnostics(args: argparse.Namespace) -> int:
-    report = health_check(required_packages=tuple(args.require))
+    report = health_check(
+        required_packages=tuple(args.require), probe_providers=args.providers
+    )
     print(json.dumps(report.to_dict(), ensure_ascii=False, sort_keys=True))
     return 0 if report.ready else 1
 

@@ -40,7 +40,13 @@ from .datasets import (
     write_coco_predictions,
     write_mot_sequence,
 )
-from .diagnostics import HealthReport, RuntimeInfo, collect_runtime_info, health_check
+from .diagnostics import (
+    HealthReport,
+    RuntimeInfo,
+    collect_provider_info,
+    collect_runtime_info,
+    health_check,
+)
 from .errors import (
     BackendError,
     InputError,
@@ -207,6 +213,7 @@ __all__ = [
     "QueueSink",
     "Relation",
     "RuntimeInfo",
+    "collect_provider_info",
     "RuntimeMetrics",
     "RESULT_SCHEMA_VERSION",
     "OpenTelemetryTracer",

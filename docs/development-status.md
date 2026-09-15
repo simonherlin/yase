@@ -862,6 +862,20 @@ truthfully validated on this Maxwell workstation.
 Result: untrusted image paths now fail before the expensive decode/conversion
 step when they exceed configured dimensions, reducing decompression-bomb risk.
 
+## Cycle 80 — provider diagnostics
+
+- [x] Keep default diagnostics dependency-light and non-invasive.
+- [x] Add explicit ONNX Runtime provider discovery with versions.
+- [x] Add explicit OpenVINO device discovery with device names.
+- [x] Add optional PyTorch CUDA and TensorRT probes with structured errors.
+- [x] Expose the probe through `yase diagnostics --providers` and the public
+  `collect_provider_info()` API.
+- [x] Add machine-readable regression coverage without making optional
+  runtimes mandatory for the base installation.
+
+Result: deployments can now distinguish an installed package from an actual
+provider/device exposed by the host.
+
 ## Exit criteria
 
 The package is considered ready for a first public release when the core and
