@@ -43,6 +43,7 @@ Le contrat public est donc :
 | Sdist | contient `native/yase_native.cpp` et `tools/build_package.py` |
 | Wheel natif | `cp313-cp313-linux_x86_64`, `_native` inclus |
 | Installation wheel natif | import, IoU et NMS pass |
+| Wheel portable Python | 3.10, 3.11, 3.12 et 3.13 pass |
 | Lockfile | `uv lock --check` pass |
 
 Le poste courant ne possède pas les headers de développement Python 3.12 ni
@@ -74,8 +75,9 @@ des choix de déploiement visibles dans `yase diagnostics --providers`.
 
 ## Risques résiduels
 
-1. Les wheels natifs multi-OS ne sont pas encore publiés ; la CI doit être
-   branchée à cibuildwheel avant une publication PyPI avec accélération.
+1. Les wheels natifs multi-OS ne sont pas encore publiés ; un environnement de
+   release dédié doit lancer cibuildwheel avant une publication PyPI avec
+   accélération. GitHub Actions reste volontairement désactivé.
 2. Les performances C++ doivent être benchmarkées contre les fallbacks sur des
    lots représentatifs ; la présence du binaire ne garantit pas un gain pour
    de très petites listes.

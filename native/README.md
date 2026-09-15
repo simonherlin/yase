@@ -28,8 +28,8 @@ make build-native
 ```
 
 The resulting wheel is platform- and Python-ABI-specific. For publication,
-build it with cibuildwheel on the supported OS/Python matrix rather than
-copying a local `.so` between machines.
+build it with cibuildwheel from a dedicated release environment on the
+supported OS/Python matrix rather than copying a local `.so` between machines.
 
 The builder needs the matching Python development headers (`Python.h`). On
 Ubuntu install `python3-dev` or the exact interpreter package such as

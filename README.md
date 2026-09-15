@@ -40,7 +40,8 @@ is the recommended development and deployment baseline. `make build` produces
 the portable `py3-none-any` wheel. `make build-native` produces an
 OS/Python-ABI-specific wheel containing the optional C++ extension; it requires
 the matching Python development headers and a C++17 compiler. For a complete
-multi-platform native wheel matrix, use cibuildwheel in CI.
+multi-platform native wheel matrix, run cibuildwheel from a dedicated release
+environment with the checked-in configuration.
 
 The native extension is intentionally small: model inference already runs in
 the selected ONNX Runtime, OpenVINO, TensorRT, or PyTorch engine. Yase keeps
