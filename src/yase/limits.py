@@ -36,17 +36,50 @@ class InputLimits:
             raise InputError("image must have 2 or 3 dimensions")
         height, width = array.shape[:2]
         channels = 1 if array.ndim == 2 else array.shape[2]
+        self.validate_shape(
+            width=width,
+            height=height,
+            channels=channels,
+            byte_count=array.nbytes,
+        )
+        return array
+
+    def validate_shape(
+        self,
+        *,
+        width: int,
+        height: int,
+        channels: int | None = None,
+        byte_count: int | None = None,
+    ) -> None:
+        """Validate image metadata before allocating a decoded array.
+
+        ``load_image`` uses this method with dimensions read from an image
+        header, which prevents a decompression bomb from reaching the pixel
+        conversion step. ``byte_count`` is optional because encoded file size
+        and decoded array size are different resources.
+        """
+        if width <= 0 or height <= 0:
+            raise InputError("image dimensions must be positive")
+        if channels is not None and channels <= 0:
+            raise InputError("image channels must be positive")
         checks = (
             (self.max_pixels, height * width, "pixel limit"),
             (self.max_width, width, "width limit"),
             (self.max_height, height, "height limit"),
-            (self.max_channels, channels, "channel limit"),
-            (self.max_bytes, array.nbytes, "byte limit"),
+            (self.max_channels, channels, "channel limit")
+            if channels is not None
+            else None,
+            (self.max_bytes, byte_count, "byte limit")
+            if byte_count is not None
+            else None,
         )
-        for limit, actual, label in checks:
-            if limit is not None and actual > limit:
+        for check in checks:
+            if check is None:
+                continue
+            limit, actual, label = check
+            if limit is not None and actual is not None and actual > limit:
                 raise InputError(f"image exceeds {label}: {actual} > {limit}")
-        return array
 
 
 __all__ = ["InputLimits"]

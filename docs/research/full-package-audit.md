@@ -1,7 +1,8 @@
 # Yase — audit complet du package et plan de production
 
 Date de l'audit : 2026-09-15  
-État inspecté : `0.63.0` plus audit runtime Python/CUDA du 2026-09-15
+État inspecté : `0.64.0` plus audit runtime Python/CUDA et durcissement des
+entrées du 2026-09-15
 
 Ce document est la référence de pilotage technique. Il distingue ce qui est
 déjà livré, ce qui est contractuellement couvert mais non testé sur matériel,
@@ -32,7 +33,7 @@ polluer `SemanticResult`, `ObservationBundle` ni les contrats de tracking.
 
 | Sous-système | État actuel | Niveau | Risque restant |
 |---|---|---:|---|
-| Entrées image/Pillow/NumPy | `load_image`, limites pixels/bytes/canaux | livré | formats vidéo et métadonnées EXIF à formaliser |
+| Entrées image/Pillow/NumPy | `load_image`, limites pixels/bytes/canaux et contrôle pré-décodage | livré | formats vidéo et métadonnées EXIF à formaliser |
 | Résultat sémantique | profondeur, segmentation, détections, OCR, VLM, embeddings, relations, événements | livré | version majeure et champs multimodaux à stabiliser |
 | Extraction unitaire | `Yase.extract`, callable, mapping, array | livré | métriques par backend à enrichir |
 | Batch image | `Yase.extract_many`, backends natifs, fallback parallèle, skip partiel | livré | erreurs de provider à mesurer par runtime |

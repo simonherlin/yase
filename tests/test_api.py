@@ -423,6 +423,19 @@ def test_input_limits_validate_decoded_images_and_yase_inputs():
         InputLimits(max_channels=0)
 
 
+def test_input_limits_reject_pillow_dimensions_before_conversion(tmp_path):
+    from PIL import Image
+
+    path = tmp_path / "oversized.png"
+    Image.new("RGB", (3, 2)).save(path)
+    with pytest.raises(InputError, match="pixel limit"):
+        load_image(path, limits=InputLimits(max_pixels=5))
+
+    image = Image.new("RGB", (3, 2))
+    with pytest.raises(InputError, match="width limit"):
+        load_image(image, limits=InputLimits(max_width=2))
+
+
 def test_yase_records_direct_extraction_metrics_on_success_and_failure():
     metrics = RuntimeMetrics(namespace="image_test")
     api = Yase(

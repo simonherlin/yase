@@ -852,6 +852,16 @@ Result: version `0.64.0` has validated CPU and OpenVINO GPU/AUTO execution
 paths; TensorRT remains ready for supported deployment hosts but cannot be
 truthfully validated on this Maxwell workstation.
 
+## Cycle 79 — safe image decoding
+
+- [x] Validate Pillow image dimensions from the header before pixel conversion.
+- [x] Keep final NumPy byte/channel checks after conversion.
+- [x] Add regression coverage for path and in-memory Pillow inputs exceeding
+  configured limits.
+
+Result: untrusted image paths now fail before the expensive decode/conversion
+step when they exceed configured dimensions, reducing decompression-bomb risk.
+
 ## Exit criteria
 
 The package is considered ready for a first public release when the core and
