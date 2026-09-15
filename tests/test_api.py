@@ -2,6 +2,7 @@ import asyncio
 import json
 import sys
 from contextlib import contextmanager
+from importlib.metadata import metadata
 from io import StringIO
 from threading import Barrier, Event
 
@@ -1072,17 +1073,20 @@ def test_cli_models_lists_filtered_model_cards(capsys):
 
 
 def test_default_registry_exposes_modern_optional_backends():
-    names = default_registry().names()
+    registry = default_registry()
+    names = registry.names()
     assert {"rf-detr", "sam3", "sam3-video", "grounding-dino"}.issubset(names)
-    assert default_registry().get("vlm").capabilities == (
+    assert registry.get("vlm").capabilities == (
         "caption",
         "question-answering",
         "structured-output",
         "image",
     )
-    assert default_registry().get("image-embedding").extra == "transformers"
-    assert default_registry().get("tesseract").extra == "ocr"
-    assert default_registry().get("paddleocr").extra == "paddle"
+    assert registry.get("image-embedding").extra == "transformers"
+    assert registry.get("tesseract").extra == "ocr"
+    assert registry.get("paddleocr").extra == "paddle"
+    extras = set(metadata("yase").get_all("Provides-Extra") or ())
+    assert {spec.extra for spec in registry.specs() if spec.extra} <= extras
 
 
 def test_zone_and_line_event_rules_emit_geometry_events():

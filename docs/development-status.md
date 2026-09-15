@@ -470,6 +470,14 @@ Result: version 0.37.0, pending final validation.
 
 Result: version 0.38.0, pending final validation.
 
+## Cycle 47 — RF-DETR distribution coherence
+
+- [x] Define the `rfdetr` optional extra referenced by the backend registry.
+- [x] Restrict the extra to Python versions supported by upstream RF-DETR.
+- [x] Test that every registry extra is declared by the installed package metadata.
+
+Result: version 0.38.1, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

@@ -19,6 +19,8 @@ uv sync --extra transformers
 uv sync --extra ocr
 # Optional OpenVINO runtime:
 uv sync --extra openvino
+# Optional RF-DETR real-time detector (Python >= 3.10):
+uv sync --extra rfdetr
 
 # Optional C++17 tracking acceleration (requires g++ or clang++):
 make native

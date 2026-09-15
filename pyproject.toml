@@ -1,6 +1,6 @@
 [project]
 name = "yase"
-version = "0.38.0"
+version = "0.38.1"
 description = "Dependency-light semantic extraction for images and real-time video."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -22,6 +22,7 @@ retrieval = ["qdrant-client>=1.14"]
 observability = ["opentelemetry-api>=1.30"]
 openvino = ["openvino>=2024.0"]
 tensorrt = ["tensorrt>=10.0"]
+rfdetr = ["rfdetr; python_version >= '3.10'"]
 all = [
   "opencv-python>=4.8",
   "onnxruntime>=1.17",
@@ -32,6 +33,7 @@ all = [
   "paddleocr>=2.9",
   "qdrant-client>=1.14",
   "opentelemetry-api>=1.30",
+  "rfdetr; python_version >= '3.10'",
 ]
 
 [project.scripts]
