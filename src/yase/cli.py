@@ -129,7 +129,9 @@ def _parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         metavar="PACKAGE",
-        help="optional package that must be installed (repeatable)",
+        help=(
+            "optional import or distribution name that must be installed (repeatable)"
+        ),
     )
     diagnostics.add_argument(
         "--providers",

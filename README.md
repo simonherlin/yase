@@ -17,6 +17,11 @@ uv sync --extra torch
 uv sync --extra transformers
 # Optional Tesseract OCR adapter:
 uv sync --extra ocr
+# Optional PaddleOCR adapter (install the PaddlePaddle engine separately):
+uv sync --extra paddle
+# CPU PaddlePaddle engine required by PaddleOCR (official index):
+uv pip install paddlepaddle==3.2.0 \\
+  --index-url https://www.paddlepaddle.org.cn/packages/stable/cpu/
 # Optional OpenVINO runtime:
 uv sync --extra openvino
 # CPU-oriented complete stack (does not install CUDA/TensorRT):
@@ -68,6 +73,8 @@ fallback fails loudly.
 For a startup gate, use `yase diagnostics --require-provider
 CUDAExecutionProvider`; the command then exits non-zero if that provider is not
 available in the installed ONNX Runtime build.
+`yase diagnostics --require` accepts either Python import names or distribution
+names such as `qdrant-client`, `opentelemetry-api`, and `paddlepaddle`.
 The extraction CLI exposes the same control with repeated
 `--provider CUDAExecutionProvider --strict-providers` flags.
 Use `--device GPU` for OpenVINO or `--device cuda` for TorchScript/TensorRT

@@ -3422,6 +3422,25 @@ def test_health_check_can_require_an_onnx_provider(monkeypatch):
     assert "not available" in report.details["provider:CUDAExecutionProvider"]
 
 
+def test_health_check_accepts_distribution_names(monkeypatch):
+    import_names = {
+        "qdrant_client",
+        "opentelemetry",
+        "paddle",
+    }
+    monkeypatch.setattr(
+        "yase.diagnostics.importlib.util.find_spec",
+        lambda name: object() if name in import_names else None,
+    )
+    report = health_check(
+        required_packages=("qdrant-client", "opentelemetry-api", "paddlepaddle")
+    )
+    assert report.ready
+    assert report.checks["package:qdrant-client"] is True
+    assert report.checks["package:opentelemetry-api"] is True
+    assert report.checks["package:paddlepaddle"] is True
+
+
 def test_cli_processing_commands_parse_input_limits():
     from yase.cli import _input_limits, _make_extractor, _parser
 

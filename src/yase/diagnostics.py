@@ -11,6 +11,26 @@ from typing import Any
 
 import numpy as np
 
+_PACKAGE_IMPORT_ALIASES = {
+    "opencv-python": "cv2",
+    "opencv-python-headless": "cv2",
+    "onnxruntime-gpu": "onnxruntime",
+    "opentelemetry-api": "opentelemetry",
+    "paddlepaddle": "paddle",
+    "paddlepaddle-gpu": "paddle",
+    "qdrant-client": "qdrant_client",
+}
+
+
+def _package_import_name(package: str) -> str:
+    """Map a distribution name accepted by the CLI to its import name."""
+    normalized = package.strip().lower()
+    return _PACKAGE_IMPORT_ALIASES.get(normalized, package)
+
+
+def _package_is_available(package: str) -> bool:
+    return importlib.util.find_spec(_package_import_name(package)) is not None
+
 
 @dataclass(frozen=True)
 class RuntimeInfo:
@@ -205,7 +225,7 @@ def health_check(
         probe_providers=probe_providers or bool(required_providers)
     )
     for package in required_packages:
-        available = importlib.util.find_spec(package) is not None
+        available = _package_is_available(package)
         checks[f"package:{package}"] = available
         if not available:
             details[f"package:{package}"] = "not installed"
