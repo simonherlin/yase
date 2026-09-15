@@ -117,6 +117,7 @@ from .sinks import (
     QueueSink,
 )
 from .stages import Stage, StageContext, StageSpec, validate_stage_specs
+from .structured import StructuredQuery, parse_structured_output
 from .tracking import (
     ByteTrackLite,
     ExternalTrackerAdapter,
@@ -132,7 +133,7 @@ from .video import (
     process_video,
 )
 
-__version__ = "0.36.0"
+__version__ = "0.37.0"
 
 __all__ = [
     "CallableExtractor",
@@ -205,6 +206,7 @@ __all__ = [
     "StageContext",
     "StageCancelled",
     "StageExecution",
+    "StructuredQuery",
     "StageSpec",
     "MultimodalConsensus",
     "ModelCard",
@@ -269,6 +271,7 @@ __all__ = [
     "verify_artifact",
     "default_registry",
     "process_video",
+    "parse_structured_output",
     "load_mot_sequence",
     "write_mot_sequence",
     "ZoneRule",

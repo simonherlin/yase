@@ -73,6 +73,7 @@ from yase import (
     StageContext,
     StageExecution,
     StageSpec,
+    StructuredQuery,
     TemperatureScaler,
     TensorRTExtractor,
     TesseractExtractor,
@@ -81,6 +82,7 @@ from yase import (
     TrackingMetrics,
     TransformersSAM3Extractor,
     TransformersSAM3VideoExtractor,
+    TransformersVLMExtractor,
     Uncertainty,
     VideoStats,
     Yase,
@@ -108,6 +110,7 @@ from yase import (
     non_maximum_suppression,
     normalise_detections,
     observation_to_json,
+    parse_structured_output,
     result_to_dict,
     result_to_json,
     sha256_file,
@@ -922,6 +925,93 @@ def test_model_catalog_and_detection_metrics_are_serializable():
     assert isinstance(metrics, DetectionMetrics)
     assert metrics.f1 == 1.0
     assert metrics.to_dict()["mean_iou"] > 0.5
+
+
+def test_structured_query_parses_and_validates_vlm_json():
+    schema = {
+        "type": "object",
+        "required": ["label", "score"],
+        "additionalProperties": False,
+        "properties": {
+            "label": {"type": "string"},
+            "score": {"type": "number"},
+            "tags": {"type": "array", "items": {"type": "string"}},
+        },
+    }
+    query = StructuredQuery("Extract the object", schema, max_new_tokens=32)
+    assert query.to_dict()["max_new_tokens"] == 32
+    parsed = parse_structured_output(
+        'Here is the result: ```json\n{"label":"car","score":0.91}\n```',
+        schema,
+    )
+    assert parsed == {"label": "car", "score": 0.91}
+    with pytest.raises(ValueError, match="required"):
+        parse_structured_output('{"label":"car"}', schema)
+    with pytest.raises(ValueError, match="unknown fields"):
+        parse_structured_output('{"label":"car","score":0.9,"other":true}', schema)
+
+
+def test_transformers_vlm_supports_injected_structured_generation():
+    class FakeTorch:
+        class cuda:
+            @staticmethod
+            def is_available():
+                return False
+
+        @staticmethod
+        def device(name):
+            return name
+
+        @staticmethod
+        @contextmanager
+        def inference_mode():
+            yield
+
+    class InputValue:
+        shape = (1, 1)
+
+        def to(self, _device):
+            return self
+
+    class Processor:
+        def __call__(self, **_kwargs):
+            return {"input_ids": InputValue()}
+
+        def batch_decode(self, _generated, skip_special_tokens):
+            assert skip_special_tokens is True
+            return ['{"label":"person","score":0.88}']
+
+    class Model:
+        def to(self, _device):
+            return self
+
+        def eval(self):
+            return self
+
+        def generate(self, **kwargs):
+            assert kwargs["max_new_tokens"] == 24
+            return np.asarray([[1, 2]])
+
+    query = StructuredQuery(
+        "Return a person object",
+        {
+            "type": "object",
+            "required": ["label", "score"],
+            "properties": {
+                "label": {"type": "string"},
+                "score": {"type": "number"},
+            },
+        },
+        max_new_tokens=24,
+    )
+    result = TransformersVLMExtractor(
+        model_id="fake",
+        processor=Processor(),
+        model=Model(),
+        torch_module=FakeTorch,
+    ).ask_structured(np.zeros((2, 2, 3), dtype=np.uint8), query)
+    assert result.scene == {"label": "person", "score": 0.88}
+    assert result.metadata["structured"] is True
 
 
 def test_transformers_sam3_video_adapter_preserves_object_ids():

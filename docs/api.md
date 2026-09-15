@@ -190,6 +190,11 @@ Optional adapters include `TesseractExtractor`, `PaddleOCRExtractor`,
 load their heavy dependencies only when instantiated and default to local-only
 Transformers model loading.
 
+`StructuredQuery` and `parse_structured_output()` provide dependency-free JSON
+schema validation for VLM answers. `TransformersVLMExtractor.ask_structured()`
+preserves the raw answer as `caption`, returns the parsed object as `scene`,
+and records the prompt/schema in metadata.
+
 `RFDETRExtractor` adapts an externally installed RF-DETR model and normalizes
 its detections. `ByteTrackLite` is a dependency-free two-stage tracker for
 low-confidence recovery; it is a practical fallback for official ByteTrack or

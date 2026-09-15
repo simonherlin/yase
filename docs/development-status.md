@@ -453,6 +453,15 @@ Result: version 0.35.3, pending final validation.
 
 Result: version 0.36.0, pending final validation.
 
+## Cycle 45 — validated structured VLM extraction
+
+- [x] Add a dependency-free `StructuredQuery` and JSON-schema subset validator.
+- [x] Add fenced/prefix JSON recovery for common VLM formatting behavior.
+- [x] Add `TransformersVLMExtractor.ask_structured()` with raw-answer retention.
+- [x] Allow injected torch modules for deterministic adapter tests.
+
+Result: version 0.37.0, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

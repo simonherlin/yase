@@ -12,6 +12,7 @@ import numpy as np
 
 from .core import SemanticResult, load_image
 from .schema import BoundingBox, Detection, TextRegion
+from .structured import StructuredQuery, parse_structured_output
 
 
 class TesseractExtractor:
@@ -428,17 +429,20 @@ class TransformersVLMExtractor:
         local_files_only: bool = True,
         processor: Optional[Any] = None,
         model: Optional[Any] = None,
+        torch_module: Optional[Any] = None,
     ) -> None:
         if not model_id and model is None:
             raise ValueError("model_id is required")
         if max_new_tokens < 1:
             raise ValueError("max_new_tokens must be >= 1")
-        try:
-            import torch
-        except ImportError as exc:
-            raise ImportError(
-                "install the transformers extra to use this adapter"
-            ) from exc
+        if torch_module is None:
+            try:
+                import torch
+            except ImportError as exc:
+                raise ImportError(
+                    "install the transformers extra to use this adapter"
+                ) from exc
+            torch_module = torch
         if processor is None or model is None:
             try:
                 from transformers import AutoModelForImageTextToText, AutoProcessor
@@ -451,10 +455,10 @@ class TransformersVLMExtractor:
             model = model or AutoModelForImageTextToText.from_pretrained(
                 model_id, **options
             )
-        self._torch = torch
+        self._torch = torch_module
         self.model_id = model_id
-        self.device = torch.device(
-            device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch_module.device(
+            device or ("cuda" if torch_module.cuda.is_available() else "cpu")
         )
         self.default_prompt = default_prompt
         self.max_new_tokens = max_new_tokens
@@ -474,11 +478,13 @@ class TransformersVLMExtractor:
             messages, tokenize=False, add_generation_prompt=True
         )
 
-    def ask(self, image: Any, prompt: Optional[str] = None) -> SemanticResult:
+    def _generate_text(
+        self, image: Any, prompt: str, max_new_tokens: Optional[int] = None
+    ) -> str:
         from PIL import Image
 
         rgb = load_image(image)
-        text = self._prompt(prompt or self.default_prompt)
+        text = self._prompt(prompt)
         inputs = self.processor(
             text=[text], images=[Image.fromarray(rgb)], return_tensors="pt"
         )
@@ -488,7 +494,7 @@ class TransformersVLMExtractor:
         }
         with self._torch.inference_mode():
             generated = self.model.generate(
-                **inputs, max_new_tokens=self.max_new_tokens
+                **inputs, max_new_tokens=max_new_tokens or self.max_new_tokens
             )
         generated_text = generated
         if "input_ids" in inputs and generated.shape[1] > inputs["input_ids"].shape[1]:
@@ -496,10 +502,32 @@ class TransformersVLMExtractor:
         decoded = self.processor.batch_decode(generated_text, skip_special_tokens=True)[
             0
         ]
+        return decoded.strip()
+
+    def ask(self, image: Any, prompt: Optional[str] = None) -> SemanticResult:
+        actual_prompt = prompt or self.default_prompt
+        decoded = self._generate_text(image, actual_prompt)
         return SemanticResult(
-            caption=decoded.strip(),
-            scene={"prompt": prompt or self.default_prompt},
+            caption=decoded,
+            scene={"prompt": actual_prompt},
             metadata={"backend": "transformers-vlm", "model_id": self.model_id},
+        )
+
+    def ask_structured(self, image: Any, query: StructuredQuery) -> SemanticResult:
+        """Generate and validate a JSON answer for a structured query."""
+        if not isinstance(query, StructuredQuery):
+            raise TypeError("query must be a StructuredQuery")
+        raw = self._generate_text(image, query.prompt, query.max_new_tokens)
+        parsed = parse_structured_output(raw, query.schema)
+        return SemanticResult(
+            caption=raw,
+            scene=parsed,
+            metadata={
+                "backend": "transformers-vlm",
+                "model_id": self.model_id,
+                "structured": True,
+                "query": query.to_dict(),
+            },
         )
 
     def extract(self, image: Any) -> SemanticResult:
