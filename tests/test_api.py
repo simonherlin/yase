@@ -759,9 +759,19 @@ def test_callable_backend_validation_and_segmentation():
         CallableExtractor(lambda image: image, task="both").extract(np.zeros((2, 2, 3)))
 
 
-def test_torchscript_backend_reports_optional_dependency():
+def test_torchscript_backend_reports_optional_dependency(monkeypatch):
+    import builtins
+
     from yase.backends import TorchScriptExtractor
 
+    real_import = builtins.__import__
+
+    def block_torch(name, *args, **kwargs):
+        if name == "torch":
+            raise ImportError("torch intentionally blocked by test")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", block_torch)
     with pytest.raises(ImportError, match="torch"):
         TorchScriptExtractor("missing.pt")
 
