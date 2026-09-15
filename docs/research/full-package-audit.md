@@ -38,6 +38,9 @@ L'état du dépôt a été vérifié après nettoyage documentaire et packaging 
   --ignore-missing-imports` passent sur les 43 modules source ;
 - la wheel portable `py3-none-any` et le sdist sont validés depuis les
   artefacts construits localement ;
+- la wheel native Linux/Python 3.12 est également construite et validée avec
+  `_native`; le smoke IoU/NMS et le benchmark local confirment le chemin C++
+  sans modifier le fallback Python ;
 - les smoke tests réels locaux ONNX Runtime 1.30.0 et OpenVINO 2026.3.1
   passent sur CPU ; OpenVINO détecte également le GPU disponible ;
 - `pip-audit --local` ne trouve aucune vulnérabilité connue et Bandit ne
