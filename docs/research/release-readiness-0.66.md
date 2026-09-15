@@ -52,7 +52,7 @@ Le contrat public est donc :
 | Wheel portable Python | installation/import validés sur Python 3.12 ; matrice 3.10/3.11/3.13 à rejouer dans release externe |
 | Smoke OpenVINO | CPU + GPU réels sur le modèle synthétique local |
 | Smoke ONNX | CPU réel ; CUDA non installé sur le poste |
-| Micro-benchmark C++ | 64 boîtes : IoU ~28×, NMS ~33× contre fallback local |
+| Micro-benchmark C++ | 64 boîtes : IoU ~30×, NMS ~37× contre fallback local ; 256 boîtes : ~35×/~78× |
 | Lockfile | `uv lock --check` pass |
 
 Le poste courant ne possède pas `python3.12-venv` ni les headers système par

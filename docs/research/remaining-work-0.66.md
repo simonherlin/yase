@@ -105,9 +105,10 @@ réel sur les petites listes.
 5. Packs de modèles versionnés avec licences et benchmarks publiés.
 
 Le benchmark `benchmarks/native.py` couvre désormais la comparaison native /
-fallback des kernels locaux. Il reste à instrumenter les runtimes complets,
-car leur latence dépend du modèle, de la résolution, du provider et du
-matériel.
+fallback des kernels locaux. Sur le poste de référence, la mesure du
+15 septembre 2026 donne environ 30×/37× de gain IoU/NMS à 64 boîtes et
+35×/78× à 256 boîtes. Il reste à instrumenter les runtimes complets, car leur
+latence dépend du modèle, de la résolution, du provider et du matériel.
 
 La frontière image est également durcie : les chemins Pillow et l’ASGI
 vérifient les en-têtes, valident les payloads complets et convertissent les
