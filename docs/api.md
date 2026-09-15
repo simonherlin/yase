@@ -108,6 +108,8 @@ and transparently falls back to Python. Run `make native` to build it in place;
 `RuntimeInfo.optional_packages["yase._native"]` reports availability.
 `yase.native.nms_indices()` provides deterministic greedy non-maximum
 suppression with optional class-aware filtering and the same fallback contract.
+`non_maximum_suppression()` applies that operation to typed `Detection` values
+while preserving masks, track IDs, and custom attributes.
 
 `BackendRegistry.discover_entry_points()` explicitly loads third-party
 factories from the `yase.backends` entry-point group. Use

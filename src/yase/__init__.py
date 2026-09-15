@@ -74,7 +74,7 @@ from .metrics import (
 )
 from .models import ModelCard, ModelCatalog, default_model_catalog
 from .native import nms_indices
-from .normalization import normalise_detections
+from .normalization import non_maximum_suppression, normalise_detections
 from .observability import RuntimeMetrics
 from .observation import (
     EmbeddingRecord,
@@ -126,7 +126,7 @@ from .video import (
     process_video,
 )
 
-__version__ = "0.32.0"
+__version__ = "0.33.0"
 
 __all__ = [
     "CallableExtractor",
@@ -253,6 +253,7 @@ __all__ = [
     "load_coco_dataset",
     "load_coco_predictions",
     "normalise_detections",
+    "non_maximum_suppression",
     "nms_indices",
     "collect_runtime_info",
     "health_check",

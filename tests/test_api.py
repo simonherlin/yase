@@ -104,6 +104,7 @@ from yase import (
     load_image,
     load_mot_sequence,
     nms_indices,
+    non_maximum_suppression,
     normalise_detections,
     observation_to_json,
     result_to_dict,
@@ -595,6 +596,23 @@ def test_nms_indices_is_class_aware_and_has_a_portable_fallback():
     assert fallback == [1, 2]
     with pytest.raises(ValueError, match="same length"):
         nms_indices(boxes, scores[:2])
+
+
+def test_typed_non_maximum_suppression_preserves_detection_payload():
+    first = Detection(
+        "person", 0.8, (0, 0, 10, 10), track_id=7, attributes={"source": "a"}
+    )
+    winner = Detection(
+        "person", 0.9, (1, 1, 11, 11), track_id=8, attributes={"source": "b"}
+    )
+    other_class = Detection("car", 0.7, (1, 1, 11, 11), track_id=9)
+    assert non_maximum_suppression([first, winner, other_class]) == [
+        winner,
+        other_class,
+    ]
+    assert non_maximum_suppression([first, winner, other_class], class_aware=False) == [
+        winner
+    ]
 
 
 def test_bytetrack_lite_uses_the_same_native_matching_contract():

@@ -6,11 +6,12 @@ that compatibility logic outside the core schema and does not import any
 modeling framework.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any, Optional
 
 import numpy as np
 
+from .native import nms_indices
 from .schema import BoundingBox, Detection
 
 _STRUCTURAL_KEYS = {
@@ -285,4 +286,36 @@ def normalise_detections(
     )
 
 
-__all__ = ["normalise_detections"]
+def non_maximum_suppression(
+    detections: Sequence[Detection],
+    *,
+    iou_threshold: float = 0.5,
+    class_aware: bool = True,
+) -> list[Detection]:
+    """Remove overlapping detections while retaining the original objects.
+
+    Results are ordered by descending score, matching the NMS index contract.
+    When ``class_aware`` is true, boxes suppress only detections with the same
+    label; masks and arbitrary detection attributes are preserved unchanged.
+    """
+    items = list(detections)
+    if any(not isinstance(item, Detection) for item in items):
+        raise TypeError("detections must contain Detection values")
+    class_ids = None
+    if class_aware:
+        label_ids: dict[str, int] = {}
+        class_ids = []
+        for item in items:
+            if item.label not in label_ids:
+                label_ids[item.label] = len(label_ids)
+            class_ids.append(label_ids[item.label])
+    kept = nms_indices(
+        [item.box for item in items],
+        [item.score for item in items],
+        iou_threshold,
+        class_ids,
+    )
+    return [items[index] for index in kept]
+
+
+__all__ = ["non_maximum_suppression", "normalise_detections"]
