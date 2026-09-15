@@ -92,6 +92,7 @@ from yase import (
     Yase,
     YaseASGI,
     ZoneRule,
+    build_from_config,
     collect_runtime_info,
     create_asgi_app,
     default_model_catalog,
@@ -110,6 +111,7 @@ from yase import (
     inspect_artifact,
     load_coco_dataset,
     load_coco_predictions,
+    load_config,
     load_image,
     load_mot_sequence,
     load_stream_checkpoint,
@@ -2490,6 +2492,46 @@ def test_tensorrt_context_pool_parallel_extraction_preserves_order_and_closes():
     assert all(runner.closed for runner in created)
     with pytest.raises(RuntimeError, match="closed"):
         pool.infer(np.zeros((1, 3, 2, 2), dtype=np.float32))
+
+
+def test_declarative_config_builds_facade_pipeline_and_json_file(tmp_path):
+    registry = BackendRegistry()
+
+    def factory(offset=0):
+        return lambda image: {"tags": [int(image[0, 0, 0]) + offset]}
+
+    registry.register("toy", factory)
+    facade = build_from_config(
+        {
+            "backend": "toy",
+            "options": {"offset": 4},
+            "limits": {"max_pixels": 4},
+        },
+        registry=registry,
+    )
+    assert facade.extract(np.zeros((2, 2, 3), dtype=np.uint8)).tags == [4]
+
+    pipeline = build_from_config(
+        {
+            "stages": [
+                {"name": "first", "backend": "toy"},
+                {"name": "disabled", "backend": "toy", "enabled": False},
+            ],
+            "record_timings": False,
+        },
+        registry=registry,
+    )
+    assert pipeline.extract(np.zeros((1, 1, 3), dtype=np.uint8)).tags == [0]
+
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps({"backend": "toy", "options": {"offset": 2}}),
+        encoding="utf-8",
+    )
+    loaded = load_config(path, registry=registry)
+    assert loaded.extract(np.zeros((1, 1, 3), dtype=np.uint8)).tags == [2]
+    with pytest.raises(ValueError, match="unknown config"):
+        build_from_config({"backend": "toy", "unexpected": True}, registry=registry)
 
 
 def test_torchscript_batch_uses_one_model_call(monkeypatch):

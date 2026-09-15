@@ -149,6 +149,10 @@ from yase import Yase, create_asgi_app
 app = create_asgi_app(Yase(model="onnx", model_path="model.onnx"))
 ~~~
 
+Deployments can also construct the same facade from a checked-in JSON/TOML
+configuration using `load_config("yase.toml")`; only names registered in
+`BackendRegistry` are allowed.
+
 ## Batch extraction
 
 `extract_many` preserves input order and timestamps. Backends that implement

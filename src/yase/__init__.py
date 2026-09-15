@@ -28,6 +28,7 @@ from .checkpoints import (
     make_stream_checkpoint,
     save_stream_checkpoint,
 )
+from .config import build_from_config, load_config
 from .core import Extractor, ImageInput, SemanticResult, Yase, load_image
 from .datasets import (
     CocoDataset,
@@ -140,7 +141,7 @@ from .video import (
     process_video,
 )
 
-__version__ = "0.59.0"
+__version__ = "0.60.0"
 
 __all__ = [
     "CallableExtractor",
@@ -155,6 +156,7 @@ __all__ = [
     "BenchmarkReport",
     "BenchmarkRunner",
     "CHECKPOINT_VERSION",
+    "build_from_config",
     "AdaptiveSemanticCascade",
     "AveragePrecisionResult",
     "ArtifactInfo",
@@ -271,6 +273,7 @@ __all__ = [
     "Uncertainty",
     "validate_stage_specs",
     "load_image",
+    "load_config",
     "load_stream_checkpoint",
     "make_stream_checkpoint",
     "load_coco_dataset",

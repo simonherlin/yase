@@ -243,6 +243,12 @@ backends; all remain lazy until `create()` or `Yase` actually instantiates one.
 The CLI uses this same registry for image, batch, video, and benchmark
 commands; registered VLM/SAM3 backends accept `--prompt`, and Grounding DINO
 accepts `--labels`.
+
+`build_from_config()` and `load_config()` construct a `Yase` facade or
+`SemanticPipeline` from JSON/TOML or a mapping. Backend names are resolved only
+through `BackendRegistry`; arbitrary import paths are rejected. The schema
+supports `options`, `limits`, stage `enabled`, `conflict`, and
+`record_timings`.
 Video CLI processing additionally exposes `--batch-size`; it is ignored for
 the latest-frame realtime worker, whose purpose is latency control.
 

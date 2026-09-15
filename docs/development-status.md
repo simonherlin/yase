@@ -725,6 +725,20 @@ environment cannot exercise accelerator hardware.
 
 Result: version `0.59.0`, pending final validation.
 
+## Cycle 70 — declarative configuration
+
+- [x] Add safe JSON/TOML loading through `load_config()` and direct mapping
+  construction through `build_from_config()`.
+- [x] Resolve all backends through `BackendRegistry`; configuration files never
+  import arbitrary Python paths.
+- [x] Support one `Yase` facade or a named `SemanticPipeline`, including input
+  limits, stage enablement, conflict policy, and timing controls.
+- [x] Validate unknown fields, backend names, options, limits, and file suffixes
+  with actionable errors.
+- [x] Add JSON-file and custom-registry regression tests.
+
+Result: version `0.60.0`, pending final validation.
+
 ## Exit criteria
 
 The package is considered ready for a first public release when the core and
