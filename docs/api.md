@@ -45,6 +45,11 @@ reference environment (`.python-version`). Python 3.9 is outside the modern
 OpenVINO/RF-DETR intersection; Python 3.14 remains pending provider-matrix
 validation.
 
+The `rfdetr` extra follows the current upstream runtime contract: RF-DETR
+1.6+, PyTorch 2.2+, torchvision 0.17+, and Transformers 5.1 through 5.x.
+Keep it separate from the generic `transformers` extra because RF-DETR's
+backbone API is not compatible with every older Transformers release.
+
 The CLI exposes the same check through `yase diagnostics`; repeat
 `--require PACKAGE` to make optional runtime packages readiness requirements.
 Add `--providers` for an explicit probe of installed ONNX Runtime providers,

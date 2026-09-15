@@ -888,6 +888,18 @@ provider/device exposed by the host.
 Result: optional runtime regressions now have a reproducible CI path without
 downloading model weights or making heavy providers part of the base package.
 
+## Cycle 82 — RF-DETR dependency contract
+
+- [x] Recheck the current upstream RF-DETR requirements against the optional
+  dependency declarations.
+- [x] Require RF-DETR 1.6+, PyTorch 2.2+, torchvision 0.17+, and Transformers
+  5.1 through 5.x in the dedicated extra.
+- [x] Keep the generic Transformers extra independent for older compatible
+  vision/VLM integrations.
+
+Result: RF-DETR resolution now fails early for an unsupported dependency mix
+instead of failing later during model construction.
+
 ## Exit criteria
 
 The package is considered ready for a first public release when the core and

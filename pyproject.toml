@@ -22,7 +22,12 @@ retrieval = ["qdrant-client>=1.14"]
 observability = ["opentelemetry-api>=1.30"]
 openvino = ["openvino>=2024.0"]
 tensorrt = ["tensorrt>=10.0"]
-rfdetr = ["rfdetr"]
+rfdetr = [
+  "rfdetr>=1.6.0",
+  "torch>=2.2",
+  "torchvision>=0.17",
+  "transformers>=5.1,<6",
+]
 all = [
   "opencv-python>=4.8",
   "onnxruntime>=1.17",
@@ -33,7 +38,7 @@ all = [
   "paddleocr>=2.9",
   "qdrant-client>=1.14",
   "opentelemetry-api>=1.30",
-  "rfdetr; python_version >= '3.10'",
+  "rfdetr>=1.6.0",
 ]
 
 [project.scripts]

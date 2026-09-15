@@ -3736,6 +3736,9 @@ retrieval = [
 ]
 rfdetr = [
     { name = "rfdetr" },
+    { name = "torch" },
+    { name = "torchvision" },
+    { name = "transformers" },
 ]
 tensorrt = [
     { name = "tensorrt" },
@@ -3784,15 +3787,18 @@ requires-dist = [
     { name = "pytesseract", marker = "extra == 'ocr'", specifier = ">=0.3.13" },
     { name = "qdrant-client", marker = "extra == 'all'", specifier = ">=1.14" },
     { name = "qdrant-client", marker = "extra == 'retrieval'", specifier = ">=1.14" },
-    { name = "rfdetr", marker = "python_full_version >= '3.10' and extra == 'all'" },
-    { name = "rfdetr", marker = "extra == 'rfdetr'" },
+    { name = "rfdetr", marker = "extra == 'all'", specifier = ">=1.6.0" },
+    { name = "rfdetr", marker = "extra == 'rfdetr'", specifier = ">=1.6.0" },
     { name = "tensorrt", marker = "extra == 'tensorrt'", specifier = ">=10.0" },
     { name = "torch", marker = "extra == 'all'", specifier = ">=2.0" },
+    { name = "torch", marker = "extra == 'rfdetr'", specifier = ">=2.2" },
     { name = "torch", marker = "extra == 'torch'", specifier = ">=2.0" },
     { name = "torch", marker = "extra == 'transformers'", specifier = ">=2.0" },
     { name = "torchvision", marker = "extra == 'all'", specifier = ">=0.15" },
+    { name = "torchvision", marker = "extra == 'rfdetr'", specifier = ">=0.17" },
     { name = "torchvision", marker = "extra == 'torch'", specifier = ">=0.15" },
     { name = "transformers", marker = "extra == 'all'", specifier = ">=4.45" },
+    { name = "transformers", marker = "extra == 'rfdetr'", specifier = ">=5.1,<6" },
     { name = "transformers", marker = "extra == 'transformers'", specifier = ">=4.45" },
 ]
 provides-extras = ["video", "torch", "onnx", "transformers", "ocr", "paddle", "retrieval", "observability", "openvino", "tensorrt", "rfdetr", "all"]
