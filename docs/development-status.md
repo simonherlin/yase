@@ -943,6 +943,20 @@ resume process without bypassing the typed contract.
 Result: the Linux native CI job now installs and discovers the headers it needs
 instead of relying on an implicit system/interpreter configuration match.
 
+## Cycle 87 — 0.65.0 release validation
+
+- [x] Bump the package and runtime metadata to 0.65.0.
+- [x] Validate the lockfile, dependency consistency, lint, formatting, and
+  the complete 147-test suite.
+- [x] Validate the real provider smoke script for OpenVINO and ONNX Runtime.
+- [x] Build the 0.65.0 wheel and source distribution.
+- [x] Verify the portable wheel in a clean Python 3.12 environment and ensure
+  the optional native extension is not embedded in the generic wheel.
+- [x] Publish the release readiness report and remaining hardware-gated limits.
+
+Result: 0.65.0 is ready as a portable release candidate; CUDA/TensorRT remains
+explicitly hardware-gated by the local Maxwell GPU.
+
 ## Exit criteria
 
 The package is considered ready for a first public release when the core and

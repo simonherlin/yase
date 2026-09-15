@@ -1,7 +1,7 @@
 # Yase — audit complet du package et plan de production
 
 Date de l'audit : 2026-09-15  
-État inspecté : `0.64.0` plus audit runtime Python/CUDA et durcissement des
+État inspecté : `0.65.0` plus audit runtime Python/CUDA et durcissement des
 entrées du 2026-09-15
 
 Ce document est la référence de pilotage technique. Il distingue ce qui est
