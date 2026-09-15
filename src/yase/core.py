@@ -280,30 +280,6 @@ class Yase:
         if len(stamps) != len(items):
             raise ValueError("timestamps must have the same length as images")
 
-        backend = self.extractor
-        if hasattr(backend, "extract_batch"):
-            arrays = [
-                load_image(
-                    image, color_order=self.color_order, limits=self.input_limits
-                )
-                for image in items
-            ]
-            try:
-                outputs = list(backend.extract_batch(arrays))
-                if len(outputs) != len(items):
-                    raise ValueError(
-                        "extract_batch must return one result per input image"
-                    )
-                return [
-                    _normalise_output(output, self.task, timestamp)
-                    for output, timestamp in zip(outputs, stamps)
-                ]
-            except Exception:
-                if error_policy == "raise":
-                    raise
-                if not hasattr(backend, "extract") and not callable(backend):
-                    return [None] * len(items)
-
         def recover(
             index: int, image: ImageInput, timestamp: Optional[float]
         ) -> Optional[SemanticResult]:
@@ -316,6 +292,72 @@ class Yase:
                     return None
                 else:
                     raise
+
+        backend = self.extractor
+        if hasattr(backend, "extract_batch"):
+            results: list[Optional[SemanticResult]] = [None] * len(items)
+            arrays: list[np.ndarray] = []
+            valid_indices: list[int] = []
+
+            def handle_batch_error(index: int, exc: Exception, started: float) -> None:
+                if self.metrics is not None:
+                    self.metrics.record_extraction(
+                        time.perf_counter() - started, success=False
+                    )
+                if on_error is not None:
+                    results[index] = on_error(exc, index)
+                elif error_policy == "raise":
+                    raise exc
+
+            for index, image in enumerate(items):
+                started = time.perf_counter()
+                try:
+                    arrays.append(
+                        load_image(
+                            image,
+                            color_order=self.color_order,
+                            limits=self.input_limits,
+                        )
+                    )
+                    valid_indices.append(index)
+                except Exception as exc:
+                    handle_batch_error(index, exc, started)
+
+            if not arrays:
+                return results
+
+            try:
+                batch_started = time.perf_counter()
+                outputs = list(backend.extract_batch(arrays))
+                if len(outputs) != len(arrays):
+                    raise ValueError(
+                        "extract_batch must return one result per valid input image"
+                    )
+                normalised = [
+                    _normalise_output(output, self.task, stamps[index])
+                    for output, index in zip(outputs, valid_indices)
+                ]
+                for index, result in zip(valid_indices, normalised):
+                    results[index] = result
+                if self.metrics is not None:
+                    per_item_duration = (time.perf_counter() - batch_started) / len(
+                        arrays
+                    )
+                    for _ in arrays:
+                        self.metrics.record_extraction(per_item_duration, success=True)
+                return results
+            except Exception:
+                if error_policy == "raise":
+                    raise
+                if not hasattr(backend, "extract") and not callable(backend):
+                    return results
+
+                # A native batch failure is retried item by item so a single
+                # malformed input or provider error cannot hide useful output
+                # from the other images in a skip-tolerant request.
+                for index in valid_indices:
+                    results[index] = recover(index, items[index], stamps[index])
+                return results
 
         if max_workers == 1:
             return [

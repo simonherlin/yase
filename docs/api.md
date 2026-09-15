@@ -9,7 +9,8 @@
   array and returns SemanticResult.
 - extract_many(images, timestamps=None, error_policy=raise, on_error=None)
   preserves input order and uses a backend's native extract_batch method when
-  available. With error_policy=skip, failed positions contain None.
+  available. With error_policy=skip, malformed batch inputs are isolated so
+  valid images still use native batching; failed positions contain None.
 - `extract_many(..., max_workers=N)` can run non-batch backends concurrently
   with bounded workers while preserving result order; the default is serial.
 - The `extract` CLI command exposes this as `--max-workers`; benchmark

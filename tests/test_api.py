@@ -2070,6 +2070,43 @@ def test_extract_many_uses_native_batch_and_preserves_order():
     assert [result.timestamp for result in results] == [0.1, 0.2, 0.3]
 
 
+def test_extract_many_batch_skip_handles_invalid_image_and_records_metrics():
+    backend = NativeBatchBackend()
+    metrics = RuntimeMetrics(namespace="batch_test")
+    api = Yase(extractor=backend, metrics=metrics)
+    images = [
+        np.full((1, 1, 3), 1, dtype=np.uint8),
+        np.zeros((1,), dtype=np.uint8),
+        np.full((1, 1, 3), 3, dtype=np.uint8),
+    ]
+
+    results = api.extract_many(images, error_policy="skip")
+
+    assert backend.calls == 1
+    assert results[0] is not None and results[0].depth[0, 0] == 1
+    assert results[1] is None
+    assert results[2] is not None and results[2].depth[0, 0] == 3
+    extraction = metrics.snapshot()["extraction"]
+    assert extraction["attempts"] == 3
+    assert extraction["failures"] == 1
+
+
+def test_extract_many_batch_load_error_uses_error_callback_with_original_index():
+    backend = NativeBatchBackend()
+    replacement = SemanticResult(tags=["recovered"])
+    seen = []
+    api = Yase(extractor=backend)
+
+    results = api.extract_many(
+        [np.zeros((1, 1, 3), dtype=np.uint8), np.zeros((1,), dtype=np.uint8)],
+        on_error=lambda error, index: seen.append((type(error), index)) or replacement,
+    )
+
+    assert backend.calls == 1
+    assert results[1] is replacement
+    assert seen == [(ValueError, 1)]
+
+
 def test_extract_many_validates_batch_contract():
     api = Yase(extractor=NativeBatchBackend())
     with pytest.raises(ValueError, match="same length"):

@@ -614,6 +614,20 @@ Result: version 0.52.0, pending final validation.
 
 Result: package-wide roadmap refreshed for the `0.52.0` release line.
 
+## Cycle 63 — resilient native batch extraction
+
+- [x] Load batch inputs independently so `error_policy="skip"` can preserve
+  valid images when another item is malformed or exceeds input limits.
+- [x] Preserve original indices and timestamps when only valid batch members
+  are sent to a native backend.
+- [x] Route pre-processing failures through the public `on_error` callback.
+- [x] Record one extraction metric per batch item, including load failures.
+- [x] Retry valid items individually when a provider-level batch call fails and
+  the request is skip-tolerant.
+- [x] Add regression tests for partial batches, callback indices, and metrics.
+
+Result: version `0.53.0`, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full
