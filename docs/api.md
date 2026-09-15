@@ -185,6 +185,12 @@ implement the same boundary with a vector database adapter.
 model ID, and optional revision in each point payload and rejects cross-space
 queries before they reach the collection.
 
+`make_stream_checkpoint()`, `save_stream_checkpoint()`, and
+`load_stream_checkpoint()` provide one versioned JSON checkpoint for the
+tracker, `SemanticTrackMemory`, and `GlobalIdentityStore`. The file writer is
+atomic and fsyncs its temporary file before replacement, making it suitable
+for worker failover and scheduled recovery jobs.
+
 `Tracker` is the common online tracking protocol. `IoUTracker` adds stable
 stream-local `track_id` values to typed detections, and both built-in trackers
 support JSON-compatible `state_dict()` / `load_state_dict()` checkpoints for

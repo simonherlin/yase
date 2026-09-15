@@ -522,6 +522,16 @@ Result: version 0.42.0, pending final validation.
 
 Result: version 0.43.0, pending final validation.
 
+## Cycle 53 — atomic stream checkpoints
+
+- [x] Add a versioned checkpoint envelope for all online semantic state.
+- [x] Restore tracker, temporal memory, and cross-camera identity together.
+- [x] Write checkpoints atomically beside the destination and fsync before replace.
+- [x] Validate component contracts, unknown components, metadata, and versions.
+- [x] Add restart simulation coverage with real built-in stateful components.
+
+Result: version 0.44.0, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

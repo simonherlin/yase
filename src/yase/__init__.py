@@ -22,6 +22,12 @@ from .backends import (
 from .benchmark import BenchmarkReport, BenchmarkRunner
 from .calibration import TemperatureScaler
 from .cascade import AdaptiveSemanticCascade, CascadePolicy, RouteDecision
+from .checkpoints import (
+    CHECKPOINT_VERSION,
+    load_stream_checkpoint,
+    make_stream_checkpoint,
+    save_stream_checkpoint,
+)
 from .core import Extractor, ImageInput, SemanticResult, Yase, load_image
 from .datasets import (
     CocoDataset,
@@ -133,7 +139,7 @@ from .video import (
     process_video,
 )
 
-__version__ = "0.43.0"
+__version__ = "0.44.0"
 
 __all__ = [
     "CallableExtractor",
@@ -147,6 +153,7 @@ __all__ = [
     "ByteTrackLite",
     "BenchmarkReport",
     "BenchmarkRunner",
+    "CHECKPOINT_VERSION",
     "AdaptiveSemanticCascade",
     "AveragePrecisionResult",
     "ArtifactInfo",
@@ -259,6 +266,8 @@ __all__ = [
     "Uncertainty",
     "validate_stage_specs",
     "load_image",
+    "load_stream_checkpoint",
+    "make_stream_checkpoint",
     "load_coco_dataset",
     "load_coco_predictions",
     "normalise_detections",
@@ -271,6 +280,7 @@ __all__ = [
     "verify_artifact",
     "default_registry",
     "process_video",
+    "save_stream_checkpoint",
     "parse_structured_output",
     "load_mot_sequence",
     "write_mot_sequence",

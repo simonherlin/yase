@@ -107,6 +107,8 @@ from yase import (
     load_coco_predictions,
     load_image,
     load_mot_sequence,
+    load_stream_checkpoint,
+    make_stream_checkpoint,
     nms_indices,
     non_maximum_suppression,
     normalise_detections,
@@ -114,6 +116,7 @@ from yase import (
     parse_structured_output,
     result_to_dict,
     result_to_json,
+    save_stream_checkpoint,
     sha256_file,
     validate_stage_specs,
     verify_artifact,
@@ -907,6 +910,56 @@ def test_semantic_track_memory_round_trips_json_checkpoint():
     assert result.detections[0].attributes["seen_count"] == 3
     with pytest.raises(ValueError, match="state version"):
         restored.load_state_dict({"version": 2})
+
+
+def test_stream_checkpoint_atomically_restores_all_state_components(tmp_path):
+    detection = Detection(
+        "person", 0.9, (0, 0, 2, 2), attributes={"embedding": [1.0, 0.0]}
+    )
+    tracker = IoUTracker()
+    tracked = tracker.update([detection], timestamp=1.0)
+    memory = SemanticTrackMemory()
+    memory.update(SemanticResult(detections=tracked), timestamp=1.0)
+    identity_store = GlobalIdentityStore(start_id=7)
+    identity_store.update([detection], camera_id="cam-a", timestamp=1.0)
+    checkpoint = tmp_path / "stream.json"
+
+    assert (
+        save_stream_checkpoint(
+            checkpoint,
+            tracker=tracker,
+            memory=memory,
+            identity_store=identity_store,
+            metadata={"job_id": "demo", "frame": 1},
+        )
+        == checkpoint
+    )
+    payload = json.loads(checkpoint.read_text(encoding="utf-8"))
+    assert payload["version"] == 1
+    assert set(payload["components"]) == {"tracker", "memory", "identity_store"}
+
+    restored_tracker = IoUTracker()
+    restored_memory = SemanticTrackMemory()
+    restored_identity = GlobalIdentityStore()
+    restored = load_stream_checkpoint(
+        checkpoint,
+        tracker=restored_tracker,
+        memory=restored_memory,
+        identity_store=restored_identity,
+    )
+    assert restored["metadata"]["job_id"] == "demo"
+    assert restored_tracker.active_ids == tracker.active_ids
+    assert restored_memory.states == memory.states
+    assert tuple(restored_identity.identities) == tuple(identity_store.identities)
+
+
+def test_stream_checkpoint_validates_components_and_versions(tmp_path):
+    with pytest.raises(TypeError, match="state_dict"):
+        make_stream_checkpoint(tracker=object())
+    path = tmp_path / "invalid.json"
+    path.write_text(json.dumps({"version": 2}), encoding="utf-8")
+    with pytest.raises(ValueError, match="version"):
+        load_stream_checkpoint(path)
 
 
 def test_multimodal_consensus_fuses_boxes_and_audits_evidence():
