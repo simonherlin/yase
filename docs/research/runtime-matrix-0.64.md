@@ -41,6 +41,7 @@ The policy is based on the current upstream intersections:
 | ONNX Runtime | 1.30.0 | CPUExecutionProvider | pass: batch and I/O binding |
 | ONNX Runtime | 1.30.0 | AzureExecutionProvider available | not selected for local inference |
 | OpenTelemetry API | 1.44.0 | no-op default tracer | pass: span creation |
+| C++17 native extension | local `g++` build | IoU matrix and class-aware NMS | pass |
 | TensorRT | not installed | CUDA/TensorRT | hardware-gated; not claimed |
 
 OpenVINO reported `CPU` and `GPU` devices, with the GPU device identified as
@@ -70,3 +71,9 @@ make check
 The complete Python test suite remains deterministic: 143 tests pass under
 Python 3.12.3. The provider smoke commands are intentionally kept separate
 from the base test suite because optional runtimes and hardware vary by host.
+
+The optional C++17 extension was also compiled and exercised locally. The
+system Python development headers are not installed, so the Ubuntu
+`python3.12-dev` and `libpython3.12-dev` archives were unpacked into `/tmp`
+for this validation; no system package was installed. The extension remains
+ignored by the portable `py3-none-any` wheel as intended.

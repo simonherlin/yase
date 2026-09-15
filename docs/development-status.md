@@ -841,6 +841,8 @@ and the provider smoke matrix is recorded in
 - [x] Install and execute ONNX Runtime 1.30.0 on CPU with normal execution and
   I/O binding, including a real temporary ONNX graph.
 - [x] Instantiate the OpenTelemetry bridge against the installed API.
+- [x] Compile and execute the optional C++17 IoU/NMS extension using temporary
+  Python development headers, without changing system packages.
 - [x] Inspect NVIDIA/CUDA capabilities and explicitly classify TensorRT as
   hardware-gated on the local Quadro M3000M (compute 5.2).
 - [x] Publish exact versions, provider lists, commands, and limitations in the
