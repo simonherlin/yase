@@ -32,6 +32,11 @@ uv pip install dist/yase-*.whl. Python 3.9 and newer are supported.
 The CLI reports available local adapters with `yase info`. Extraction from a
 local ONNX model is available with `yase extract image.jpg --model onnx
 --model-path model.onnx`.
+The same commands also accept registered semantic backends such as `vlm`,
+`image-embedding`, `sam3`, `rf-detr`, `tesseract`, and `paddleocr`; use
+`--model-path` for a local/Hugging Face model identifier, `--prompt` for VLM
+or SAM3, and `--labels` for Grounding DINO. Optional dependencies remain
+lazy.
 The same interface supports `yase video input.mp4 --model onnx
 --model-path model.onnx --output results.jsonl` and `--realtime` for a live
 source.

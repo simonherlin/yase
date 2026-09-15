@@ -2243,6 +2243,20 @@ def test_cli_processing_commands_parse_input_limits():
     assert limits.max_width == 640
     assert limits.max_bytes == 1000000
     assert args.max_workers == 3
+    modern = _parser().parse_args(
+        [
+            "extract",
+            "frame.jpg",
+            "--model",
+            "vlm",
+            "--model-path",
+            "Qwen/Qwen3-VL-2B-Instruct",
+            "--prompt",
+            "describe the scene",
+        ]
+    )
+    assert modern.model == "vlm"
+    assert modern.prompt == "describe the scene"
     with pytest.raises(SystemExit):
         _parser().parse_args(
             [

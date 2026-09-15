@@ -29,6 +29,22 @@ from .core import Yase
 from .serialization import result_to_dict, write_jsonl
 from .video import RealtimeVideoStream, VideoStream
 
+_CLI_MODELS = (
+    "torchscript",
+    "onnx",
+    "openvino",
+    "tensorrt",
+    "rf-detr",
+    "sam3",
+    "grounding-dino",
+    "image-embedding",
+    "vlm",
+    "tesseract",
+    "paddleocr",
+)
+_LOCAL_ARTIFACT_MODELS = {"torchscript", "onnx", "openvino", "tensorrt"}
+_MODEL_ID_MODELS = {"sam3", "grounding-dino", "image-embedding", "vlm"}
+
 
 def _positive_int(value: str) -> int:
     try:
@@ -47,6 +63,20 @@ def _add_input_limits(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--max-height", type=_positive_int)
     parser.add_argument("--max-channels", type=_positive_int)
     parser.add_argument("--max-bytes", type=_positive_int)
+
+
+def _add_model_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--model", choices=_CLI_MODELS, required=True)
+    parser.add_argument(
+        "--model-path",
+        help="local artifact for tensor runtimes, or local HF model ID/path",
+    )
+    parser.add_argument("--prompt", help="text prompt for SAM3 or a VLM")
+    parser.add_argument(
+        "--labels",
+        nargs="+",
+        help="concept labels for Grounding DINO (space-separated)",
+    )
 
 
 def _input_limits(args: argparse.Namespace) -> Optional[InputLimits]:
@@ -115,12 +145,7 @@ def _parser() -> argparse.ArgumentParser:
 
     extract = subparsers.add_parser("extract", help="extract semantics from images")
     extract.add_argument("images", nargs="+", type=Path)
-    extract.add_argument(
-        "--model",
-        choices=("torchscript", "onnx", "openvino", "tensorrt"),
-        required=True,
-    )
-    extract.add_argument("--model-path", required=True)
+    _add_model_options(extract)
     extract.add_argument(
         "--task", choices=("depth", "segmentation", "both"), default="depth"
     )
@@ -132,12 +157,7 @@ def _parser() -> argparse.ArgumentParser:
 
     video = subparsers.add_parser("video", help="extract semantics from a video")
     video.add_argument("source")
-    video.add_argument(
-        "--model",
-        choices=("torchscript", "onnx", "openvino", "tensorrt"),
-        required=True,
-    )
-    video.add_argument("--model-path", required=True)
+    _add_model_options(video)
     video.add_argument(
         "--task", choices=("depth", "segmentation", "both"), default="depth"
     )
@@ -154,12 +174,7 @@ def _parser() -> argparse.ArgumentParser:
         "benchmark", help="measure latency of a local model on images"
     )
     benchmark.add_argument("images", nargs="+", type=Path)
-    benchmark.add_argument(
-        "--model",
-        choices=("torchscript", "onnx", "openvino", "tensorrt"),
-        required=True,
-    )
-    benchmark.add_argument("--model-path", required=True)
+    _add_model_options(benchmark)
     benchmark.add_argument(
         "--task", choices=("depth", "segmentation", "both"), default="depth"
     )
@@ -194,6 +209,40 @@ def _models(args: argparse.Namespace) -> int:
     cards = default_model_catalog().search(task=args.task)
     print(json.dumps([card.to_dict() for card in cards], ensure_ascii=False))
     return 0
+
+
+def _make_extractor(args: argparse.Namespace) -> Yase:
+    """Build a CLI extractor while keeping optional dependencies lazy."""
+    options = {"input_limits": _input_limits(args)}
+    if args.model in _LOCAL_ARTIFACT_MODELS:
+        if not args.model_path:
+            raise ValueError(f"--model-path is required for {args.model}")
+        options["model_path"] = args.model_path
+    elif args.model in _MODEL_ID_MODELS:
+        if not args.model_path:
+            raise ValueError(f"--model-path is required for {args.model}")
+        options["model_id"] = args.model_path
+        if args.model == "grounding-dino":
+            if not args.labels:
+                raise ValueError("--labels is required for grounding-dino")
+            options["labels"] = args.labels
+        elif args.model == "sam3" and args.prompt:
+            options["prompt"] = args.prompt
+        elif args.model == "vlm" and args.prompt:
+            options["default_prompt"] = args.prompt
+    elif args.model == "rf-detr":
+        if args.prompt:
+            raise ValueError("--prompt is not supported by rf-detr")
+    elif args.model == "tesseract" and args.prompt:
+        raise ValueError("--prompt is not supported by tesseract")
+    elif args.model == "paddleocr" and args.prompt:
+        raise ValueError("--prompt is not supported by paddleocr")
+    return Yase(
+        task=args.task,
+        model=args.model,
+        registry=default_registry(),
+        **options,
+    )
 
 
 def _evaluate_mot(args: argparse.Namespace) -> int:
@@ -234,12 +283,7 @@ def _evaluate_coco(args: argparse.Namespace) -> int:
 
 
 def _extract(args: argparse.Namespace) -> int:
-    extractor = Yase(
-        task=args.task,
-        model=args.model,
-        model_path=args.model_path,
-        input_limits=_input_limits(args),
-    )
+    extractor = _make_extractor(args)
     results = extractor.extract_many(
         discover_images(args.images), max_workers=args.max_workers
     )
@@ -256,12 +300,7 @@ def _extract(args: argparse.Namespace) -> int:
 
 def _video(args: argparse.Namespace) -> int:
     source = int(args.source) if args.source.isdigit() else args.source
-    extractor = Yase(
-        task=args.task,
-        model=args.model,
-        model_path=args.model_path,
-        input_limits=_input_limits(args),
-    )
+    extractor = _make_extractor(args)
     stream_type = RealtimeVideoStream if args.realtime else VideoStream
     stream_options = {"max_frames": args.max_frames}
     if not args.realtime:
@@ -285,12 +324,7 @@ def _video(args: argparse.Namespace) -> int:
 
 
 def _benchmark(args: argparse.Namespace) -> int:
-    extractor = Yase(
-        task=args.task,
-        model=args.model,
-        model_path=args.model_path,
-        input_limits=_input_limits(args),
-    )
+    extractor = _make_extractor(args)
     report = BenchmarkRunner(warmup=args.warmup).run(
         extractor,
         discover_images(args.images),

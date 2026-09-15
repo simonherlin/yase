@@ -541,6 +541,15 @@ Result: version 0.44.0, pending final validation.
 
 Result: version 0.45.0, pending final validation.
 
+## Cycle 55 — registry-complete CLI
+
+- [x] Expose all built-in lazy backends through `extract`, `video`, and `benchmark`.
+- [x] Add model identifier/path, VLM/SAM3 prompt, and Grounding DINO label options.
+- [x] Preserve local runtime behavior and fail clearly when required model options are absent.
+- [x] Add parser coverage for modern registered backends without importing heavy runtimes.
+
+Result: version 0.46.0, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full
