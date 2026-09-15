@@ -6,8 +6,10 @@ stable ``extract``/``extract_batch`` contract to applications.
 """
 
 from collections.abc import Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Optional
+from queue import Queue
+from typing import Any, Callable, Optional
 
 import numpy as np
 
@@ -370,12 +372,30 @@ class TensorRTExtractor:
         self,
         model_path: Optional[str] = None,
         runner: Any = None,
+        runner_pool: Any = None,
+        runner_factory: Optional[Callable[[], Any]] = None,
+        pool_size: int = 1,
         task: str = "depth",
         size: Optional[tuple[int, int]] = None,
         device: str = "cuda",
         input_limits: Optional[InputLimits] = None,
     ) -> None:
         _validate_options(task, size)
+        if (
+            isinstance(pool_size, bool)
+            or not isinstance(pool_size, int)
+            or pool_size < 1
+        ):
+            raise ValueError("pool_size must be a positive integer")
+        configured = sum(
+            value is not None for value in (runner, runner_pool, runner_factory)
+        )
+        if configured > 1:
+            raise ValueError("pass only one of runner, runner_pool, or runner_factory")
+        if runner_factory is not None:
+            runner = TensorRTContextPool(runner_factory, size=pool_size)
+        elif runner_pool is not None:
+            runner = runner_pool
         if runner is None:
             if model_path is None:
                 raise ValueError("model_path or runner is required")
@@ -389,16 +409,17 @@ class TensorRTExtractor:
         self.device = device
         self.input_limits = input_limits
 
+    def _infer(self, tensor: np.ndarray) -> Any:
+        if hasattr(self.runner, "infer"):
+            return self.runner.infer(tensor)
+        return self.runner(tensor)
+
     def extract(self, image: Any) -> SemanticResult:
         return self.extract_batch([image])[0]
 
     def extract_batch(self, images: Sequence[Any]) -> list[SemanticResult]:
         tensor = _prepare_batch(images, self.size, self.input_limits)
-        outputs = (
-            self.runner.infer(tensor)
-            if hasattr(self.runner, "infer")
-            else self.runner(tensor)
-        )
+        outputs = self._infer(tensor)
         if isinstance(outputs, Mapping):
             values = list(outputs.values())
         elif isinstance(outputs, (tuple, list)):
@@ -418,5 +439,94 @@ class TensorRTExtractor:
             for index in range(len(images))
         ]
 
+    def extract_batch_parallel(
+        self,
+        images: Sequence[Any],
+        max_workers: Optional[int] = None,
+    ) -> list[SemanticResult]:
+        """Run one image per independent TensorRT context and keep input order.
 
-__all__ = ["OpenVINOExtractor", "TensorRTExtractor"]
+        This method requires a ``runner_pool`` or ``runner_factory``. It is
+        intended for latency-sensitive streams and heterogeneous image sizes;
+        ordinary ``extract_batch`` remains the preferred path for engines whose
+        optimized batch dimension is more efficient than concurrent contexts.
+        """
+        if not isinstance(self.runner, TensorRTContextPool) and not hasattr(
+            self.runner, "infer"
+        ):
+            raise TypeError(
+                "extract_batch_parallel requires a runner_pool or runner_factory"
+            )
+        workers = max_workers or getattr(self.runner, "size", 1)
+        if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
+            raise ValueError("max_workers must be a positive integer")
+
+        def extract_one(image: Any) -> SemanticResult:
+            tensor = _prepare_batch([image], self.size, self.input_limits)
+            outputs = self._infer(tensor)
+            if isinstance(outputs, Mapping):
+                values = list(outputs.values())
+            elif isinstance(outputs, (tuple, list)):
+                values = list(outputs)
+            else:
+                values = [outputs]
+            if not values:
+                raise ValueError("TensorRT runner returned no outputs")
+            metadata = {
+                "backend": "tensorrt",
+                "model_path": self.model_path,
+                "device": self.device,
+                "task": self.task,
+                "parallel_contexts": True,
+            }
+            return _result_from_values(values, 0, 1, self.task, metadata)
+
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            return list(executor.map(extract_one, images))
+
+    def close(self) -> None:
+        """Release a managed runner pool when it exposes ``close``."""
+        close = getattr(self.runner, "close", None)
+        if callable(close):
+            close()
+
+
+class TensorRTContextPool:
+    """Thread-safe pool of independent TensorRT-compatible runners."""
+
+    def __init__(self, factory: Callable[[], Any], size: int = 1) -> None:
+        if not callable(factory):
+            raise TypeError("factory must be callable")
+        if isinstance(size, bool) or not isinstance(size, int) or size < 1:
+            raise ValueError("size must be a positive integer")
+        self.size = size
+        self._available: Queue[Any] = Queue(maxsize=size)
+        self._runners: list[Any] = []
+        for _ in range(size):
+            runner = factory()
+            if not callable(runner) and not hasattr(runner, "infer"):
+                raise TypeError("factory must return a callable or infer runner")
+            self._runners.append(runner)
+            self._available.put(runner)
+        self._closed = False
+
+    def infer(self, tensor: np.ndarray) -> Any:
+        if self._closed:
+            raise RuntimeError("TensorRTContextPool is closed")
+        runner = self._available.get()
+        try:
+            return runner.infer(tensor) if hasattr(runner, "infer") else runner(tensor)
+        finally:
+            self._available.put(runner)
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        for runner in self._runners:
+            close = getattr(runner, "close", None)
+            if callable(close):
+                close()
+
+
+__all__ = ["OpenVINOExtractor", "TensorRTContextPool", "TensorRTExtractor"]

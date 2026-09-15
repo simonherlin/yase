@@ -78,6 +78,7 @@ from yase import (
     StageSpec,
     StructuredQuery,
     TemperatureScaler,
+    TensorRTContextPool,
     TensorRTExtractor,
     TesseractExtractor,
     TextRegion,
@@ -2453,6 +2454,42 @@ def test_tensorrt_extractor_accepts_custom_runner():
     result = backend.extract(np.zeros((2, 2, 3), dtype=np.uint8))
     assert result.depth.shape == (2, 2)
     assert result.metadata["backend"] == "tensorrt"
+
+
+def test_tensorrt_context_pool_parallel_extraction_preserves_order_and_closes():
+    class Runner:
+        def __init__(self):
+            self.closed = False
+
+        def infer(self, tensor):
+            return {"depth": tensor[:, 0, :, :]}
+
+        def close(self):
+            self.closed = True
+
+    created = []
+
+    def factory():
+        runner = Runner()
+        created.append(runner)
+        return runner
+
+    pool = TensorRTContextPool(factory, size=2)
+    backend = TensorRTExtractor(runner_pool=pool)
+    results = backend.extract_batch_parallel(
+        [
+            np.full((2, 2, 3), 1, dtype=np.uint8),
+            np.full((2, 2, 3), 2, dtype=np.uint8),
+            np.full((2, 2, 3), 3, dtype=np.uint8),
+        ]
+    )
+    assert [float(result.depth[0, 0]) for result in results] == pytest.approx(
+        [1 / 255, 2 / 255, 3 / 255]
+    )
+    backend.close()
+    assert all(runner.closed for runner in created)
+    with pytest.raises(RuntimeError, match="closed"):
+        pool.infer(np.zeros((1, 3, 2, 2), dtype=np.float32))
 
 
 def test_torchscript_batch_uses_one_model_call(monkeypatch):

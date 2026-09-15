@@ -147,6 +147,11 @@ overlap per-image submissions while restoring input order from callback
 userdata. Inject `async_queue=` in tests or managed runtimes; otherwise the
 adapter lazily constructs the queue from the installed OpenVINO package.
 
+`TensorRTContextPool(factory, size=N)` owns independent runners/contexts for
+concurrent inference. Pass it as `runner_pool=` and call
+`TensorRTExtractor.extract_batch_parallel()` when latency overlap is preferred
+over the engine's vectorized batch path; call `close()` during worker shutdown.
+
 `normalise_detections()` converts common detector mappings, columnar outputs,
 numeric ``(x1, y1, x2, y2, score, class_id)`` rows, and normalized coordinates
 into typed `Detection` objects. `inspect_artifact()`, `sha256_file()`, and

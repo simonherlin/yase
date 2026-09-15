@@ -111,10 +111,14 @@ IR/ONNX artifact. For NVIDIA CUDA plans, `TensorRTExtractor` supports the
 native execution-context path or a custom runner managed by the application:
 
 ~~~python
-from yase import OpenVINOExtractor, TensorRTExtractor
+from yase import OpenVINOExtractor, TensorRTContextPool, TensorRTExtractor
 
 depth = OpenVINOExtractor("model.xml", device="AUTO").extract("photo.jpg")
 depth = TensorRTExtractor("model.plan").extract("photo.jpg")
+
+# Independent contexts for concurrent latency-sensitive inference:
+pool = TensorRTContextPool(lambda: make_runner(), size=2)
+results = TensorRTExtractor(runner_pool=pool).extract_batch_parallel(images)
 
 # OpenVINO asynchronous queue (one request per image, ordered results):
 images = ["one.jpg", "two.jpg"]

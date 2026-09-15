@@ -95,7 +95,7 @@ from .pipeline import PipelineStage, SemanticPipeline
 from .registry import BackendRegistry, BackendSpec, default_registry
 from .reid import GlobalIdentity, GlobalIdentityStore, cosine_similarity
 from .retrieval import QdrantVectorIndex
-from .runtimes import OpenVINOExtractor, TensorRTExtractor
+from .runtimes import OpenVINOExtractor, TensorRTContextPool, TensorRTExtractor
 from .scheduler import (
     ObservationScheduler,
     SchedulerConfig,
@@ -140,7 +140,7 @@ from .video import (
     process_video,
 )
 
-__version__ = "0.58.0"
+__version__ = "0.59.0"
 
 __all__ = [
     "CallableExtractor",
@@ -229,6 +229,7 @@ __all__ = [
     "StreamContext",
     "TorchScriptExtractor",
     "TensorRTExtractor",
+    "TensorRTContextPool",
     "TextRegion",
     "TemperatureScaler",
     "TrackMemoryState",

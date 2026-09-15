@@ -712,6 +712,19 @@ dependency-free ASGI surface, and package-level artifact validation. Live
 provider CI remains the next operational investment because this CPU-only
 environment cannot exercise accelerator hardware.
 
+## Cycle 69 — TensorRT context pool
+
+- [x] Add a thread-safe `TensorRTContextPool` around independent callable or
+  `.infer()` runners.
+- [x] Add `TensorRTExtractor.extract_batch_parallel()` for overlap across
+  independent contexts while preserving input order.
+- [x] Keep ordinary vectorized `extract_batch()` as the default for engines
+  whose optimized batch dimension is faster.
+- [x] Add explicit lifecycle shutdown and closed-pool errors.
+- [x] Add deterministic pool tests without TensorRT or CUDA installed.
+
+Result: version `0.59.0`, pending final validation.
+
 ## Exit criteria
 
 The package is considered ready for a first public release when the core and
