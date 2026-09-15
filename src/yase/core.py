@@ -446,17 +446,19 @@ class Yase:
         """Extract one image and return a versioned observation bundle."""
         from .observation import FrameRef, ObservationBundle
 
-        result = self.extract(image, timestamp=timestamp)
+        # Materialize once. Passing the normalized array to ``extract`` avoids
+        # reopening a path/Pillow image merely to infer FrameRef dimensions.
+        loaded = load_image(
+            image, color_order=self.color_order, limits=self.input_limits
+        )
+        result = self.extract(loaded, timestamp=timestamp)
         if frame is None:
-            array = load_image(
-                image, color_order=self.color_order, limits=self.input_limits
-            )
             frame = FrameRef(
                 frame_id=frame_id,
                 source_id=source_id,
                 timestamp=result.timestamp,
-                width=array.shape[1],
-                height=array.shape[0],
+                width=loaded.shape[1],
+                height=loaded.shape[0],
                 color_order="RGB",
             )
         return ObservationBundle.from_result(

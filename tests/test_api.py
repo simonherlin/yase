@@ -2809,6 +2809,27 @@ def test_yase_extract_bundle_infers_dimensions():
     assert bundle.result.depth.shape == (4, 5)
 
 
+def test_yase_extract_bundle_materializes_pillow_input_once():
+    from PIL import Image
+
+    image = Image.new("RGB", (5, 4))
+    calls = 0
+    original_convert = image.convert
+
+    def counted_convert(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return original_convert(*args, **kwargs)
+
+    image.convert = counted_convert
+    bundle = Yase(extractor=lambda value: {"depth": value[..., 0]}).extract_bundle(
+        image
+    )
+    assert bundle.frame.width == 5
+    assert bundle.frame.height == 4
+    assert calls == 1
+
+
 def test_semantic_result_serialization_is_versioned_and_reconstructable():
     original = SemanticResult(
         depth=np.ones((2, 2), dtype=np.float32),
