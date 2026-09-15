@@ -82,16 +82,26 @@ Le 15 septembre 2026, le poste Linux x86_64 de développement a rapporté :
 
 | Composant | Résultat | Interprétation |
 |---|---|---|
-| ONNX Runtime 1.30.0 | Azure + CPU | aucun provider CUDA installé |
+| ONNX Runtime 1.30.0 (env. projet) | Azure + CPU | package CPU de référence |
 | OpenVINO 2026.3.1 | CPU + GPU | modèle synthétique compilé et exécuté sur les deux devices |
 | NVIDIA driver | 580.173.02, runtime CUDA 13.0 | driver visible via `nvidia-smi`, toolkit absent |
 | `nvcc` | absent | pas de compilation CUDA locale |
-| TensorRT / `trtexec` | absents | aucune validation TensorRT annoncée |
+| TensorRT / `trtexec` (env. projet) | absents | package système non installé |
 | GPU | Quadro M3000M, 4 GiB | matériel ancien, à exclure de la matrice TensorRT moderne |
 
-Cette photographie ne remplace pas une matrice de release multi-OS. Elle
-confirme uniquement le chemin OpenVINO local et maintient les chemins ONNX
-CUDA/TensorRT explicitement non validés sur cette machine.
+Cette photographie de l’environnement projet ne remplace pas une matrice de
+release multi-OS. Elle confirme le chemin OpenVINO local ; le venv GPU séparé
+ci-dessous complète l’essai logiciel CUDA/TensorRT sans modifier cet
+environnement de référence.
+
+Un venv GPU isolé a ensuite reçu `onnxruntime-gpu` 1.30.0, CUDA/cuDNN pip et
+TensorRT 11.3.0.99. Les providers ONNX CUDA/TensorRT sont alors annoncés, mais
+le smoke CUDA échoue à l’initialisation cuBLAS avec « architectural feature
+absent from the device ». TensorRT importe correctement, puis refuse de
+construire un engine identity minimal car la compute capability 5.2 est hors
+de sa plage moderne. Cette séquence valide à la fois l’installation logicielle
+et le refus matériel attendu ; elle ne transforme pas cette machine en cible
+GPU supportée.
 
 ## Sources officielles consultées
 

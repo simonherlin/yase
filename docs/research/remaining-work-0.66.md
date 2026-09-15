@@ -54,10 +54,11 @@ réel sur les petites listes.
    restent à valider sur les machines cibles.
 3. [partiellement livré] Valider les providers GPU sur des machines
    compatibles : CUDA EP, TensorRT, OpenVINO GPU/NPU. Le poste local a validé
-   OpenVINO CPU/GPU sur un modèle synthétique ; ONNX Runtime ne propose que
-   Azure/CPU et TensorRT n’est pas installé. Le poste local Maxwell ne peut pas
-   être la preuve d’un TensorRT moderne. `strict_providers=True` empêche
-   désormais une fausse validation par fallback CPU.
+   OpenVINO CPU/GPU sur un modèle synthétique. Un venv GPU isolé expose bien
+   CUDA/TensorRT, mais cuBLAS et la construction TensorRT refusent la compute
+   capability 5.2 du GPU local. Le poste local Maxwell ne peut donc pas être la
+   preuve d’un TensorRT moderne. `strict_providers=True` empêche désormais une
+   fausse validation par fallback CPU.
 4. [partiellement livré] Publier une matrice de compatibilité par OS, Python,
    runtime, architecture CPU/GPU et licence de checkpoint. `yase diagnostics`
    émet désormais les versions des distributions détectées et les providers
