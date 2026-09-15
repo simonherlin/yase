@@ -34,13 +34,17 @@ Yase is split into a lightweight core and optional capability layers:
     checks without importing optional frameworks.
 17. `native.py` exposes optional C++17 acceleration for IoU, greedy NMS, and
     tracking hot paths; the public Python fallback remains deterministic when
-    no compiler artifact is installed.
+    no compiler artifact is installed. The PEP 517 build emits a portable
+    wheel by default and an ABI-specific native wheel only when
+    `YASE_BUILD_NATIVE=1` (or cibuildwheel) is set.
 
 A backend may return a typed result, a mapping, or an array. The result schema
 supports depth, segmentation, detections, tags, embeddings, OCR, captions,
 scene data, events, timestamps, and backend metadata without coupling the core
 to a particular model family. Heavy model integrations remain explicit plugins
-so a CPU-only installation stays small and deterministic.
+so a CPU-only installation stays small and deterministic. C++ is deliberately
+limited to measured, framework-independent CPU kernels; model execution is
+delegated to the specialized runtime selected by the application.
 
 `SemanticResult` remains the compatibility object for low-latency one-shot
 calls. Long-lived systems should promote it to an `ObservationBundle`: this

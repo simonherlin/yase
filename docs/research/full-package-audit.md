@@ -1,7 +1,7 @@
 # Yase — audit complet du package et plan de production
 
 Date de l'audit : 2026-09-15  
-État inspecté : `0.65.0` plus audit runtime Python/CUDA et durcissement des
+État inspecté : `0.66.0` plus audit runtime Python/CUDA et durcissement des
 entrées du 2026-09-15
 
 Ce document est la référence de pilotage technique. Il distingue ce qui est
@@ -53,7 +53,7 @@ polluer `SemanticResult`, `ObservationBundle` ni les contrats de tracking.
 | Retrieval Qdrant | upsert/query, filtres, namespace, named vectors, payload indexes | livré | migration de schémas multi-vecteurs |
 | Observabilité | métriques thread-safe, JSON, Prometheus text, spans facade/stages | livré | propagation de trace dans sinks et transports |
 | Packaging | wheel pure portable, sdist C++/builder, extras lazy, Python 3.10–3.13 | livré | matrice OS/Python/accélérateur à publier |
-| Native C++ | IoU/NMS hot paths, fallback Python | livré | ABI/build wheels spécialisés non distribués |
+| Native C++ | IoU/NMS hot paths, fallback Python, wheel ABI optionnel | livré | benchmark public et wheels multi-OS à publier |
 | CLI | image, vidéo, benchmark, diagnostics, catalogues, évaluations | livré | config CLI déclarative éventuelle |
 | Service | ASGI borné, health/readiness, métriques, extraction simple/batch base64 | livré | auth/rate-limit laissés à l'infrastructure |
 | Configuration | JSON/TOML, registry-only, facade/pipeline | livré | schémas de configuration à stabiliser |
@@ -196,6 +196,10 @@ locales prioritaires sont OpenVINO CPU et ONNX Runtime CPU.
 - Schéma versionné et reconstruction sûre des résultats.
 - Endpoint ASGI batch borné.
 - Wheel pure portable et sources natives conservées dans le sdist.
+- Profil `YASE_BUILD_NATIVE=1` pour produire un wheel ABI-spécifique avec
+  `_native`, sans rendre le compilateur obligatoire pour le wheel standard.
+- Extras `onnx`/`onnx-gpu`, `all`/`all-gpu`, OpenVINO et TensorRT séparés afin
+  de rendre les choix de runtime explicites.
 
 ## 6. Critères de sortie d'une release 1.x
 
@@ -217,7 +221,7 @@ Une release production doit satisfaire simultanément :
 Les tâches suivantes sont les plus rentables et doivent être implémentées dans
 cet ordre :
 
-1. tester les extras sur les runtimes et matériels réellement supportés ;
+1. publier les wheels natifs via cibuildwheel sur les OS/Python supportés ;
 2. propager les traces OpenTelemetry dans les sous-stages et lots ;
 3. ajouter des migrations de schéma et checkpoints réellement rétrocompatibles ;
 4. produire une stratégie keyframe/VLM et une configuration de déploiement plus

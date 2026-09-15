@@ -8,4 +8,5 @@
 - [0.62.0 release readiness report](research/release-readiness-0.62.md)
 - [0.63.0 release readiness report](research/release-readiness-0.63.md)
 - [0.65.0 release readiness report](research/release-readiness-0.65.md)
+- [0.66.0 release readiness report](research/release-readiness-0.66.md)
 - [Autonomous development status](development-status.md)

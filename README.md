@@ -19,20 +19,39 @@ uv sync --extra transformers
 uv sync --extra ocr
 # Optional OpenVINO runtime:
 uv sync --extra openvino
+# CPU-oriented complete stack (does not install CUDA/TensorRT):
+uv sync --extra all
+# GPU-oriented stack (requires compatible CUDA/TensorRT components):
+uv sync --extra all-gpu
+# Alternative ONNX Runtime provider; choose this instead of `onnx`:
+uv sync --extra onnx-gpu
+# NVIDIA TensorRT plan execution:
+uv sync --extra tensorrt
 # Optional RF-DETR real-time detector (Python >= 3.10, Transformers 5.x):
 uv sync --extra rfdetr
 
-# Optional C++17 tracking acceleration (requires g++ or clang++):
+# Optional C++17 tracking acceleration in the source checkout:
 make native
 ~~~
 
 The package can also be installed from a built wheel with
-uv pip install dist/yase-*.whl. Python 3.10–3.13 are supported; Python 3.12
-is the recommended development and deployment baseline.
+`uv pip install dist/yase-*.whl`. Python 3.10–3.13 are supported; Python 3.12
+is the recommended development and deployment baseline. `make build` produces
+the portable `py3-none-any` wheel. `make build-native` produces an
+OS/Python-ABI-specific wheel containing the optional C++ extension; it requires
+the matching Python development headers and a C++17 compiler. For a complete
+multi-platform native wheel matrix, use cibuildwheel in CI.
+
+The native extension is intentionally small: model inference already runs in
+the selected ONNX Runtime, OpenVINO, TensorRT, or PyTorch engine. Yase keeps
+Python for orchestration, schemas, I/O, plugins, and error policies, and uses
+C++ only for reusable CPU hot paths (IoU and greedy NMS). This avoids a second
+inference engine, keeps the portable wheel universal, and guarantees the same
+deterministic Python fallback when no compiler or native wheel is available.
 The provider results for the reference workstation are recorded in
 [`docs/research/runtime-matrix-0.64.md`](docs/research/runtime-matrix-0.64.md).
-The complete 0.65.0 release gates are recorded in
-[`docs/research/release-readiness-0.65.md`](docs/research/release-readiness-0.65.md).
+The complete 0.66.0 release gates are recorded in
+[`docs/research/release-readiness-0.66.md`](docs/research/release-readiness-0.66.md).
 
 The CLI reports available local adapters with `yase info`. Extraction from a
 local ONNX model is available with `yase extract image.jpg --model onnx

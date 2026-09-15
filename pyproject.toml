@@ -1,6 +1,6 @@
 [project]
 name = "yase"
-version = "0.65.0"
+version = "0.66.0"
 description = "Dependency-light semantic extraction for images and real-time video."
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
@@ -15,8 +15,9 @@ dependencies = [
 [project.optional-dependencies]
 video = ["opencv-python>=4.8"]
 torch = ["torch>=2.0", "torchvision>=0.15"]
-onnx = ["onnxruntime>=1.17"]
-transformers = ["torch>=2.0", "transformers>=4.45"]
+onnx = ["onnxruntime>=1.17,<2"]
+onnx-gpu = ["onnxruntime-gpu>=1.17,<2"]
+transformers = ["torch>=2.0", "transformers>=4.45,<6"]
 ocr = ["pytesseract>=0.3.13"]
 paddle = ["paddleocr>=2.9"]
 retrieval = ["qdrant-client>=1.14"]
@@ -31,15 +32,30 @@ rfdetr = [
 ]
 all = [
   "opencv-python>=4.8",
-  "onnxruntime>=1.17",
-  "torch>=2.0",
-  "torchvision>=0.15",
-  "transformers>=4.45",
+  "onnxruntime>=1.17,<2",
+  "torch>=2.2",
+  "torchvision>=0.17",
+  "transformers>=5.1,<6",
   "pytesseract>=0.3.13",
   "paddleocr>=2.9",
   "qdrant-client>=1.14",
   "opentelemetry-api>=1.30",
+  "openvino>=2024.0",
   "rfdetr>=1.6.0",
+]
+all-gpu = [
+  "opencv-python>=4.8",
+  "onnxruntime-gpu>=1.17,<2",
+  "torch>=2.2",
+  "torchvision>=0.17",
+  "transformers>=5.1,<6",
+  "pytesseract>=0.3.13",
+  "paddleocr>=2.9",
+  "qdrant-client>=1.14",
+  "opentelemetry-api>=1.30",
+  "openvino>=2024.0",
+  "rfdetr>=1.6.0",
+  "tensorrt>=10.0",
 ]
 
 [project.scripts]

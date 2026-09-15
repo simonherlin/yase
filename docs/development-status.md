@@ -969,6 +969,19 @@ explicitly hardware-gated by the local Maxwell GPU.
 Result: the published pure wheel imports across the complete advertised
 Python range; heavy provider combinations remain separately matrixed.
 
+## Cycle 89 — coherent native distribution
+
+- [x] Replace the manual-only native path with an opt-in setuptools extension.
+- [x] Keep the default wheel pure and portable.
+- [x] Add an ABI-specific native wheel profile with `YASE_BUILD_NATIVE=1`.
+- [x] Verify a native wheel built from the source distribution on Python 3.13.
+- [x] Split CPU/GPU ONNX extras and document complete stack profiles.
+- [x] Align the CI native job with wheel-content verification.
+
+Result: version 0.66.0 has one coherent source tree, one portable install path,
+and one explicit optimized distribution path. C++ remains a focused accelerator
+instead of duplicating model runtimes.
+
 ## Exit criteria
 
 The package is considered ready for a first public release when the core and

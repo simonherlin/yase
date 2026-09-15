@@ -83,6 +83,21 @@ jobs:
           python-version: "3.11"
       - run: uv sync --dev
       - run: sudo apt-get update && sudo apt-get install -y python3.11-dev
+      - name: Build native wheel
+        run: YASE_BUILD_NATIVE=1 uv run python -m build --wheel
+      - name: Verify native wheel contains the extension
+        run: |
+          uv run python - <<'PY'
+          import pathlib
+          import zipfile
+
+          wheel = next(pathlib.Path("dist").glob("*.whl"))
+          with zipfile.ZipFile(wheel) as archive:
+              names = archive.namelist()
+          assert any(name.startswith("yase/_native") for name in names), names
+          assert any("cp311" in name for name in [wheel.name])
+          print(wheel)
+          PY
       - run: uv run python tools/build_native.py
       - run: uv run pytest -q -k "iou_matrix or tracking"
       - name: Import in-place native extension
