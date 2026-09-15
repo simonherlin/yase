@@ -578,6 +578,13 @@ def test_iou_matrix_has_a_portable_fallback_and_native_contract():
     assert fallback[0][0] == pytest.approx(1 / 7)
 
 
+def test_bytetrack_lite_uses_the_same_native_matching_contract():
+    tracker = ByteTrackLite(high_threshold=0.5, low_threshold=0.1)
+    first = tracker.update([Detection("person", 0.9, (0, 0, 10, 10))])
+    second = tracker.update([Detection("person", 0.4, (1, 1, 11, 11))])
+    assert first[0].track_id == second[0].track_id
+
+
 def test_presence_event_engine_emits_enter_and_exit():
     engine = EventEngine([PresenceRule("person", enter_frames=2, exit_frames=2)])
     detection = Detection("person", 0.9, (0, 0, 10, 10), track_id=3)

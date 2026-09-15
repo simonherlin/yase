@@ -203,16 +203,22 @@ class ByteTrackLite:
         assignments: dict[int, int] = {}
 
         def match(pool: list[tuple[int, Detection]]) -> None:
-            for index, detection in sorted(
-                pool, key=lambda item: item[1].score, reverse=True
-            ):
+            ordered_pool = sorted(pool, key=lambda item: item[1].score, reverse=True)
+            track_ids = list(candidates)
+            predicted = [self._tracks[track_id].predict() for track_id in track_ids]
+            overlaps = iou_matrix(
+                predicted, [detection.box for _, detection in ordered_pool]
+            )
+            for detection_position, (index, detection) in enumerate(ordered_pool):
                 best_id: Optional[int] = None
                 best_iou = self.iou_threshold
-                for track_id in candidates:
+                for track_position, track_id in enumerate(track_ids):
+                    if track_id not in candidates:
+                        continue
                     state = self._tracks[track_id]
                     if self.class_aware and state.label != detection.label:
                         continue
-                    overlap = box_iou(state.predict(), detection.box)
+                    overlap = overlaps[track_position][detection_position]
                     if overlap >= best_iou:
                         best_iou = overlap
                         best_id = track_id

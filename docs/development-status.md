@@ -381,6 +381,14 @@ Result: version 0.29.0, 108 deterministic tests passing before final validation.
 
 Result: version 0.30.0, 109 tests passing with native code enabled locally.
 
+## Cycle 36 — native ByteTrack matching
+
+- [x] Reuse the native IoU matrix for ByteTrackLite high/low-score matching.
+- [x] Preserve score ordering, class-aware filtering, and track IDs.
+- [x] Add a regression test for low-confidence track recovery.
+
+Result: version 0.31.0, 110 tests passing with native code enabled locally.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full
