@@ -106,6 +106,8 @@ adapters also accept `input_limits=InputLimits(...)`.
 `yase.native.iou_matrix()` uses the compiled C++17 extension when available
 and transparently falls back to Python. Run `make native` to build it in place;
 `RuntimeInfo.optional_packages["yase._native"]` reports availability.
+The generic wheel intentionally remains ABI-independent; compile the optional
+extension in-place from the sdist when native acceleration is required.
 `yase.native.nms_indices()` provides deterministic greedy non-maximum
 suppression with optional class-aware filtering and the same fallback contract.
 `non_maximum_suppression()` applies that operation to typed `Detection` values

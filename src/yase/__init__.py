@@ -126,7 +126,7 @@ from .video import (
     process_video,
 )
 
-__version__ = "0.34.0"
+__version__ = "0.35.0"
 
 __all__ = [
     "CallableExtractor",

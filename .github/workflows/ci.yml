@@ -54,6 +54,7 @@ jobs:
           }
           missing = required - names
           assert not missing, sorted(missing)
+          assert not any(name.startswith("yase/_native") for name in names)
           source = next(path for path in artifacts if path.suffixes[-2:] == [".tar", ".gz"])
           with tarfile.open(source) as archive:
               source_names = set(archive.getnames())
@@ -73,24 +74,9 @@ jobs:
       - run: uv sync --dev
       - run: uv run python tools/build_native.py
       - run: uv run pytest -q -k "iou_matrix or tracking"
-      - run: uv run python -m build --wheel
-      - name: Verify native wheel payload
+      - name: Import in-place native extension
         run: |
           uv run python - <<'PY'
-          import pathlib
-          import zipfile
-
-          wheel = next(pathlib.Path("dist").glob("*.whl"))
-          with zipfile.ZipFile(wheel) as archive:
-              native = [name for name in archive.namelist() if name.startswith("yase/_native")]
-          assert native, f"native extension missing from {wheel}"
-          print(native)
-          PY
-      - run: uv venv .venv-wheel --python 3.11
-      - run: uv pip install --python .venv-wheel/bin/python dist/*.whl
-      - name: Import installed native wheel
-        run: |
-          .venv-wheel/bin/python - <<'PY'
           from yase.native import NATIVE_AVAILABLE, iou_matrix
 
           assert NATIVE_AVAILABLE

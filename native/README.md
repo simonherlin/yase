@@ -11,4 +11,6 @@ uv run python -c "from yase.native import NATIVE_AVAILABLE; print(NATIVE_AVAILAB
 The extension accelerates pairwise IoU matrices used by tracking and greedy
 non-maximum suppression used by detector post-processing. `iou_matrix()` and
 `nms_indices()` always have deterministic Python fallbacks, so the public API
-and wheel remain portable when no compiler is available.
+and generic Python wheel remain portable when no compiler is available. The
+compiled artifact is intentionally not copied into a `py3-none-any` wheel:
+native wheels must be built with platform- and Python-ABI-specific tooling.

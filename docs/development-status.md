@@ -413,6 +413,14 @@ Result: version 0.33.0, pending final validation.
 
 Result: version 0.34.0, pending final validation.
 
+## Cycle 40 — ABI-safe native packaging
+
+- [x] Prevent Python-ABI-specific binaries from entering `py3-none-any` wheels.
+- [x] Keep native source and the in-place builder available in sdists.
+- [x] Add CI assertions for portable wheel contents and source rebuildability.
+
+Result: version 0.35.0, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full
