@@ -145,6 +145,21 @@ backend = OnnxRuntimeExtractor("model.onnx", task="depth", size=(640, 192))
 result = backend.extract("photo.jpg")
 ~~~
 
+When a deployment must fail rather than silently fall back to CPU, configure
+the requested execution provider explicitly and enable `strict_providers`:
+
+~~~python
+backend = OnnxRuntimeExtractor(
+    "model.onnx",
+    providers=[("CUDAExecutionProvider", {"device_id": "0"})],
+    strict_providers=True,
+)
+~~~
+
+The adapter records the active provider list in every result metadata payload;
+strict mode checks that each requested provider is actually active in the
+created ONNX Runtime session.
+
 For Intel CPU/GPU/NPU targets, use the lazy OpenVINO adapter with a local
 IR/ONNX artifact. For NVIDIA CUDA plans, `TensorRTExtractor` supports the
 native execution-context path or a custom runner managed by the application:

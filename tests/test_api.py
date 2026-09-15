@@ -2302,6 +2302,41 @@ def test_onnx_supports_nhwc_and_provider_configuration():
         )
 
 
+def test_onnx_strict_providers_reject_cpu_fallback_and_report_active_provider():
+    class ProviderSession(FakeOnnxSession):
+        def __init__(self, providers):
+            super().__init__([np.ones((1, 1, 1), dtype=np.float32)])
+            self.providers = providers
+
+        def get_providers(self):
+            return self.providers
+
+    with pytest.raises(RuntimeError, match="not active"):
+        OnnxRuntimeExtractor(
+            "unused.onnx",
+            session=ProviderSession(["CPUExecutionProvider"]),
+            providers=["CUDAExecutionProvider"],
+            strict_providers=True,
+        )
+
+    backend = OnnxRuntimeExtractor(
+        "unused.onnx",
+        session=ProviderSession(["CUDAExecutionProvider", "CPUExecutionProvider"]),
+        providers=[("CUDAExecutionProvider", {"device_id": "0"})],
+        strict_providers=True,
+    )
+    result = backend.extract(np.zeros((1, 1, 3), dtype=np.uint8))
+    assert backend.active_providers == (
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider",
+    )
+    assert result.metadata["strict_providers"] is True
+    assert result.metadata["providers"] == [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider",
+    ]
+
+
 def test_onnx_optional_io_binding_uses_bound_outputs():
     class Output:
         def __init__(self, name):

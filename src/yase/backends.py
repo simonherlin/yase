@@ -17,6 +17,19 @@ from .errors import BackendError
 from .limits import InputLimits
 
 
+def _provider_names(providers: Sequence[Any] | None) -> tuple[str, ...]:
+    """Normalize ONNX Runtime provider specifications to provider names."""
+    names: list[str] = []
+    for provider in providers or ():
+        if isinstance(provider, tuple):
+            if not provider:
+                raise ValueError("provider tuples must contain a provider name")
+            names.append(str(provider[0]))
+        else:
+            names.append(str(provider))
+    return tuple(names)
+
+
 class CallableExtractor:
     """Turn a callable into a documented extractor backend."""
 
@@ -210,6 +223,7 @@ class OnnxRuntimeExtractor:
         size: tuple | None = None,
         providers: Sequence[Any] | None = None,
         provider_options: Sequence[Mapping[str, Any]] | None = None,
+        strict_providers: bool = False,
         session_options: Any | None = None,
         input_layout: str = "NCHW",
         graph_optimization_level: Any | None = None,
@@ -229,6 +243,8 @@ class OnnxRuntimeExtractor:
             raise TypeError("use_io_binding must be a boolean")
         if not isinstance(record_timings, bool):
             raise TypeError("record_timings must be a boolean")
+        if not isinstance(strict_providers, bool):
+            raise TypeError("strict_providers must be a boolean")
         if provider_options is not None and providers is None:
             raise ValueError("provider_options requires providers")
         if provider_options is not None and any(
@@ -284,6 +300,7 @@ class OnnxRuntimeExtractor:
         self.model_path = str(model_path)
         self.providers = providers
         self.provider_options = provider_options
+        self.strict_providers = strict_providers
         self.input_layout = input_layout
         self.task = task
         self.size = size
@@ -291,6 +308,30 @@ class OnnxRuntimeExtractor:
         self.use_io_binding = use_io_binding
         self.record_timings = record_timings
         self.cache = cache
+        requested_providers = _provider_names(providers)
+        get_providers = getattr(session, "get_providers", None)
+        active_providers = (
+            tuple(str(provider) for provider in get_providers())
+            if callable(get_providers)
+            else ()
+        )
+        if strict_providers and requested_providers:
+            if not active_providers:
+                raise RuntimeError(
+                    "strict_providers requires an ONNX session exposing get_providers()"
+                )
+            missing = tuple(
+                provider
+                for provider in requested_providers
+                if provider not in active_providers
+            )
+            if missing:
+                raise RuntimeError(
+                    "requested ONNX Runtime providers are not active: "
+                    f"{', '.join(missing)}; active providers: "
+                    f"{', '.join(active_providers)}"
+                )
+        self.active_providers = active_providers
         inputs = session.get_inputs()
         if not inputs:
             raise ValueError("ONNX session has no inputs")
@@ -366,10 +407,9 @@ class OnnxRuntimeExtractor:
                 "task": self.task,
                 "io_binding": self.use_io_binding,
                 "providers": list(
-                    self.session.get_providers()
-                    if hasattr(self.session, "get_providers")
-                    else (self.providers or [])
+                    self.active_providers or _provider_names(self.providers)
                 ),
+                "strict_providers": self.strict_providers,
             },
             self.record_timings,
             timings or {},
