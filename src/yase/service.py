@@ -121,16 +121,25 @@ class YaseASGI:
             raise ValueError("image_base64 decoded to empty bytes")
         from PIL import Image
 
-        image = Image.open(BytesIO(image_bytes))
-        if self.input_limits is not None:
-            width, height = image.size
-            self.input_limits.validate_shape(
-                width=width,
-                height=height,
-                channels=3,
-                byte_count=width * height * 3,
-            )
-        return image
+        try:
+            probe_stream = BytesIO(image_bytes)
+            with Image.open(probe_stream) as probe:
+                if self.input_limits is not None:
+                    width, height = probe.size
+                    self.input_limits.validate_shape(
+                        width=width,
+                        height=height,
+                        channels=3,
+                        byte_count=width * height * 3,
+                    )
+                probe.verify()
+            return Image.open(BytesIO(image_bytes))
+        except Image.DecompressionBombError as exc:
+            raise ValueError(
+                "image exceeds Pillow decompression safety limits"
+            ) from exc
+        except (Image.UnidentifiedImageError, OSError) as exc:
+            raise ValueError("invalid image payload") from exc
 
     @staticmethod
     async def _read_body(receive: Any, limit: int) -> bytes:

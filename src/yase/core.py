@@ -14,6 +14,7 @@ from typing import Any, Protocol
 
 import numpy as np
 
+from .errors import InputError
 from .limits import InputLimits
 from .observability import RuntimeMetrics
 
@@ -75,14 +76,19 @@ def load_image(
             from PIL import Image
         except ImportError as exc:
             raise ImportError("Pillow is required to load image paths") from exc
-        with Image.open(image) as pil_image:
-            if limits is not None:
-                limits.validate_shape(
-                    width=pil_image.width,
-                    height=pil_image.height,
-                    channels=3,
-                )
-            array = np.asarray(pil_image.convert("RGB"))
+        try:
+            with Image.open(image) as pil_image:
+                if limits is not None:
+                    limits.validate_shape(
+                        width=pil_image.width,
+                        height=pil_image.height,
+                        channels=3,
+                    )
+                array = np.asarray(pil_image.convert("RGB"))
+        except Image.DecompressionBombError as exc:
+            raise InputError(
+                "image exceeds Pillow decompression safety limits"
+            ) from exc
         return limits.validate(array) if limits is not None else array
     if hasattr(image, "convert") and hasattr(image, "size"):
         if limits is not None:

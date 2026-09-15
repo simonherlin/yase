@@ -103,6 +103,10 @@ fallback des kernels locaux. Il reste à instrumenter les runtimes complets,
 car leur latence dépend du modèle, de la résolution, du provider et du
 matériel.
 
+La frontière image est également durcie : les chemins Pillow et l’ASGI
+vérifient les en-têtes, valident les payloads complets et convertissent les
+décompressions dangereuses en erreurs d’entrée contrôlées.
+
 ## Ce qui ne doit pas être fait maintenant
 
 - Ajouter tous les modèles disponibles sans contrat de sortie ou politique de

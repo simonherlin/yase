@@ -373,6 +373,8 @@ For deployment probes, `yase diagnostics` reports Python, NumPy, CPU, optional
 runtime availability, and installed distribution versions without loading
 model weights. Add `--providers` when the target machine should also be probed
 for ONNX Runtime, OpenVINO, PyTorch CUDA, and TensorRT devices.
+ASGI uploads are header-checked and verified before inference; malformed images
+and Pillow decompression bombs are rejected as client input errors.
 
 For small collections, `NumpyVectorIndex` provides local cosine retrieval and
 can ingest `SemanticResult.embeddings`. For larger collections, keep this API

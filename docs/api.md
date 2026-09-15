@@ -25,6 +25,9 @@
   max_bytes=...)` can be passed to `Yase(..., input_limits=...)` or used
   directly with `load_image(..., limits=...)`. Violations raise `InputError`
   after decoding and before backend execution.
+- Pillow-backed path and ASGI decoding validate image headers before conversion,
+  verify uploaded payload integrity, and translate decompression bombs or
+  malformed images into input errors rather than backend failures.
 - The `extract`, `video`, and `benchmark` CLI commands expose the same
   controls through `--max-pixels`, `--max-width`, `--max-height`,
   `--max-channels`, and `--max-bytes`.

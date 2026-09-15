@@ -692,6 +692,41 @@ def test_asgi_offloads_inference_and_returns_structured_timeout():
     app.close()
 
 
+def test_asgi_rejects_valid_base64_that_is_not_a_complete_image():
+    api = Yase(extractor=lambda image: image[..., 0])
+    app = create_asgi_app(api)
+
+    async def request():
+        sent = []
+        events = [
+            {
+                "type": "http.request",
+                "body": json.dumps(
+                    {"image_base64": base64.b64encode(b"not-an-image").decode()}
+                ).encode("utf-8"),
+                "more_body": False,
+            }
+        ]
+
+        async def receive():
+            return events.pop(0)
+
+        async def send(message):
+            sent.append(message)
+
+        await app(
+            {"type": "http", "method": "POST", "path": "/extract"},
+            receive,
+            send,
+        )
+        return sent
+
+    response = asyncio.run(request())
+    assert response[0]["status"] == 400
+    assert json.loads(response[1]["body"])["error"]["type"] == "invalid_request"
+    app.close()
+
+
 def test_normalise_tuple_and_result_timestamp():
     both = Yase(
         task="both",
