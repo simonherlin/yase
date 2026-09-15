@@ -99,6 +99,11 @@ per-stage status counts, duration summaries, processed video frames, dropped
 frames, and video latency summaries. Pass the same collector as `metrics=` to
 `VideoStream` or `RealtimeVideoStream` to record stream statistics.
 
+`BackendRegistry.discover_entry_points()` explicitly loads third-party
+factories from the `yase.backends` entry-point group. Use
+`default_registry(include_plugins=True)` when plugin discovery is desired;
+the default registry remains built-in-only and lazy.
+
 ## Backends
 
 CallableExtractor wraps a Python callable. CompositeExtractor combines named

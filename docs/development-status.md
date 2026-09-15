@@ -335,6 +335,15 @@ Result: version 0.24.0, 104 deterministic tests passing before final validation.
 
 Result: version 0.25.0, 104 deterministic tests passing before final validation.
 
+## Cycle 31 — explicit backend plugin discovery
+
+- [x] Support Python entry points in the `yase.backends` group.
+- [x] Preserve lazy, built-in-only defaults unless discovery is requested.
+- [x] Record plugin provenance in `BackendSpec.metadata`.
+- [x] Support modern and Python 3.9 entry-point APIs with regression tests.
+
+Result: version 0.26.0, 105 deterministic tests passing before final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

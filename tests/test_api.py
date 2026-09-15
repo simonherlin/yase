@@ -481,6 +481,30 @@ def test_backend_registry_is_explicit_and_replaceable():
         registry.register("fake", lambda: 2)
 
 
+def test_backend_registry_discovers_optional_entry_points(monkeypatch):
+    from importlib import metadata
+
+    class EntryPoint:
+        name = "plugin"
+        value = "tests.plugin:factory"
+
+        def load(self):
+            return lambda **_options: "loaded"
+
+    class EntryPoints(list):
+        def select(self, **_criteria):
+            return self
+
+    monkeypatch.setattr(metadata, "entry_points", lambda: EntryPoints([EntryPoint()]))
+    registry = BackendRegistry()
+    specs = registry.discover_entry_points()
+    assert [spec.name for spec in specs] == ["plugin"]
+    assert registry.create("plugin") == "loaded"
+    assert specs[0].metadata["entry_point"] == "tests.plugin:factory"
+    with pytest.raises(ValueError, match="group"):
+        registry.discover_entry_points("")
+
+
 def test_composite_reports_structured_backend_error():
     def failing(_image):
         raise ValueError("bad input")

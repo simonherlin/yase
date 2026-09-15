@@ -2,6 +2,7 @@
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from importlib import metadata
 from typing import Any, Optional
 
 
@@ -65,9 +66,45 @@ class BackendRegistry:
     def specs(self) -> tuple[BackendSpec, ...]:
         return tuple(self._specs[name] for name in self.names())
 
+    def discover_entry_points(
+        self,
+        group: str = "yase.backends",
+        *,
+        replace: bool = False,
+    ) -> tuple[BackendSpec, ...]:
+        """Load third-party backend factories from Python entry points.
 
-def default_registry() -> BackendRegistry:
-    """Return a registry containing only built-in, lazy-imported adapters."""
+        Discovery is explicit so importing Yase never executes arbitrary plugin
+        code. Both the modern ``select`` API and Python 3.9's mapping-shaped
+        entry-point API are supported.
+        """
+        if not group:
+            raise ValueError("entry-point group must not be empty")
+        discovered = metadata.entry_points()
+        if hasattr(discovered, "select"):
+            entries = discovered.select(group=group)
+        else:  # pragma: no cover - Python 3.9 compatibility branch
+            entries = discovered.get(group, ())
+        loaded: list[BackendSpec] = []
+        for entry in entries:
+            try:
+                factory = entry.load()
+                spec = self.register(
+                    entry.name,
+                    factory,
+                    metadata={"entry_point": entry.value, "group": group},
+                    replace=replace,
+                )
+            except Exception as exc:
+                raise RuntimeError(
+                    f"could not load backend plugin '{entry.name}' from {group}"
+                ) from exc
+            loaded.append(spec)
+        return tuple(loaded)
+
+
+def default_registry(*, include_plugins: bool = False) -> BackendRegistry:
+    """Return built-ins, optionally extended by explicit plugin discovery."""
     from .adapters import (
         RFDETRExtractor,
         TransformersGroundingDinoExtractor,
@@ -133,6 +170,8 @@ def default_registry() -> BackendRegistry:
         extra="transformers",
         metadata={"license": "verify upstream checkpoint and code license"},
     )
+    if include_plugins:
+        registry.discover_entry_points()
     return registry
 
 
