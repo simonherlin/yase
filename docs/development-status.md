@@ -577,6 +577,15 @@ Result: version 0.48.0, pending final validation.
 
 Result: version 0.49.0, pending final validation.
 
+## Cycle 59 — batched composite extraction
+
+- [x] Add `CompositeExtractor.extract_batch()` with ordered row-wise fusion.
+- [x] Invoke native child batches once and retain per-image fallback children.
+- [x] Preserve conflict policies, timestamps, metadata, and contextual errors.
+- [x] Add regression coverage for mixed batch/non-batch composites.
+
+Result: version 0.50.0, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

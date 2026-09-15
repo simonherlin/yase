@@ -131,6 +131,9 @@ segmentation, or paired outputs. Inject a session object in tests to avoid the
 optional runtime dependency. `OpenVINOExtractor` compiles a local IR/ONNX
 artifact for CPU/GPU/NPU/AUTO. `TensorRTExtractor` runs a local CUDA plan or a
 custom `runner` exposing `infer(array)` for Polygraphy/CuPy/Triton integration.
+`CompositeExtractor.extract_batch()` invokes each batch-capable child once and
+merges outputs by input position; non-batch children retain the compatible
+per-image fallback.
 
 `normalise_detections()` converts common detector mappings, columnar outputs,
 numeric ``(x1, y1, x2, y2, score, class_id)`` rows, and normalized coordinates

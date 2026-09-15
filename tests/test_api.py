@@ -1904,6 +1904,39 @@ def test_composite_merges_fields_and_preserves_timestamp():
     assert result.metadata == {"metadata": "kept"}
 
 
+def test_composite_extract_batch_uses_native_backend_batches_and_preserves_order():
+    class BatchDepth:
+        def __init__(self):
+            self.calls = 0
+
+        def extract_batch(self, images):
+            self.calls += 1
+            return [{"depth": image[..., 0]} for image in images]
+
+    class Tags:
+        def __call__(self, image):
+            return {"tags": [int(image[0, 0, 0])]}
+
+    depth = BatchDepth()
+    composite = CompositeExtractor({"depth": depth, "tags": Tags()})
+    images = [np.full((2, 2, 3), value, dtype=np.uint8) for value in (2, 7, 4)]
+    results = composite.extract_batch(images)
+    assert depth.calls == 1
+    assert [int(result.depth[0, 0]) for result in results] == [2, 7, 4]
+    assert [result.tags for result in results] == [[2], [7], [4]]
+
+
+def test_composite_extract_batch_contextualizes_size_errors():
+    class Broken:
+        def extract_batch(self, _images):
+            return []
+
+    with pytest.raises(BackendError, match="backend 'broken'"):
+        CompositeExtractor({"broken": Broken()}).extract_batch(
+            [np.zeros((1, 1, 3), dtype=np.uint8)]
+        )
+
+
 def test_composite_conflicts_support_explicit_policies():
     backends = [
         lambda image: SemanticResult(depth=np.ones((1, 1)), timestamp=1.0),

@@ -412,18 +412,15 @@ class CompositeExtractor:
                 return
         merged[field] = value
 
-    def extract(self, image: Any) -> SemanticResult:
-        """Run each backend and merge outputs, preserving timestamps."""
+    def _merge_results(
+        self, values: Sequence[tuple[str, SemanticResult]]
+    ) -> SemanticResult:
         merged = {}
         metadata = {}
         timestamp = None
-        for source, backend in self.backends:
-            try:
-                result = self._coerce(self._invoke(backend, image), source)
-            except Exception as exc:
-                raise BackendError(str(source), str(exc), original=exc) from exc
+        for source, result in values:
             for field in self._FIELDS:
-                self._merge(merged, field, getattr(result, field), str(source))
+                self._merge(merged, field, getattr(result, field), source)
             if result.timestamp is not None:
                 if timestamp is not None and result.timestamp != timestamp:
                     if self.conflict == "error":
@@ -458,6 +455,39 @@ class CompositeExtractor:
             document=merged.get("document"),
             depth_map=merged.get("depth_map"),
         )
+
+    def extract(self, image: Any) -> SemanticResult:
+        """Run each backend and merge outputs, preserving timestamps."""
+        values = []
+        for source, backend in self.backends:
+            try:
+                result = self._coerce(self._invoke(backend, image), source)
+            except Exception as exc:
+                raise BackendError(str(source), str(exc), original=exc) from exc
+            values.append((str(source), result))
+        return self._merge_results(values)
+
+    def extract_batch(self, images: Sequence[Any]) -> list[SemanticResult]:
+        """Run each backend in batch when supported and merge by input order."""
+        items = list(images)
+        if not items:
+            raise ValueError("extract_batch requires at least one image")
+        rows: list[list[tuple[str, SemanticResult]]] = [[] for _ in items]
+        for source, backend in self.backends:
+            try:
+                if hasattr(backend, "extract_batch"):
+                    outputs = list(backend.extract_batch(items))
+                    if len(outputs) != len(items):
+                        raise ValueError(
+                            "extract_batch must return one result per input image"
+                        )
+                else:
+                    outputs = [self._invoke(backend, image) for image in items]
+                for index, output in enumerate(outputs):
+                    rows[index].append((str(source), self._coerce(output, str(source))))
+            except Exception as exc:
+                raise BackendError(str(source), str(exc), original=exc) from exc
+        return [self._merge_results(row) for row in rows]
 
 
 __all__ = [
