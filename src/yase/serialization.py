@@ -1,7 +1,7 @@
 """Stable JSON-friendly serialization for semantic results."""
 
 import json
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any, Optional, TextIO, Union
@@ -9,6 +9,25 @@ from typing import Any, Optional, TextIO, Union
 import numpy as np
 
 from .core import SemanticResult
+
+RESULT_SCHEMA_VERSION = "1.0"
+_RESULT_FIELDS = {
+    "depth",
+    "segmentation",
+    "detections",
+    "tags",
+    "embeddings",
+    "timestamp",
+    "metadata",
+    "ocr",
+    "caption",
+    "scene",
+    "events",
+    "keypoints",
+    "relations",
+    "document",
+    "depth_map",
+}
 
 
 def _json_value(value: Any, include_arrays: bool) -> Any:
@@ -42,7 +61,32 @@ def result_to_dict(result: SemanticResult, include_arrays: bool = False) -> dict
     """
     if not isinstance(result, SemanticResult):
         raise TypeError("result must be a SemanticResult")
-    return _json_value(asdict(result), include_arrays)
+    payload = _json_value(asdict(result), include_arrays)
+    payload["schema_version"] = RESULT_SCHEMA_VERSION
+    return payload
+
+
+def result_from_dict(payload: Mapping[str, Any]) -> SemanticResult:
+    """Reconstruct a semantic result from a JSON-compatible mapping.
+
+    Legacy payloads without ``schema_version`` are accepted as version 1.0.
+    Shape/dtype-only array summaries cannot be losslessly reconstructed and
+    are rejected instead of silently producing incorrect tensors.
+    """
+    if not isinstance(payload, Mapping):
+        raise TypeError("payload must be a mapping")
+    version = payload.get("schema_version", RESULT_SCHEMA_VERSION)
+    if version != RESULT_SCHEMA_VERSION:
+        raise ValueError(f"unsupported result schema version: {version}")
+    values = {key: payload[key] for key in _RESULT_FIELDS if key in payload}
+    for field in ("depth", "segmentation", "embeddings"):
+        value = values.get(field)
+        if isinstance(value, Mapping) and {"dtype", "shape"}.issubset(value):
+            raise ValueError(
+                f"{field} contains a shape/dtype summary; serialize with "
+                "include_arrays=True to reconstruct it"
+            )
+    return SemanticResult(**values)
 
 
 def result_to_json(
@@ -84,4 +128,10 @@ def write_jsonl(
     return count
 
 
-__all__ = ["result_to_dict", "result_to_json", "write_jsonl"]
+__all__ = [
+    "RESULT_SCHEMA_VERSION",
+    "result_from_dict",
+    "result_to_dict",
+    "result_to_json",
+    "write_jsonl",
+]

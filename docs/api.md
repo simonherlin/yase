@@ -61,6 +61,10 @@ whether unit normalization has been applied.
 `observation_to_json()` and `write_observation_jsonl()` provide deterministic
 JSON/JSONL exports for archives and message sinks. Large arrays remain compact
 shape/dtype descriptors unless `include_arrays=True` is explicitly requested.
+Standalone `result_to_dict()` payloads now carry `schema_version="1.0"`; use
+`result_from_dict()` to restore payloads containing real array values. Legacy
+payloads without a version remain accepted, while shape/dtype summaries are
+intentionally rejected during reconstruction.
 
 `StageSpec`, `StageContext`, and the `Stage` protocol provide a migration path
 from independent named stages to a validated execution graph. Attach a

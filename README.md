@@ -153,6 +153,9 @@ Deployments can also construct the same facade from a checked-in JSON/TOML
 configuration using `load_config("yase.toml")`; only names registered in
 `BackendRegistry` are allowed.
 
+Serialized `SemanticResult` payloads include a `schema_version` and can be
+restored with `result_from_dict()` when arrays were exported explicitly.
+
 ## Batch extraction
 
 `extract_many` preserves input order and timestamps. Backends that implement

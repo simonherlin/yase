@@ -114,7 +114,13 @@ from .schema import (
     SemanticEvent,
     TextRegion,
 )
-from .serialization import result_to_dict, result_to_json, write_jsonl
+from .serialization import (
+    RESULT_SCHEMA_VERSION,
+    result_from_dict,
+    result_to_dict,
+    result_to_json,
+    write_jsonl,
+)
 from .service import YaseASGI, create_asgi_app
 from .sinks import (
     CallbackSink,
@@ -141,7 +147,7 @@ from .video import (
     process_video,
 )
 
-__version__ = "0.60.0"
+__version__ = "0.61.0"
 
 __all__ = [
     "CallableExtractor",
@@ -202,6 +208,7 @@ __all__ = [
     "Relation",
     "RuntimeInfo",
     "RuntimeMetrics",
+    "RESULT_SCHEMA_VERSION",
     "OpenTelemetryTracer",
     "RFDETRExtractor",
     "SearchHit",
@@ -249,6 +256,7 @@ __all__ = [
     "RouteDecision",
     "result_to_dict",
     "result_to_json",
+    "result_from_dict",
     "write_jsonl",
     "write_observation_jsonl",
     "write_coco_predictions",

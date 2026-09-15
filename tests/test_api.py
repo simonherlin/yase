@@ -121,6 +121,7 @@ from yase import (
     normalise_detections,
     observation_to_json,
     parse_structured_output,
+    result_from_dict,
     result_to_dict,
     result_to_json,
     save_stream_checkpoint,
@@ -2704,6 +2705,30 @@ def test_yase_extract_bundle_infers_dimensions():
         height=4,
     )
     assert bundle.result.depth.shape == (4, 5)
+
+
+def test_semantic_result_serialization_is_versioned_and_reconstructable():
+    original = SemanticResult(
+        depth=np.ones((2, 2), dtype=np.float32),
+        tags=["scene"],
+        timestamp=3.5,
+        metadata={"source": "unit"},
+    )
+    payload = result_to_dict(original, include_arrays=True)
+    assert payload["schema_version"] == "1.0"
+    restored = result_from_dict(payload)
+    assert np.array_equal(restored.depth, original.depth)
+    assert restored.tags == original.tags
+    assert restored.metadata == original.metadata
+
+    legacy = dict(payload)
+    legacy.pop("schema_version")
+    assert result_from_dict(legacy).timestamp == 3.5
+    summarized = result_to_dict(original)
+    with pytest.raises(ValueError, match="shape/dtype"):
+        result_from_dict(summarized)
+    with pytest.raises(ValueError, match="unsupported result schema"):
+        result_from_dict({"schema_version": "2.0"})
 
 
 def test_observation_json_and_jsonl_are_stable_and_array_safe():

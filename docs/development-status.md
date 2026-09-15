@@ -739,6 +739,19 @@ Result: version `0.59.0`, pending final validation.
 
 Result: version `0.60.0`, pending final validation.
 
+## Cycle 71 — versioned semantic result serialization
+
+- [x] Add `RESULT_SCHEMA_VERSION = "1.0"` to standalone result serialization.
+- [x] Add `result_from_dict()` with legacy payload acceptance and explicit
+  rejection of unsupported versions.
+- [x] Reject shape/dtype-only summaries when a caller requests reconstruction,
+  avoiding silent fake tensors.
+- [x] Keep `ObservationBundle` serialization compatible while making nested
+  result schemas self-describing.
+- [x] Add round-trip, legacy, summary-rejection, and future-version tests.
+
+Result: version `0.61.0`, pending final validation.
+
 ## Exit criteria
 
 The package is considered ready for a first public release when the core and
