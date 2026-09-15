@@ -3,7 +3,7 @@
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -147,7 +147,7 @@ class GlobalIdentityStore:
         self,
         detections: list[Detection],
         camera_id: str = "default",
-        timestamp: Optional[float] = None,
+        timestamp: float | None = None,
     ) -> list[Detection]:
         now = float(0.0 if timestamp is None else timestamp)
         self._expire(now)
@@ -159,7 +159,7 @@ class GlobalIdentityStore:
                 assigned.append(detection)
                 continue
             embedding = np.asarray(raw_embedding, dtype=np.float32).reshape(-1)
-            best_id: Optional[int] = None
+            best_id: int | None = None
             best_score = self.similarity_threshold
             for global_id, identity in self._identities.items():
                 if global_id in used or identity.embedding.shape != embedding.shape:

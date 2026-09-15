@@ -2,7 +2,7 @@
 
 import math
 from collections.abc import Sequence
-from typing import Any, Optional
+from typing import Any
 
 try:  # The binary is built explicitly; importing Yase never compiles code.
     from ._native import iou_matrix as _native_iou_matrix
@@ -64,7 +64,7 @@ def _python_nms_indices(
     boxes: Sequence[tuple[float, float, float, float]],
     scores: Sequence[float],
     iou_threshold: float,
-    class_ids: Optional[Sequence[int]],
+    class_ids: Sequence[int] | None,
 ) -> list[int]:
     order = sorted(range(len(boxes)), key=lambda index: scores[index], reverse=True)
     kept: list[int] = []
@@ -82,7 +82,7 @@ def nms_indices(
     boxes: Sequence[Any],
     scores: Sequence[float],
     iou_threshold: float = 0.5,
-    class_ids: Optional[Sequence[int]] = None,
+    class_ids: Sequence[int] | None = None,
 ) -> list[int]:
     """Return stable greedy-NMS indices, using C++ when available."""
     if not 0 <= iou_threshold <= 1:

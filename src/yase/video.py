@@ -1,9 +1,9 @@
 """Real-time video iteration utilities."""
 
 import time
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, replace
-from typing import Any, Callable, Optional, Union
+from typing import Any
 
 from .core import SemanticResult, _normalise_output, load_image
 from .limits import InputLimits
@@ -46,25 +46,25 @@ class VideoStream:
 
     def __init__(
         self,
-        source: Union[str, int, Any],
+        source: str | int | Any,
         extractor: Any,
         stride: int = 1,
-        max_fps: Optional[float] = None,
+        max_fps: float | None = None,
         drop_frames: bool = True,
         color_order: str = "BGR",
-        max_frames: Optional[int] = None,
+        max_frames: int | None = None,
         batch_size: int = 1,
-        on_error: Optional[Callable[[Exception, int], Optional[SemanticResult]]] = None,
+        on_error: Callable[[Exception, int], SemanticResult | None] | None = None,
         error_policy: str = "raise",
-        tracker: Optional[Any] = None,
-        memory: Optional[Any] = None,
-        identity_store: Optional[Any] = None,
+        tracker: Any | None = None,
+        memory: Any | None = None,
+        identity_store: Any | None = None,
         camera_id: str = "default",
-        event_engine: Optional[Any] = None,
-        sink: Optional[Any] = None,
+        event_engine: Any | None = None,
+        sink: Any | None = None,
         source_id: str = "default",
-        input_limits: Optional[InputLimits] = None,
-        metrics: Optional[RuntimeMetrics] = None,
+        input_limits: InputLimits | None = None,
+        metrics: RuntimeMetrics | None = None,
     ) -> None:
         if stride < 1:
             raise ValueError("stride must be >= 1")
@@ -200,7 +200,7 @@ class VideoStream:
 
     def _extract_batch(
         self, images: list[Any], indices: list[int], timestamps: list[float]
-    ) -> list[Optional[SemanticResult]]:
+    ) -> list[SemanticResult | None]:
         """Extract a frame batch while keeping per-frame error semantics."""
         backend = self.extractor
         try:
@@ -217,7 +217,7 @@ class VideoStream:
                     else backend(image)
                     for image in images
                 ]
-            results: list[Optional[SemanticResult]] = []
+            results: list[SemanticResult | None] = []
             for output, timestamp in zip(outputs, timestamps):
                 results.append(self._coerce_output(output, timestamp))
             return results
@@ -227,7 +227,7 @@ class VideoStream:
 
         # A failed batch must be retried frame by frame: a single corrupt frame
         # should not discard otherwise valid frames when skip/recovery is used.
-        recovered: list[Optional[SemanticResult]] = []
+        recovered: list[SemanticResult | None] = []
         for image, index, timestamp in zip(images, indices, timestamps):
             try:
                 output = (
@@ -271,7 +271,7 @@ class VideoStream:
         started_at = time.perf_counter()
         frames_read = frames_processed = frames_dropped = 0
         yielded = 0
-        last_timestamp: Optional[float] = None
+        last_timestamp: float | None = None
         index = 0
         latencies = []
         pending: list[tuple[int, float, Any]] = []
@@ -285,8 +285,8 @@ class VideoStream:
             indices = [item[0] for item in batch]
             timestamps = [item[1] for item in batch]
             raw_frames = [item[2] for item in batch]
-            images: list[Optional[Any]] = [None] * len(batch)
-            results: list[Optional[SemanticResult]] = [None] * len(batch)
+            images: list[Any | None] = [None] * len(batch)
+            results: list[SemanticResult | None] = [None] * len(batch)
             valid_positions = []
             for position, frame in enumerate(raw_frames):
                 try:
@@ -386,7 +386,7 @@ class VideoStream:
             self._capture = None
 
     def save_checkpoint(
-        self, destination: Any, metadata: Optional[Mapping[str, Any]] = None
+        self, destination: Any, metadata: Mapping[str, Any] | None = None
     ) -> Any:
         """Atomically checkpoint attached online state for worker recovery."""
         from .checkpoints import save_stream_checkpoint
@@ -414,7 +414,7 @@ class VideoStream:
 
 
 def process_video(
-    source: Union[str, int, Any], extractor: Any, **kwargs: Any
+    source: str | int | Any, extractor: Any, **kwargs: Any
 ) -> Iterator[FrameResult]:
     """Convenience generator equivalent to VideoStream."""
     return iter(VideoStream(source, extractor, **kwargs))
@@ -434,23 +434,23 @@ class RealtimeVideoStream(VideoStream):
 
     def __init__(
         self,
-        source: Union[str, int, Any],
+        source: str | int | Any,
         extractor: Any,
         queue_size: int = 1,
         drop_frames: bool = True,
         color_order: str = "BGR",
-        max_frames: Optional[int] = None,
-        on_error: Optional[Callable[[Exception, int], Optional[SemanticResult]]] = None,
+        max_frames: int | None = None,
+        on_error: Callable[[Exception, int], SemanticResult | None] | None = None,
         error_policy: str = "raise",
-        tracker: Optional[Any] = None,
-        memory: Optional[Any] = None,
-        identity_store: Optional[Any] = None,
+        tracker: Any | None = None,
+        memory: Any | None = None,
+        identity_store: Any | None = None,
         camera_id: str = "default",
-        event_engine: Optional[Any] = None,
-        sink: Optional[Any] = None,
+        event_engine: Any | None = None,
+        sink: Any | None = None,
         source_id: str = "default",
-        input_limits: Optional[InputLimits] = None,
-        metrics: Optional[RuntimeMetrics] = None,
+        input_limits: InputLimits | None = None,
+        metrics: RuntimeMetrics | None = None,
     ) -> None:
         if queue_size != 1:
             raise ValueError("latest-frame mode requires queue_size=1")
@@ -481,7 +481,7 @@ class RealtimeVideoStream(VideoStream):
         self._worker = None
         self._latest = None
         self._reader_done = False
-        self._reader_error: Optional[BaseException] = None
+        self._reader_error: BaseException | None = None
         self._read_count = 0
         self._drop_count = 0
 

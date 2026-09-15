@@ -6,7 +6,7 @@ import json
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 import numpy as np
 
@@ -44,13 +44,13 @@ class CocoDataset:
         """Return annotations in the same order as ``images``."""
         return [list(self.annotations.get(image.image_id, ())) for image in self.images]
 
-    def image_paths(self, root: Optional[Union[str, Path]] = None) -> list[Path]:
+    def image_paths(self, root: str | Path | None = None) -> list[Path]:
         """Resolve image filenames against an optional dataset root."""
         base = Path(root) if root is not None else Path()
         return [base / image.file_name for image in self.images]
 
 
-def _read_mot_rows(path: Union[str, Path]) -> list[list[str]]:
+def _read_mot_rows(path: str | Path) -> list[list[str]]:
     rows = []
     with open(path, newline="", encoding="utf-8") as handle:
         for row in csv.reader(handle):
@@ -61,10 +61,10 @@ def _read_mot_rows(path: Union[str, Path]) -> list[list[str]]:
 
 
 def load_mot_sequence(
-    path: Union[str, Path],
+    path: str | Path,
     *,
     label: str = "object",
-    score_column: Optional[int] = None,
+    score_column: int | None = None,
     min_score: float = 0.0,
 ) -> list[list[Detection]]:
     """Load MOT rows into frame-indexed ``Detection`` lists.
@@ -108,7 +108,7 @@ def load_mot_sequence(
 
 def write_mot_sequence(
     frames: Iterable[Iterable[Detection]],
-    destination: Union[str, Path],
+    destination: str | Path,
     *,
     default_confidence: float = 1.0,
 ) -> int:
@@ -195,7 +195,7 @@ def _rle_mask(segmentation: Mapping[str, Any], width: int, height: int) -> np.nd
 
 def _decode_coco_segmentation(
     segmentation: Any, width: int, height: int
-) -> Optional[np.ndarray]:
+) -> np.ndarray | None:
     if segmentation is None:
         return None
     if isinstance(segmentation, Mapping):
@@ -206,7 +206,7 @@ def _decode_coco_segmentation(
 
 
 def _annotation_box(
-    annotation: Mapping[str, Any], mask: Optional[np.ndarray]
+    annotation: Mapping[str, Any], mask: np.ndarray | None
 ) -> BoundingBox:
     bbox = annotation.get("bbox")
     if bbox is not None:
@@ -222,7 +222,7 @@ def _annotation_box(
 
 
 def load_coco_dataset(
-    path: Union[str, Path],
+    path: str | Path,
     *,
     include_masks: bool = True,
     include_crowd: bool = False,
@@ -330,10 +330,10 @@ def _encode_uncompressed_rle(mask: np.ndarray) -> dict[str, Any]:
 
 def write_coco_predictions(
     frames: Iterable[Iterable[Detection]],
-    destination: Union[str, Path],
+    destination: str | Path,
     *,
     image_ids: Sequence[int],
-    category_ids: Optional[Mapping[str, int]] = None,
+    category_ids: Mapping[str, int] | None = None,
     include_masks: bool = False,
 ) -> int:
     """Write aligned detections as COCO result JSON and return row count."""
@@ -376,7 +376,7 @@ def write_coco_predictions(
 
 
 def load_coco_predictions(
-    path: Union[str, Path],
+    path: str | Path,
     dataset: CocoDataset,
     *,
     include_masks: bool = False,
@@ -422,9 +422,9 @@ def load_coco_predictions(
 
 
 def discover_images(
-    inputs: Iterable[Union[str, Path]],
+    inputs: Iterable[str | Path],
     *,
-    extensions: Optional[Sequence[str]] = None,
+    extensions: Sequence[str] | None = None,
     recursive: bool = True,
 ) -> list[Path]:
     """Expand files, directories, and glob patterns into sorted image paths."""

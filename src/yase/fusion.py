@@ -2,7 +2,7 @@
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, Optional, Union
+from typing import Any
 
 import numpy as np
 
@@ -33,8 +33,8 @@ class MultimodalConsensus:
 
     def __init__(
         self,
-        source_weights: Optional[Mapping[str, float]] = None,
-        calibrators: Optional[Mapping[str, TemperatureScaler]] = None,
+        source_weights: Mapping[str, float] | None = None,
+        calibrators: Mapping[str, TemperatureScaler] | None = None,
         iou_threshold: float = 0.35,
         min_score: float = 0.5,
         min_margin: float = 0.05,
@@ -51,10 +51,8 @@ class MultimodalConsensus:
 
     def fuse(
         self,
-        results: Union[
-            Mapping[str, SemanticResult], Iterable[tuple[str, SemanticResult]]
-        ],
-        timestamp: Optional[float] = None,
+        results: Mapping[str, SemanticResult] | Iterable[tuple[str, SemanticResult]],
+        timestamp: float | None = None,
     ) -> SemanticResult:
         items = list(results.items()) if isinstance(results, Mapping) else list(results)
         groups: list[list[tuple[str, Detection, float]]] = []

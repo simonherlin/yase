@@ -1,7 +1,7 @@
 """Optional production vector-store integrations."""
 
 from collections.abc import Mapping
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -19,15 +19,15 @@ class QdrantVectorIndex:
     def __init__(
         self,
         collection: str,
-        dimension: Optional[int] = None,
+        dimension: int | None = None,
         *,
-        client: Optional[Any] = None,
-        url: Optional[str] = None,
-        path: Optional[str] = None,
-        models: Optional[Any] = None,
-        space: Optional[str] = None,
-        vector_name: Optional[str] = None,
-        payload_indexes: Optional[Any] = None,
+        client: Any | None = None,
+        url: str | None = None,
+        path: str | None = None,
+        models: Any | None = None,
+        space: str | None = None,
+        vector_name: str | None = None,
+        payload_indexes: Any | None = None,
     ) -> None:
         if not collection:
             raise ValueError("collection must not be empty")
@@ -99,7 +99,7 @@ class QdrantVectorIndex:
         self,
         item_id: str,
         vector: Any,
-        metadata: Optional[Mapping[str, Any]] = None,
+        metadata: Mapping[str, Any] | None = None,
     ) -> None:
         if not item_id:
             raise ValueError("item_id must not be empty")
@@ -134,7 +134,7 @@ class QdrantVectorIndex:
         self,
         item_id: str,
         record: EmbeddingRecord,
-        metadata: Optional[Mapping[str, Any]] = None,
+        metadata: Mapping[str, Any] | None = None,
     ) -> None:
         """Add a provenance-aware embedding and bind the collection to its space."""
         if not isinstance(record, EmbeddingRecord):
@@ -154,8 +154,8 @@ class QdrantVectorIndex:
         self,
         vector: Any,
         limit: int = 10,
-        min_score: Optional[float] = None,
-        where: Optional[Mapping[str, Any]] = None,
+        min_score: float | None = None,
+        where: Mapping[str, Any] | None = None,
     ) -> list[SearchHit]:
         if limit < 1:
             raise ValueError("limit must be >= 1")
@@ -218,8 +218,8 @@ class QdrantVectorIndex:
         self,
         record: EmbeddingRecord,
         limit: int = 10,
-        min_score: Optional[float] = None,
-        where: Optional[Mapping[str, Any]] = None,
+        min_score: float | None = None,
+        where: Mapping[str, Any] | None = None,
     ) -> list[SearchHit]:
         """Search with a provenance-aware query embedding."""
         if not isinstance(record, EmbeddingRecord):

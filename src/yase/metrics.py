@@ -2,7 +2,7 @@
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Optional, Union
+from typing import Any
 
 import numpy as np
 
@@ -35,7 +35,7 @@ class DetectionMetrics:
         denominator = self.precision + self.recall
         return 2 * self.precision * self.recall / denominator if denominator else 0.0
 
-    def to_dict(self) -> dict[str, Union[float, int]]:
+    def to_dict(self) -> dict[str, float | int]:
         return {
             "true_positives": self.true_positives,
             "false_positives": self.false_positives,
@@ -109,7 +109,7 @@ def evaluate_detections(
     overlaps: list[float] = []
     true_positives = 0
     for detection in predicted:
-        best_index: Optional[int] = None
+        best_index: int | None = None
         best_overlap = iou_threshold
         for index, target in enumerate(expected):
             if index in used or (class_aware and detection.label != target.label):
@@ -178,7 +178,7 @@ def _average_precision_at_threshold(
     false_positive_flags: list[int] = []
     for _, frame_index, _, prediction in indexed_candidates:
         expected = truth_frames[frame_index]
-        best_index: Optional[int] = None
+        best_index: int | None = None
         best_overlap = iou_threshold
         for target_index, target in enumerate(expected):
             if target_index in used[frame_index]:
@@ -245,7 +245,7 @@ def evaluate_average_precision(
     ground_truth: Iterable[Iterable[Detection]],
     iou_threshold: float = 0.5,
     class_aware: bool = True,
-    recall_thresholds: Optional[Iterable[float]] = None,
+    recall_thresholds: Iterable[float] | None = None,
 ) -> AveragePrecisionResult:
     """Compute COCO-style 101-point interpolated AP at one IoU threshold.
 
@@ -274,7 +274,7 @@ def evaluate_average_precision(
 def evaluate_mean_average_precision(
     predictions: Iterable[Iterable[Detection]],
     ground_truth: Iterable[Iterable[Detection]],
-    iou_thresholds: Optional[Iterable[float]] = None,
+    iou_thresholds: Iterable[float] | None = None,
     class_aware: bool = True,
 ) -> MeanAveragePrecisionResult:
     """Compute mean AP over the standard ``0.50:0.05:0.95`` IoU sweep."""
@@ -331,7 +331,7 @@ class TrackingMetrics:
         denominator = 2 * idtp + idfp + idfn
         return 2 * idtp / denominator if denominator else 0.0
 
-    def to_dict(self) -> dict[str, Union[float, int]]:
+    def to_dict(self) -> dict[str, float | int]:
         return {
             "true_positives": self.true_positives,
             "false_positives": self.false_positives,
@@ -355,7 +355,7 @@ def evaluate_tracking(
     if len(predicted_frames) != len(truth_frames):
         raise ValueError("predictions and ground_truth must have equal frame counts")
     true_positives = false_positives = false_negatives = switches = total = 0
-    previous_ids: dict[int, Optional[int]] = {}
+    previous_ids: dict[int, int | None] = {}
     for predicted, expected in zip(predicted_frames, truth_frames):
         predicted_list = sorted(
             list(predicted), key=lambda item: item.score, reverse=True
@@ -364,7 +364,7 @@ def evaluate_tracking(
         total += len(expected_list)
         used: set[int] = set()
         for detection in predicted_list:
-            best_index: Optional[int] = None
+            best_index: int | None = None
             best_overlap = iou_threshold
             for index, target in enumerate(expected_list):
                 if index in used or (class_aware and detection.label != target.label):
@@ -422,7 +422,7 @@ class MaskMetrics:
         )
         return 2 * self.true_positives / denominator if denominator else 0.0
 
-    def to_dict(self) -> dict[str, Union[float, int]]:
+    def to_dict(self) -> dict[str, float | int]:
         return {
             "true_positives": self.true_positives,
             "false_positives": self.false_positives,
@@ -448,7 +448,7 @@ def evaluate_masks(
     overlaps: list[float] = []
     true_positives = 0
     for detection in sorted(predicted, key=lambda item: item.score, reverse=True):
-        best_index: Optional[int] = None
+        best_index: int | None = None
         best_overlap = iou_threshold
         for index, target in enumerate(expected):
             if index in used or (class_aware and detection.label != target.label):
@@ -475,7 +475,7 @@ def evaluate_mask_average_precision(
     ground_truth: Iterable[Iterable[Detection]],
     iou_threshold: float = 0.5,
     class_aware: bool = True,
-    recall_thresholds: Optional[Iterable[float]] = None,
+    recall_thresholds: Iterable[float] | None = None,
 ) -> AveragePrecisionResult:
     """Compute interpolated AP using instance-mask IoU instead of box IoU."""
     if not 0 <= iou_threshold <= 1:
@@ -501,7 +501,7 @@ def evaluate_mask_average_precision(
 def evaluate_mean_mask_average_precision(
     predictions: Iterable[Iterable[Detection]],
     ground_truth: Iterable[Iterable[Detection]],
-    iou_thresholds: Optional[Iterable[float]] = None,
+    iou_thresholds: Iterable[float] | None = None,
     class_aware: bool = True,
 ) -> MeanAveragePrecisionResult:
     """Compute instance-mask AP/AR over the standard IoU threshold sweep."""
@@ -603,7 +603,7 @@ class HOTAResult:
     false_negatives: int
     iou_threshold: float
 
-    def to_dict(self) -> dict[str, Union[float, int]]:
+    def to_dict(self) -> dict[str, float | int]:
         return {
             "hota": self.hota,
             "detection_accuracy": self.detection_accuracy,
@@ -718,7 +718,7 @@ def evaluate_hota(
 def evaluate_hota_curve(
     predictions: Iterable[Iterable[Detection]],
     ground_truth: Iterable[Iterable[Detection]],
-    alphas: Optional[Iterable[float]] = None,
+    alphas: Iterable[float] | None = None,
     class_aware: bool = True,
 ) -> HOTACurveResult:
     """Evaluate HOTA over multiple IoU thresholds and average the results.

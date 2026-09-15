@@ -9,7 +9,7 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -34,9 +34,7 @@ class NumpyVectorIndex:
     database adapter when the collection or concurrency requirements grow.
     """
 
-    def __init__(
-        self, dimension: Optional[int] = None, space: Optional[str] = None
-    ) -> None:
+    def __init__(self, dimension: int | None = None, space: str | None = None) -> None:
         if space is not None and not space:
             raise ValueError("space must not be empty when provided")
         self.dimension = dimension
@@ -51,7 +49,7 @@ class NumpyVectorIndex:
         self,
         item_id: str,
         vector: Any,
-        metadata: Optional[Mapping[str, Any]] = None,
+        metadata: Mapping[str, Any] | None = None,
     ) -> None:
         if not item_id:
             raise ValueError("item_id must not be empty")
@@ -74,7 +72,7 @@ class NumpyVectorIndex:
         self,
         item_id: str,
         result: SemanticResult,
-        metadata: Optional[Mapping[str, Any]] = None,
+        metadata: Mapping[str, Any] | None = None,
     ) -> None:
         if result.embeddings is None:
             raise ValueError("SemanticResult does not contain embeddings")
@@ -84,7 +82,7 @@ class NumpyVectorIndex:
         self,
         item_id: str,
         record: EmbeddingRecord,
-        metadata: Optional[Mapping[str, Any]] = None,
+        metadata: Mapping[str, Any] | None = None,
     ) -> None:
         """Add a provenance-aware embedding and bind the index to its space."""
         if not isinstance(record, EmbeddingRecord):
@@ -108,8 +106,8 @@ class NumpyVectorIndex:
         self,
         vector: Any,
         limit: int = 10,
-        min_score: Optional[float] = None,
-        where: Optional[Mapping[str, Any]] = None,
+        min_score: float | None = None,
+        where: Mapping[str, Any] | None = None,
     ) -> list[SearchHit]:
         if limit < 1:
             raise ValueError("limit must be >= 1")
@@ -144,8 +142,8 @@ class NumpyVectorIndex:
         self,
         record: EmbeddingRecord,
         limit: int = 10,
-        min_score: Optional[float] = None,
-        where: Optional[Mapping[str, Any]] = None,
+        min_score: float | None = None,
+        where: Mapping[str, Any] | None = None,
     ) -> list[SearchHit]:
         """Search with a provenance-aware query embedding."""
         if not isinstance(record, EmbeddingRecord):

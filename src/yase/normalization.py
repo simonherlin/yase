@@ -7,7 +7,7 @@ modeling framework.
 """
 
 from collections.abc import Mapping, Sequence
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -39,7 +39,7 @@ _STRUCTURAL_KEYS = {
 }
 
 
-def _label(value: Any, label_map: Optional[Mapping[Any, str]]) -> str:
+def _label(value: Any, label_map: Mapping[Any, str] | None) -> str:
     if value is None:
         return "object"
     if label_map is not None and value in label_map:
@@ -61,7 +61,7 @@ def _score(value: Any, strict: bool) -> float:
 def _box(
     values: Any,
     box_format: str,
-    image_shape: Optional[tuple[int, int]],
+    image_shape: tuple[int, int] | None,
     clip: bool,
 ) -> BoundingBox:
     coordinates = [float(value) for value in np.asarray(values).reshape(-1)]
@@ -101,13 +101,13 @@ def _box(
 def _single_mapping(
     item: Mapping[str, Any],
     *,
-    image_shape: Optional[tuple[int, int]],
+    image_shape: tuple[int, int] | None,
     box_format: str,
-    label_map: Optional[Mapping[Any, str]],
+    label_map: Mapping[Any, str] | None,
     score_threshold: float,
     clip: bool,
     strict: bool,
-) -> Optional[Detection]:
+) -> Detection | None:
     values = item.get("box", item.get("bbox", item.get("xyxy", item.get("xywh"))))
     if values is None and all(key in item for key in ("x1", "y1", "x2", "y2")):
         values = [item[key] for key in ("x1", "y1", "x2", "y2")]
@@ -141,9 +141,9 @@ def _single_mapping(
 def _columnar_mapping(
     value: Mapping[str, Any],
     *,
-    image_shape: Optional[tuple[int, int]],
+    image_shape: tuple[int, int] | None,
     box_format: str,
-    label_map: Optional[Mapping[Any, str]],
+    label_map: Mapping[Any, str] | None,
     score_threshold: float,
     clip: bool,
     strict: bool,
@@ -191,9 +191,9 @@ def _columnar_mapping(
 def normalise_detections(
     value: Any,
     *,
-    image_shape: Optional[tuple[int, int]] = None,
+    image_shape: tuple[int, int] | None = None,
     box_format: str = "xyxy",
-    label_map: Optional[Mapping[Any, str]] = None,
+    label_map: Mapping[Any, str] | None = None,
     score_threshold: float = 0.0,
     clip: bool = False,
     strict: bool = False,

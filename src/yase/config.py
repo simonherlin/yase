@@ -3,7 +3,7 @@
 import json
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 from .core import Yase
 from .limits import InputLimits
@@ -32,7 +32,7 @@ def _options(value: Any, label: str) -> dict[str, Any]:
     return options
 
 
-def _limits(value: Any) -> Optional[InputLimits]:
+def _limits(value: Any) -> InputLimits | None:
     if value is None:
         return None
     values = _options(value, "limits")
@@ -53,9 +53,9 @@ def _backend(config: Mapping[str, Any], registry: BackendRegistry, label: str) -
 def build_from_config(
     config: Mapping[str, Any],
     *,
-    registry: Optional[BackendRegistry] = None,
+    registry: BackendRegistry | None = None,
     include_plugins: bool = False,
-) -> Union[Yase, SemanticPipeline]:
+) -> Yase | SemanticPipeline:
     """Build a facade or pipeline from a validated mapping.
 
     Supported top-level forms are ``backend``/``model`` for one extractor or
@@ -131,11 +131,11 @@ def build_from_config(
 
 
 def load_config(
-    source: Union[str, Path, Mapping[str, Any]],
+    source: str | Path | Mapping[str, Any],
     *,
-    registry: Optional[BackendRegistry] = None,
+    registry: BackendRegistry | None = None,
     include_plugins: bool = False,
-) -> Union[Yase, SemanticPipeline]:
+) -> Yase | SemanticPipeline:
     """Load JSON/TOML config from a path or build directly from a mapping."""
     if isinstance(source, Mapping):
         return build_from_config(

@@ -2,7 +2,7 @@
 
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Optional, Protocol
+from typing import Any, Protocol
 
 from .core import SemanticResult
 from .schema import Detection, SemanticEvent
@@ -22,7 +22,7 @@ class StreamContext:
 
     stream_id: str = "default"
     frame_index: int = -1
-    timestamp: Optional[float] = None
+    timestamp: float | None = None
     state: dict[str, Any] = field(default_factory=dict)
 
     def update(self, frame_index: int, timestamp: float) -> None:
@@ -41,7 +41,7 @@ class PresenceRule:
         self,
         label: str,
         *,
-        event_label: Optional[str] = None,
+        event_label: str | None = None,
         threshold: float = 0.5,
         enter_frames: int = 1,
         exit_frames: int = 1,
@@ -60,7 +60,7 @@ class PresenceRule:
         self._present_frames = 0
         self._missing_frames = 0
         self._active = False
-        self._start: Optional[float] = None
+        self._start: float | None = None
         self._track_ids: set[int] = set()
 
     @staticmethod
@@ -130,7 +130,7 @@ class DwellRule:
         label: str,
         min_duration: float,
         *,
-        event_label: Optional[str] = None,
+        event_label: str | None = None,
         threshold: float = 0.5,
     ) -> None:
         if not label or min_duration <= 0:
@@ -322,7 +322,7 @@ class LineCrossingRule:
         start: tuple[float, float],
         end: tuple[float, float],
         *,
-        event_label: Optional[str] = None,
+        event_label: str | None = None,
         threshold: float = 0.5,
     ) -> None:
         if not label or start == end:

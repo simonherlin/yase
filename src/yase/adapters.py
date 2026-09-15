@@ -6,7 +6,7 @@ loading and require ``local_files_only=False`` explicitly for hub access.
 """
 
 from collections.abc import Mapping, Sequence
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -22,7 +22,7 @@ class TesseractExtractor:
         self,
         language: str = "eng",
         config: str = "",
-        engine: Optional[Any] = None,
+        engine: Any | None = None,
     ) -> None:
         if not language:
             raise ValueError("language must not be empty")
@@ -90,9 +90,7 @@ class TesseractExtractor:
 class PaddleOCRExtractor:
     """Adapter for PaddleOCR 2.x/3.x engines with a normalized output shape."""
 
-    def __init__(
-        self, language: str = "en", engine: Optional[Any] = None, **options: Any
-    ):
+    def __init__(self, language: str = "en", engine: Any | None = None, **options: Any):
         if engine is None:
             try:
                 from paddleocr import PaddleOCR
@@ -172,11 +170,11 @@ class TransformersImageEmbeddingExtractor:
     def __init__(
         self,
         model_id: str,
-        device: Optional[str] = None,
+        device: str | None = None,
         normalize: bool = True,
         local_files_only: bool = True,
-        processor: Optional[Any] = None,
-        model: Optional[Any] = None,
+        processor: Any | None = None,
+        model: Any | None = None,
     ) -> None:
         if not model_id and model is None:
             raise ValueError("model_id is required")
@@ -249,11 +247,11 @@ class TransformersObjectDetectionExtractor:
     def __init__(
         self,
         model_id: str,
-        device: Optional[str] = None,
+        device: str | None = None,
         threshold: float = 0.5,
         local_files_only: bool = True,
-        processor: Optional[Any] = None,
-        model: Optional[Any] = None,
+        processor: Any | None = None,
+        model: Any | None = None,
     ) -> None:
         if not model_id and model is None:
             raise ValueError("model_id is required")
@@ -423,13 +421,13 @@ class TransformersVLMExtractor:
     def __init__(
         self,
         model_id: str,
-        device: Optional[str] = None,
+        device: str | None = None,
         default_prompt: str = "Describe the image concisely.",
         max_new_tokens: int = 128,
         local_files_only: bool = True,
-        processor: Optional[Any] = None,
-        model: Optional[Any] = None,
-        torch_module: Optional[Any] = None,
+        processor: Any | None = None,
+        model: Any | None = None,
+        torch_module: Any | None = None,
     ) -> None:
         if not model_id and model is None:
             raise ValueError("model_id is required")
@@ -479,7 +477,7 @@ class TransformersVLMExtractor:
         )
 
     def _generate_text(
-        self, image: Any, prompt: str, max_new_tokens: Optional[int] = None
+        self, image: Any, prompt: str, max_new_tokens: int | None = None
     ) -> str:
         return self._generate_text_batch(
             [image], [prompt], max_new_tokens=max_new_tokens
@@ -489,7 +487,7 @@ class TransformersVLMExtractor:
         self,
         images: Sequence[Any],
         prompts: Sequence[str],
-        max_new_tokens: Optional[int] = None,
+        max_new_tokens: int | None = None,
     ) -> list[str]:
         from PIL import Image
 
@@ -523,7 +521,7 @@ class TransformersVLMExtractor:
             raise ValueError("VLM processor must return one answer per image")
         return [str(value).strip() for value in decoded]
 
-    def ask(self, image: Any, prompt: Optional[str] = None) -> SemanticResult:
+    def ask(self, image: Any, prompt: str | None = None) -> SemanticResult:
         actual_prompt = prompt or self.default_prompt
         decoded = self._generate_text(image, actual_prompt)
         return SemanticResult(
@@ -533,7 +531,7 @@ class TransformersVLMExtractor:
         )
 
     def ask_batch(
-        self, images: Sequence[Any], prompts: Optional[Sequence[str]] = None
+        self, images: Sequence[Any], prompts: Sequence[str] | None = None
     ) -> list[SemanticResult]:
         """Generate ordered answers for a batch of images in one model call."""
         actual_prompts = (
@@ -608,7 +606,7 @@ class RFDETRExtractor:
 
     def __init__(
         self,
-        model: Optional[Any] = None,
+        model: Any | None = None,
         threshold: float = 0.5,
         model_variant: str = "base",
     ) -> None:
@@ -680,13 +678,13 @@ class PromptableSegmentationExtractor:
     imposed on Yase's core package.
     """
 
-    def __init__(self, predictor: Any, prompt: Optional[Any] = None) -> None:
+    def __init__(self, predictor: Any, prompt: Any | None = None) -> None:
         if not hasattr(predictor, "segment") and not hasattr(predictor, "predict"):
             raise TypeError("predictor must expose segment or predict")
         self.predictor = predictor
         self.prompt = prompt
 
-    def extract(self, image: Any, prompt: Optional[Any] = None) -> SemanticResult:
+    def extract(self, image: Any, prompt: Any | None = None) -> SemanticResult:
         prompt = self.prompt if prompt is None else prompt
         if prompt is None:
             raise ValueError("a prompt is required for promptable segmentation")
@@ -727,14 +725,14 @@ class TransformersSAM3Extractor:
     def __init__(
         self,
         model_id: str = "facebook/sam3",
-        prompt: Optional[str] = None,
-        device: Optional[str] = None,
+        prompt: str | None = None,
+        device: str | None = None,
         threshold: float = 0.5,
         mask_threshold: float = 0.5,
         local_files_only: bool = True,
-        processor: Optional[Any] = None,
-        model: Optional[Any] = None,
-        torch_module: Optional[Any] = None,
+        processor: Any | None = None,
+        model: Any | None = None,
+        torch_module: Any | None = None,
     ) -> None:
         if not model_id and model is None:
             raise ValueError("model_id is required")
@@ -768,7 +766,7 @@ class TransformersSAM3Extractor:
         self.processor = processor
         self.model = model.to(self.device).eval() if hasattr(model, "to") else model
 
-    def extract(self, image: Any, prompt: Optional[str] = None) -> SemanticResult:
+    def extract(self, image: Any, prompt: str | None = None) -> SemanticResult:
         from PIL import Image
 
         text = self.prompt if prompt is None else prompt
@@ -867,13 +865,13 @@ class TransformersSAM3VideoExtractor:
     def __init__(
         self,
         model_id: str = "facebook/sam3",
-        prompt: Optional[str] = None,
-        device: Optional[str] = None,
+        prompt: str | None = None,
+        device: str | None = None,
         local_files_only: bool = True,
         processing_device: str = "cpu",
-        model: Optional[Any] = None,
-        processor: Optional[Any] = None,
-        torch_module: Optional[Any] = None,
+        model: Any | None = None,
+        processor: Any | None = None,
+        torch_module: Any | None = None,
     ) -> None:
         if not model_id and model is None:
             raise ValueError("model_id is required")
@@ -909,8 +907,8 @@ class TransformersSAM3VideoExtractor:
     def extract_video(
         self,
         frames: Any,
-        prompt: Optional[str] = None,
-        max_frames: Optional[int] = None,
+        prompt: str | None = None,
+        max_frames: int | None = None,
     ) -> list[SemanticResult]:
         from PIL import Image
 

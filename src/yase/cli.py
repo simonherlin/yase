@@ -4,7 +4,6 @@ import argparse
 import json
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Optional
 
 from . import (
     BenchmarkRunner,
@@ -84,7 +83,7 @@ def _add_model_options(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _input_limits(args: argparse.Namespace) -> Optional[InputLimits]:
+def _input_limits(args: argparse.Namespace) -> InputLimits | None:
     values = {
         "max_pixels": args.max_pixels,
         "max_width": args.max_width,
@@ -354,7 +353,7 @@ def _benchmark(args: argparse.Namespace) -> int:
     return 0
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     return args.handler(args)
 

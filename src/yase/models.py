@@ -2,7 +2,7 @@
 
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -13,7 +13,7 @@ class ModelCard:
     task: str
     license: str
     source_url: str
-    weights_url: Optional[str] = None
+    weights_url: str | None = None
     capabilities: tuple[str, ...] = ()
     notes: str = ""
     metadata: Mapping[str, Any] = field(default_factory=dict)
@@ -33,7 +33,7 @@ class ModelCatalog:
     make provenance, capabilities and redistribution constraints inspectable.
     """
 
-    def __init__(self, cards: Optional[Iterable[ModelCard]] = None) -> None:
+    def __init__(self, cards: Iterable[ModelCard] | None = None) -> None:
         self._cards: dict[str, ModelCard] = {}
         for card in cards or ():
             self.register(card)
@@ -54,7 +54,7 @@ class ModelCatalog:
     def names(self) -> tuple[str, ...]:
         return tuple(sorted(self._cards))
 
-    def search(self, task: Optional[str] = None) -> tuple[ModelCard, ...]:
+    def search(self, task: str | None = None) -> tuple[ModelCard, ...]:
         return tuple(
             card for card in self._cards.values() if task is None or card.task == task
         )

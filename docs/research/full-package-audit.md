@@ -1,7 +1,7 @@
 # Yase — audit complet du package et plan de production
 
 Date de l'audit : 2026-09-15  
-État inspecté : `0.63.0`
+État inspecté : `0.63.0` plus audit runtime Python/CUDA du 2026-09-15
 
 Ce document est la référence de pilotage technique. Il distingue ce qui est
 déjà livré, ce qui est contractuellement couvert mais non testé sur matériel,
@@ -51,7 +51,7 @@ polluer `SemanticResult`, `ObservationBundle` ni les contrats de tracking.
 | Retrieval local | index NumPy, NPZ, namespace d'embedding | livré | HNSW/FAISS local optionnel |
 | Retrieval Qdrant | upsert/query, filtres, namespace, named vectors, payload indexes | livré | migration de schémas multi-vecteurs |
 | Observabilité | métriques thread-safe, JSON, Prometheus text, spans facade/stages | livré | propagation de trace dans sinks et transports |
-| Packaging | wheel pure portable, sdist C++/builder, extras lazy | livré | matrice OS/Python/accélérateur à publier |
+| Packaging | wheel pure portable, sdist C++/builder, extras lazy, Python 3.10–3.13 | livré | matrice OS/Python/accélérateur à publier |
 | Native C++ | IoU/NMS hot paths, fallback Python | livré | ABI/build wheels spécialisés non distribués |
 | CLI | image, vidéo, benchmark, diagnostics, catalogues, évaluations | livré | config CLI déclarative éventuelle |
 | Service | ASGI borné, health/readiness, métriques, extraction simple/batch base64 | livré | auth/rate-limit laissés à l'infrastructure |
@@ -128,11 +128,27 @@ placés derrière des adaptateurs et des notices de licence. Les poids ne sont
 jamais téléchargés implicitement. Les intégrations doivent rester optionnelles
 et leurs performances doivent être mesurées sur le matériel cible.
 
+### Politique Python et matériel local
+
+Python 3.12 est la référence Yase. OpenVINO documente actuellement Python
+3.10–3.14, mais indique que Python 3.9 a été retiré des versions modernes;
+RF-DETR demande Python 3.10 ou supérieur; les bindings TensorRT couvrent une
+plage plus large, mais les samples et la matrice runtime favorisent Python
+3.10–3.14. La compatibilité de production retenue est donc 3.10–3.13 avec
+3.12 comme version de développement, en attendant une validation complète de
+3.14.
+
+Le poste de développement expose une NVIDIA Quadro M3000M, compute capability
+5.2, avec 4 Go de VRAM. Les versions TensorRT actuelles ciblent Turing ou plus
+récent; ce GPU ne peut donc pas servir de preuve pour TensorRT moderne. Il
+reste utile pour diagnostics CUDA historiques, tandis que les validations
+locales prioritaires sont OpenVINO CPU et ONNX Runtime CPU.
+
 ## 4. Backlog priorisé
 
 ### P0 — avant une release production générale
 
-1. Construire une matrice CI de smoke tests optionnels : Python 3.9–3.13,
+1. Construire une matrice CI de smoke tests optionnels : Python 3.10–3.13,
    Linux/macOS/Windows, CPU, CUDA/ONNX EP, OpenVINO si disponible.
 2. Ajouter des tests hardware-gated qui vérifient réellement les providers,
    les formes dynamiques, les erreurs OOM et la fermeture des ressources.

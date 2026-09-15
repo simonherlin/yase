@@ -4,7 +4,7 @@ import math
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Any, Optional
+from typing import Any
 
 from .core import SemanticResult
 from .schema import Detection
@@ -141,7 +141,7 @@ class SemanticTrackMemory:
         self._missed = missed_values
 
     def update(
-        self, result: SemanticResult, timestamp: Optional[float] = None
+        self, result: SemanticResult, timestamp: float | None = None
     ) -> SemanticResult:
         self._frame += 1
         now = float(self._frame if timestamp is None else timestamp)

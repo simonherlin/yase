@@ -1,9 +1,9 @@
 """Composable semantic extraction pipelines."""
 
 import time
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, Callable, Optional, Union
+from typing import Any
 
 from .backends import CompositeExtractor
 from .core import ImageInput, SemanticResult, load_image
@@ -17,7 +17,7 @@ class PipelineStage:
     name: str
     backend: Any
     enabled: bool = True
-    spec: Optional[StageSpec] = None
+    spec: StageSpec | None = None
 
 
 class SemanticPipeline:
@@ -31,7 +31,7 @@ class SemanticPipeline:
 
     def __init__(
         self,
-        stages: Union[Mapping[str, Any], Iterable[PipelineStage]],
+        stages: Mapping[str, Any] | Iterable[PipelineStage],
         conflict: str = "error",
         record_timings: bool = True,
     ) -> None:
@@ -68,7 +68,7 @@ class SemanticPipeline:
         return tuple(stage for stage in self.stages if stage.enabled)
 
     def extract(
-        self, image: ImageInput, timestamp: Optional[float] = None
+        self, image: ImageInput, timestamp: float | None = None
     ) -> SemanticResult:
         active = self.active_stages
         if not active:
@@ -88,10 +88,10 @@ class SemanticPipeline:
     def extract_many(
         self,
         images: Iterable[ImageInput],
-        timestamps: Optional[Iterable[Optional[float]]] = None,
+        timestamps: Iterable[float | None] | None = None,
         error_policy: str = "raise",
-        on_error: Optional[Callable[[Exception, int, str], Optional[Any]]] = None,
-    ) -> list[Optional[SemanticResult]]:
+        on_error: Callable[[Exception, int, str], Any | None] | None = None,
+    ) -> list[SemanticResult | None]:
         """Run all active stages while preserving input order.
 
         Each stage uses ``extract_batch`` when it implements it, which avoids
@@ -113,7 +113,7 @@ class SemanticPipeline:
             started = time.perf_counter()
             stage_values: list[Any] = [None] * len(items)
 
-            def recover(index: int) -> Optional[Any]:
+            def recover(index: int) -> Any | None:
                 try:
                     return self._invoke_stage(stage, items[index])
                 except Exception as exc:
@@ -175,7 +175,7 @@ class SemanticPipeline:
                                 CompositeExtractor._coerce(replacement, stage.name),
                             )
                         )
-        results: list[Optional[SemanticResult]] = []
+        results: list[SemanticResult | None] = []
         for row, timestamp in zip(rows, stamps):
             if not row:
                 results.append(None)
@@ -274,7 +274,7 @@ class SemanticPipeline:
     def extract_scheduled(
         self,
         image: ImageInput,
-        timestamp: Optional[float] = None,
+        timestamp: float | None = None,
         *,
         config: Any = None,
         tracer: Any = None,
@@ -286,7 +286,7 @@ class SemanticPipeline:
     async def extract_scheduled_async(
         self,
         image: ImageInput,
-        timestamp: Optional[float] = None,
+        timestamp: float | None = None,
         *,
         config: Any = None,
         tracer: Any = None,
@@ -298,7 +298,7 @@ class SemanticPipeline:
     def extract_bundle_scheduled(
         self,
         image: ImageInput,
-        timestamp: Optional[float] = None,
+        timestamp: float | None = None,
         *,
         frame: Any = None,
         frame_id: int = 0,
@@ -322,12 +322,12 @@ class SemanticPipeline:
 
     @staticmethod
     def _result_from_scheduler_report(
-        report: Any, timestamp: Optional[float]
+        report: Any, timestamp: float | None
     ) -> SemanticResult:
         return report.as_result(timestamp=timestamp)
 
     def __call__(
-        self, image: ImageInput, timestamp: Optional[float] = None
+        self, image: ImageInput, timestamp: float | None = None
     ) -> SemanticResult:
         return self.extract(image, timestamp=timestamp)
 

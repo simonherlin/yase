@@ -4,7 +4,7 @@ import math
 import time
 from collections.abc import MutableMapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Optional, Protocol
+from typing import Any, Protocol
 
 from .observation import FrameRef
 
@@ -26,7 +26,7 @@ class StageSpec:
     requires: tuple[str, ...] = ()
     provides: tuple[str, ...] = ()
     capabilities: tuple[str, ...] = ()
-    estimated_latency_ms: Optional[float] = None
+    estimated_latency_ms: float | None = None
     optional: bool = False
 
     def __post_init__(self) -> None:
@@ -60,11 +60,11 @@ class StageSpec:
 class StageContext:
     """Mutable per-invocation context shared by a stage and its adapters."""
 
-    frame: Optional[FrameRef] = None
+    frame: FrameRef | None = None
     cache: MutableMapping[str, Any] = field(default_factory=dict)
     metadata: MutableMapping[str, Any] = field(default_factory=dict)
-    cancel_event: Optional[Any] = None
-    deadline: Optional[float] = None
+    cancel_event: Any | None = None
+    deadline: float | None = None
 
     @property
     def cancelled(self) -> bool:

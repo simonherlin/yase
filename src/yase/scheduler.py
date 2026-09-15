@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from threading import Event
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -33,8 +33,8 @@ class SchedulerConfig:
     """Safety and performance policies for one scheduler instance."""
 
     cache_size: int = 128
-    max_total_latency_ms: Optional[float] = None
-    max_stage_latency_ms: Optional[float] = None
+    max_total_latency_ms: float | None = None
+    max_stage_latency_ms: float | None = None
     on_error: str = "raise"
     on_budget: str = "raise"
     max_workers: int = 1
@@ -66,7 +66,7 @@ class StageExecution:
     status: str
     duration_seconds: float = 0.0
     cache_hit: bool = False
-    error: Optional[str] = None
+    error: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -98,7 +98,7 @@ class SchedulerReport:
             include_arrays,
         )
 
-    def as_result(self, timestamp: Optional[float] = None) -> SemanticResult:
+    def as_result(self, timestamp: float | None = None) -> SemanticResult:
         """Project semantic fields from the report to the stable result API."""
         values = {
             name: self.fields[name]
@@ -116,10 +116,10 @@ class ObservationScheduler:
         self,
         stages: Sequence[Any],
         *,
-        config: Optional[SchedulerConfig] = None,
-        on_stage: Optional[Callable[[StageExecution], None]] = None,
-        metrics: Optional[RuntimeMetrics] = None,
-        tracer: Optional[Any] = None,
+        config: SchedulerConfig | None = None,
+        on_stage: Callable[[StageExecution], None] | None = None,
+        metrics: RuntimeMetrics | None = None,
+        tracer: Any | None = None,
         initial_fields: Sequence[str] = ("image", "frame"),
     ) -> None:
         items = list(stages)
@@ -177,9 +177,9 @@ class ObservationScheduler:
         self,
         image: ImageInput,
         *,
-        frame: Optional[FrameRef] = None,
-        initial_fields: Optional[Mapping[str, Any]] = None,
-        cancel_event: Optional[Event] = None,
+        frame: FrameRef | None = None,
+        initial_fields: Mapping[str, Any] | None = None,
+        cancel_event: Event | None = None,
     ) -> SchedulerReport:
         """Run the graph and return all named fields plus stage telemetry."""
         if self.config.max_workers > 1:
@@ -310,9 +310,9 @@ class ObservationScheduler:
         self,
         image: ImageInput,
         *,
-        frame: Optional[FrameRef],
-        initial_fields: Optional[Mapping[str, Any]],
-        cancel_event: Optional[Event],
+        frame: FrameRef | None,
+        initial_fields: Mapping[str, Any] | None,
+        cancel_event: Event | None,
     ) -> SchedulerReport:
         """Run independent ready stages concurrently with bounded workers.
 
@@ -498,9 +498,9 @@ class ObservationScheduler:
         self,
         images: Sequence[ImageInput],
         *,
-        frames: Optional[Sequence[Optional[FrameRef]]] = None,
-        initial_fields: Optional[Sequence[Optional[Mapping[str, Any]]]] = None,
-        cancel_event: Optional[Event] = None,
+        frames: Sequence[FrameRef | None] | None = None,
+        initial_fields: Sequence[Mapping[str, Any] | None] | None = None,
+        cancel_event: Event | None = None,
     ) -> list[SchedulerReport]:
         """Run an ordered batch while preserving one report per input."""
         items = list(images)
@@ -571,7 +571,7 @@ class ObservationScheduler:
 
     def _cache_key(
         self, stage: Any, image: np.ndarray, fields: Mapping[str, Any]
-    ) -> Optional[tuple]:
+    ) -> tuple | None:
         if self.config.cache_size == 0:
             return None
         values = tuple(

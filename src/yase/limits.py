@@ -1,7 +1,6 @@
 """Input safety limits for untrusted image and video workloads."""
 
 from dataclasses import dataclass
-from typing import Optional
 
 import numpy as np
 
@@ -12,11 +11,11 @@ from .errors import InputError
 class InputLimits:
     """Optional resource limits applied after image decoding."""
 
-    max_pixels: Optional[int] = None
-    max_width: Optional[int] = None
-    max_height: Optional[int] = None
-    max_channels: Optional[int] = None
-    max_bytes: Optional[int] = None
+    max_pixels: int | None = None
+    max_width: int | None = None
+    max_height: int | None = None
+    max_channels: int | None = None
+    max_bytes: int | None = None
 
     def __post_init__(self) -> None:
         for name in (

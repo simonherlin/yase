@@ -5,7 +5,7 @@ are initialized explicitly by applications and accept local model artifacts.
 """
 
 from collections.abc import Mapping, Sequence
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -21,7 +21,7 @@ class CallableExtractor:
         self,
         function: Any,
         task: str = "depth",
-        input_limits: Optional[InputLimits] = None,
+        input_limits: InputLimits | None = None,
     ) -> None:
         if not callable(function):
             raise TypeError("function must be callable")
@@ -60,10 +60,10 @@ class TorchScriptExtractor:
     def __init__(
         self,
         model_path: str,
-        device: Optional[str] = None,
+        device: str | None = None,
         task: str = "depth",
-        size: Optional[tuple] = None,
-        input_limits: Optional[InputLimits] = None,
+        size: tuple | None = None,
+        input_limits: InputLimits | None = None,
     ) -> None:
         if task not in ("depth", "segmentation", "both"):
             raise ValueError("task must be depth, segmentation, or both")
@@ -158,19 +158,19 @@ class OnnxRuntimeExtractor:
     def __init__(
         self,
         model_path: str,
-        session: Optional[Any] = None,
+        session: Any | None = None,
         task: str = "depth",
-        input_name: Optional[str] = None,
-        output_names: Optional[Any] = None,
-        size: Optional[tuple] = None,
-        providers: Optional[Sequence[Any]] = None,
-        provider_options: Optional[Sequence[Mapping[str, Any]]] = None,
-        session_options: Optional[Any] = None,
+        input_name: str | None = None,
+        output_names: Any | None = None,
+        size: tuple | None = None,
+        providers: Sequence[Any] | None = None,
+        provider_options: Sequence[Mapping[str, Any]] | None = None,
+        session_options: Any | None = None,
         input_layout: str = "NCHW",
-        graph_optimization_level: Optional[Any] = None,
+        graph_optimization_level: Any | None = None,
         enable_profiling: bool = False,
         use_io_binding: bool = False,
-        input_limits: Optional[InputLimits] = None,
+        input_limits: InputLimits | None = None,
     ) -> None:
         if task not in ("depth", "segmentation", "both"):
             raise ValueError("task must be depth, segmentation, or both")

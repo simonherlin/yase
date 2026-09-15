@@ -5,7 +5,7 @@ import time
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from statistics import mean, median
-from typing import Any, Optional
+from typing import Any
 
 from .core import ImageInput, SemanticResult
 from .metrics import evaluate_tracking
@@ -77,10 +77,9 @@ class BenchmarkRunner:
         self,
         extractor: Any,
         inputs: Iterable[ImageInput],
-        name: Optional[str] = None,
-        evaluator: Optional[
-            Callable[[SemanticResult, ImageInput], Mapping[str, float]]
-        ] = None,
+        name: str | None = None,
+        evaluator: Callable[[SemanticResult, ImageInput], Mapping[str, float]]
+        | None = None,
     ) -> BenchmarkReport:
         items = list(inputs)
         for item in items[: self.warmup]:
@@ -117,9 +116,8 @@ class BenchmarkRunner:
         self,
         extractors: Mapping[str, Any],
         inputs: Iterable[ImageInput],
-        evaluator: Optional[
-            Callable[[SemanticResult, ImageInput], Mapping[str, float]]
-        ] = None,
+        evaluator: Callable[[SemanticResult, ImageInput], Mapping[str, float]]
+        | None = None,
     ) -> dict[str, BenchmarkReport]:
         """Run every extractor on the same materialized input sequence."""
         items = list(inputs)
@@ -133,7 +131,7 @@ class BenchmarkRunner:
         tracker: Any,
         detections: Iterable[Iterable[Detection]],
         ground_truth: Iterable[Iterable[Detection]],
-        name: Optional[str] = None,
+        name: str | None = None,
         iou_threshold: float = 0.5,
     ) -> BenchmarkReport:
         """Benchmark tracker latency and attach MOTA/IDF1 quality metrics."""

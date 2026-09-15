@@ -40,6 +40,11 @@ provide lazy readiness diagnostics. They inspect optional packages with
 `find_spec` and never download weights or import heavy runtimes just to answer
 whether a service can start.
 
+The supported package range is Python 3.10–3.13, with Python 3.12 as the
+reference environment (`.python-version`). Python 3.9 is outside the modern
+OpenVINO/RF-DETR intersection; Python 3.14 remains pending provider-matrix
+validation.
+
 The CLI exposes the same check through `yase diagnostics`; repeat
 `--require PACKAGE` to make optional runtime packages readiness requirements.
 Scores are normalized to `[0, 1]` by typed primitives, but their calibration is

@@ -5,11 +5,11 @@ This keeps the base package usable on CPU-only machines while exposing a
 stable ``extract``/``extract_batch`` contract to applications.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from queue import Queue
-from typing import Any, Callable, Optional
+from typing import Any
 
 import numpy as np
 
@@ -19,8 +19,8 @@ from .limits import InputLimits
 
 def _prepare_image(
     image: Any,
-    size: Optional[tuple[int, int]],
-    limits: Optional[InputLimits] = None,
+    size: tuple[int, int] | None,
+    limits: InputLimits | None = None,
 ) -> np.ndarray:
     array = load_image(image, limits=limits).astype(np.float32, copy=False)
     if size is not None:
@@ -37,8 +37,8 @@ def _prepare_image(
 
 def _prepare_batch(
     images: Sequence[Any],
-    size: Optional[tuple[int, int]],
-    limits: Optional[InputLimits] = None,
+    size: tuple[int, int] | None,
+    limits: InputLimits | None = None,
 ) -> np.ndarray:
     arrays = [_prepare_image(image, size, limits) for image in images]
     if not arrays:
@@ -48,7 +48,7 @@ def _prepare_batch(
     return np.ascontiguousarray(np.stack(arrays, axis=0).transpose(0, 3, 1, 2))
 
 
-def _validate_options(task: str, size: Optional[tuple[int, int]]) -> None:
+def _validate_options(task: str, size: tuple[int, int] | None) -> None:
     if task not in ("depth", "segmentation", "both"):
         raise ValueError("task must be depth, segmentation, or both")
     if size is not None and (len(size) != 2 or any(value <= 0 for value in size)):
@@ -89,15 +89,15 @@ class OpenVINOExtractor:
 
     def __init__(
         self,
-        model_path: Optional[str] = None,
+        model_path: str | None = None,
         device: str = "AUTO",
         task: str = "depth",
-        size: Optional[tuple[int, int]] = None,
-        input_name: Optional[str] = None,
-        output_names: Optional[Sequence[str]] = None,
+        size: tuple[int, int] | None = None,
+        input_name: str | None = None,
+        output_names: Sequence[str] | None = None,
         compiled_model: Any = None,
         core: Any = None,
-        input_limits: Optional[InputLimits] = None,
+        input_limits: InputLimits | None = None,
         async_queue: Any = None,
         async_jobs: int = 0,
     ) -> None:
@@ -139,7 +139,7 @@ class OpenVINOExtractor:
         name = getattr(port, "any_name", None)
         return str(name) if name is not None else str(port)
 
-    def _resolve_input(self, input_name: Optional[str]) -> Any:
+    def _resolve_input(self, input_name: str | None) -> Any:
         inputs = list(getattr(self.compiled_model, "inputs", []))
         if not inputs:
             raise ValueError("OpenVINO compiled model has no inputs")
@@ -255,7 +255,7 @@ class OpenVINOExtractor:
                 "wait_all"
             )
 
-        outputs: list[Optional[list[Any]]] = [None] * len(images)
+        outputs: list[list[Any] | None] = [None] * len(images)
 
         def callback(request: Any, userdata: Any = None) -> None:
             if not isinstance(userdata, int) or not 0 <= userdata < len(images):
@@ -370,15 +370,15 @@ class TensorRTExtractor:
 
     def __init__(
         self,
-        model_path: Optional[str] = None,
+        model_path: str | None = None,
         runner: Any = None,
         runner_pool: Any = None,
-        runner_factory: Optional[Callable[[], Any]] = None,
+        runner_factory: Callable[[], Any] | None = None,
         pool_size: int = 1,
         task: str = "depth",
-        size: Optional[tuple[int, int]] = None,
+        size: tuple[int, int] | None = None,
         device: str = "cuda",
-        input_limits: Optional[InputLimits] = None,
+        input_limits: InputLimits | None = None,
     ) -> None:
         _validate_options(task, size)
         if (
@@ -442,7 +442,7 @@ class TensorRTExtractor:
     def extract_batch_parallel(
         self,
         images: Sequence[Any],
-        max_workers: Optional[int] = None,
+        max_workers: int | None = None,
     ) -> list[SemanticResult]:
         """Run one image per independent TensorRT context and keep input order.
 

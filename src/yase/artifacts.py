@@ -4,7 +4,6 @@ import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -15,7 +14,7 @@ class ArtifactInfo:
     size_bytes: int
     suffix: str
     modified_at: str
-    sha256: Optional[str] = None
+    sha256: str | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {

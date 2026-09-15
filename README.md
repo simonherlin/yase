@@ -27,7 +27,8 @@ make native
 ~~~
 
 The package can also be installed from a built wheel with
-uv pip install dist/yase-*.whl. Python 3.9 and newer are supported.
+uv pip install dist/yase-*.whl. Python 3.10–3.13 are supported; Python 3.12
+is the recommended development and deployment baseline.
 
 The CLI reports available local adapters with `yase info`. Extraction from a
 local ONNX model is available with `yase extract image.jpg --model onnx
@@ -127,6 +128,9 @@ results = OpenVINOExtractor("model.xml", async_jobs=4).extract_batch_async(image
 
 Install accelerator runtimes separately; Yase never downloads weights or
 imports these frameworks unless their adapters are instantiated.
+
+The repository pins Python 3.12 in `.python-version` because it is the most
+conservative intersection of the supported vision runtimes.
 
 Tracing is optional and lazy:
 

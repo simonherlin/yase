@@ -4,7 +4,7 @@ import json
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -13,7 +13,7 @@ class StructuredQuery:
 
     prompt: str
     schema: Mapping[str, Any]
-    max_new_tokens: Optional[int] = None
+    max_new_tokens: int | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:

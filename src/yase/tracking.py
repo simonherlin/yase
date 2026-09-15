@@ -3,7 +3,7 @@
 import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from .native import iou_matrix
 from .schema import BoundingBox, Detection
@@ -28,8 +28,8 @@ class Tracker(Protocol):
 
     def update(
         self,
-        detections: Optional[Sequence[Detection]],
-        timestamp: Optional[float] = None,
+        detections: Sequence[Detection] | None,
+        timestamp: float | None = None,
     ) -> list[Detection]: ...
 
     def reset(self) -> None: ...
@@ -155,8 +155,8 @@ class IoUTracker:
 
     def update(
         self,
-        detections: Optional[Sequence[Detection]],
-        timestamp: Optional[float] = None,
+        detections: Sequence[Detection] | None,
+        timestamp: float | None = None,
     ) -> list[Detection]:
         del timestamp  # Reserved for motion-aware trackers with the same API.
         current = list(detections or [])
@@ -168,7 +168,7 @@ class IoUTracker:
         )
         assigned: list[Detection] = []
         for detection_index, detection in enumerate(current):
-            best_id: Optional[int] = None
+            best_id: int | None = None
             best_iou = self.iou_threshold
             for track_index, track_id in enumerate(track_ids):
                 if track_id not in candidates:
@@ -356,8 +356,8 @@ class ByteTrackLite:
 
     def update(
         self,
-        detections: Optional[Sequence[Detection]],
-        timestamp: Optional[float] = None,
+        detections: Sequence[Detection] | None,
+        timestamp: float | None = None,
     ) -> list[Detection]:
         del timestamp
         current = list(detections or [])
@@ -382,7 +382,7 @@ class ByteTrackLite:
                 predicted, [detection.box for _, detection in ordered_pool]
             )
             for detection_position, (index, detection) in enumerate(ordered_pool):
-                best_id: Optional[int] = None
+                best_id: int | None = None
                 best_iou = self.iou_threshold
                 for track_position, track_id in enumerate(track_ids):
                     if track_id not in candidates:
@@ -462,7 +462,7 @@ class ExternalTrackerAdapter:
     def __init__(
         self,
         tracker: Any,
-        converter: Optional[Callable[[Any], Sequence[Detection]]] = None,
+        converter: Callable[[Any], Sequence[Detection]] | None = None,
     ) -> None:
         if not hasattr(tracker, "update") and not hasattr(tracker, "track"):
             raise TypeError("tracker must expose update or track")
@@ -471,8 +471,8 @@ class ExternalTrackerAdapter:
 
     def update(
         self,
-        detections: Optional[Sequence[Detection]],
-        timestamp: Optional[float] = None,
+        detections: Sequence[Detection] | None,
+        timestamp: float | None = None,
     ) -> list[Detection]:
         current = list(detections or [])
         method = getattr(self.tracker, "update", None) or self.tracker.track

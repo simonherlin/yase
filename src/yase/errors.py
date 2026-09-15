@@ -1,7 +1,5 @@
 """Public exception types for applications and service boundaries."""
 
-from typing import Optional
-
 
 class YaseError(Exception):
     """Base class for errors raised by Yase itself."""
@@ -19,8 +17,8 @@ class BackendError(YaseError, RuntimeError):
         backend: str,
         message: str,
         *,
-        original: Optional[BaseException] = None,
-        index: Optional[int] = None,
+        original: BaseException | None = None,
+        index: int | None = None,
     ) -> None:
         self.backend = backend
         self.index = index

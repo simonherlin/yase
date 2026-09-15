@@ -3,7 +3,7 @@
 from collections.abc import Callable, Iterable
 from pathlib import Path
 from queue import Full, Queue
-from typing import Any, Optional, Protocol, TextIO, Union
+from typing import Any, Protocol, TextIO
 
 from .observation import ObservationBundle, observation_to_json
 
@@ -36,7 +36,7 @@ class CallbackSink:
 class MemorySink:
     """Collect observations for tests, notebooks, or small local jobs."""
 
-    def __init__(self, max_items: Optional[int] = None) -> None:
+    def __init__(self, max_items: int | None = None) -> None:
         if max_items is not None and max_items < 0:
             raise ValueError("max_items cannot be negative")
         self.observations: list[ObservationBundle] = []
@@ -58,7 +58,7 @@ class JsonlObservationSink:
 
     def __init__(
         self,
-        destination: Union[str, Path, TextIO],
+        destination: str | Path | TextIO,
         *,
         include_arrays: bool = False,
         flush_each: bool = False,
@@ -125,7 +125,7 @@ class QueueSink:
             return False
         return True
 
-    def get(self, timeout: Optional[float] = None) -> ObservationBundle:
+    def get(self, timeout: float | None = None) -> ObservationBundle:
         """Consume one observation, raising ``queue.Empty`` when configured."""
         return self.queue.get(timeout=timeout)
 

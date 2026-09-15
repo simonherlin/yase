@@ -12,7 +12,7 @@ import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional, TextIO, Union
+from typing import Any, TextIO
 
 import numpy as np
 
@@ -20,7 +20,7 @@ from .core import SemanticResult
 from .serialization import _json_value, result_to_dict
 
 
-def _copy_mapping(value: Optional[Mapping[str, Any]]) -> Mapping[str, Any]:
+def _copy_mapping(value: Mapping[str, Any] | None) -> Mapping[str, Any]:
     return dict(value or {})
 
 
@@ -30,9 +30,9 @@ class FrameRef:
 
     frame_id: int
     source_id: str = "default"
-    timestamp: Optional[float] = None
-    width: Optional[int] = None
-    height: Optional[int] = None
+    timestamp: float | None = None
+    width: int | None = None
+    height: int | None = None
     color_order: str = "RGB"
 
     def __post_init__(self) -> None:
@@ -67,12 +67,12 @@ class ModelProvenance:
     """Reproducibility and redistribution metadata for one model artifact."""
 
     model_id: str
-    revision: Optional[str] = None
-    artifact_sha256: Optional[str] = None
-    runtime: Optional[str] = None
-    device: Optional[str] = None
-    precision: Optional[str] = None
-    license: Optional[str] = None
+    revision: str | None = None
+    artifact_sha256: str | None = None
+    runtime: str | None = None
+    device: str | None = None
+    precision: str | None = None
+    license: str | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -104,9 +104,9 @@ class ModelProvenance:
 class Uncertainty:
     """Confidence semantics attached to a named output or stage."""
 
-    confidence: Optional[float] = None
+    confidence: float | None = None
     calibrated: bool = False
-    method: Optional[str] = None
+    method: str | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -131,7 +131,7 @@ class EmbeddingRecord:
     vector: np.ndarray
     space: str
     model_id: str
-    revision: Optional[str] = None
+    revision: str | None = None
     modality: str = "image"
     normalized: bool = False
     metadata: Mapping[str, Any] = field(default_factory=dict)
@@ -197,16 +197,16 @@ class ObservationBundle:
     def from_result(
         cls,
         result: SemanticResult,
-        frame: Optional[FrameRef] = None,
+        frame: FrameRef | None = None,
         *,
         frame_id: int = 0,
         source_id: str = "default",
-        width: Optional[int] = None,
-        height: Optional[int] = None,
+        width: int | None = None,
+        height: int | None = None,
         color_order: str = "RGB",
         provenance: tuple[ModelProvenance, ...] = (),
-        uncertainty: Optional[Mapping[str, Uncertainty]] = None,
-        metadata: Optional[Mapping[str, Any]] = None,
+        uncertainty: Mapping[str, Uncertainty] | None = None,
+        metadata: Mapping[str, Any] | None = None,
     ) -> "ObservationBundle":
         """Wrap a legacy result without changing its contents."""
         if frame is None:
@@ -244,7 +244,7 @@ def observation_to_json(
     observation: ObservationBundle,
     *,
     include_arrays: bool = False,
-    indent: Optional[int] = None,
+    indent: int | None = None,
 ) -> str:
     """Serialize one observation bundle to deterministic JSON."""
     if not isinstance(observation, ObservationBundle):
@@ -259,7 +259,7 @@ def observation_to_json(
 
 def write_observation_jsonl(
     observations: Any,
-    destination: Union[str, Path, TextIO],
+    destination: str | Path | TextIO,
     *,
     include_arrays: bool = False,
 ) -> int:

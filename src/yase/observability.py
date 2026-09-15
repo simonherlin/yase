@@ -4,7 +4,7 @@ from collections import defaultdict
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from threading import Lock
-from typing import Any, Optional
+from typing import Any
 
 
 def _label_value(value: Any) -> str:
@@ -51,7 +51,7 @@ class OpenTelemetryTracer:
     def span(
         self,
         name: str,
-        attributes: Optional[Mapping[str, Any]] = None,
+        attributes: Mapping[str, Any] | None = None,
     ) -> Iterator[Any]:
         """Create a current span and annotate failures before re-raising."""
         if not isinstance(name, str) or not name:

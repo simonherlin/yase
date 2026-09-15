@@ -8,7 +8,7 @@ while allowing applications to attach large open-vocabulary models.
 
 import time
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -25,7 +25,7 @@ class RouteDecision:
     novelty: float
     reason: str
     fast_seconds: float
-    accurate_seconds: Optional[float] = None
+    accurate_seconds: float | None = None
 
 
 @dataclass(frozen=True)
@@ -114,7 +114,7 @@ def _confidence(result: SemanticResult) -> float:
     return 0.0
 
 
-def _novelty(current: np.ndarray, previous: Optional[np.ndarray]) -> float:
+def _novelty(current: np.ndarray, previous: np.ndarray | None) -> float:
     if previous is None:
         return 1.0
     current_small = current.astype(np.float32)[::8, ::8]
@@ -138,12 +138,12 @@ class AdaptiveSemanticCascade:
         self,
         fast: Any,
         accurate: Any,
-        policy: Optional[CascadePolicy] = None,
+        policy: CascadePolicy | None = None,
     ) -> None:
         self.fast = fast
         self.accurate = accurate
         self.policy = policy or CascadePolicy()
-        self._previous: Optional[np.ndarray] = None
+        self._previous: np.ndarray | None = None
         self._frames = 0
         self._stable = 0
 
@@ -153,7 +153,7 @@ class AdaptiveSemanticCascade:
         self._stable = 0
 
     def extract(
-        self, image: ImageInput, timestamp: Optional[float] = None
+        self, image: ImageInput, timestamp: float | None = None
     ) -> SemanticResult:
         array = load_image(image)
         started = time.perf_counter()
@@ -252,7 +252,7 @@ class AdaptiveSemanticCascade:
         )
 
     def __call__(
-        self, image: ImageInput, timestamp: Optional[float] = None
+        self, image: ImageInput, timestamp: float | None = None
     ) -> SemanticResult:
         return self.extract(image, timestamp=timestamp)
 

@@ -4,7 +4,7 @@ import json
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
-from typing import Any, Optional, TextIO, Union
+from typing import Any, TextIO
 
 import numpy as np
 
@@ -93,7 +93,7 @@ def result_to_json(
     result: SemanticResult,
     *,
     include_arrays: bool = False,
-    indent: Optional[int] = None,
+    indent: int | None = None,
 ) -> str:
     """Serialize one result as JSON."""
     return json.dumps(
@@ -106,7 +106,7 @@ def result_to_json(
 
 def write_jsonl(
     results: Iterable[SemanticResult],
-    destination: Union[str, Path, TextIO],
+    destination: str | Path | TextIO,
     *,
     include_arrays: bool = False,
 ) -> int:

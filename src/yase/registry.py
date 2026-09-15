@@ -3,7 +3,7 @@
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from importlib import metadata
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -13,7 +13,7 @@ class BackendSpec:
     name: str
     factory: Callable[..., Any]
     capabilities: tuple[str, ...] = ()
-    extra: Optional[str] = None
+    extra: str | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
 
@@ -29,8 +29,8 @@ class BackendRegistry:
         factory: Callable[..., Any],
         *,
         capabilities: tuple[str, ...] = (),
-        extra: Optional[str] = None,
-        metadata: Optional[Mapping[str, Any]] = None,
+        extra: str | None = None,
+        metadata: Mapping[str, Any] | None = None,
         replace: bool = False,
     ) -> BackendSpec:
         if not name or not callable(factory):

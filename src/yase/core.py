@@ -5,40 +5,40 @@ weights or requires PyTorch.
 """
 
 import time
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, Callable, Optional, Protocol, Union
+from typing import Any, Protocol
 
 import numpy as np
 
 from .limits import InputLimits
 from .observability import RuntimeMetrics
 
-ImageInput = Union[str, Path, np.ndarray, Any]
+ImageInput = str | Path | np.ndarray | Any
 
 
 @dataclass(frozen=True)
 class SemanticResult:
     """The semantic outputs produced for one image."""
 
-    depth: Optional[np.ndarray] = None
-    segmentation: Optional[np.ndarray] = None
-    detections: Optional[Any] = None
-    tags: Optional[Any] = None
-    embeddings: Optional[np.ndarray] = None
-    timestamp: Optional[float] = None
+    depth: np.ndarray | None = None
+    segmentation: np.ndarray | None = None
+    detections: Any | None = None
+    tags: Any | None = None
+    embeddings: np.ndarray | None = None
+    timestamp: float | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
-    ocr: Optional[Any] = None
-    caption: Optional[str] = None
-    scene: Optional[Any] = None
-    events: Optional[Any] = None
-    keypoints: Optional[Any] = None
-    relations: Optional[Any] = None
-    document: Optional[Any] = None
-    depth_map: Optional[Any] = None
+    ocr: Any | None = None
+    caption: str | None = None
+    scene: Any | None = None
+    events: Any | None = None
+    keypoints: Any | None = None
+    relations: Any | None = None
+    document: Any | None = None
+    depth_map: Any | None = None
 
     def __post_init__(self) -> None:
         for name in ("depth", "segmentation", "embeddings"):
@@ -46,7 +46,7 @@ class SemanticResult:
             if value is not None and not isinstance(value, np.ndarray):
                 object.__setattr__(self, name, np.asarray(value))
 
-    def with_timestamp(self, timestamp: Optional[float]) -> "SemanticResult":
+    def with_timestamp(self, timestamp: float | None) -> "SemanticResult":
         """Return a copy with ``timestamp`` when one is supplied."""
         if timestamp is None or self.timestamp == timestamp:
             return self
@@ -62,7 +62,7 @@ class Extractor(Protocol):
 def load_image(
     image: ImageInput,
     color_order: str = "RGB",
-    limits: Optional[InputLimits] = None,
+    limits: InputLimits | None = None,
 ) -> np.ndarray:
     """Return an HxWxC uint8 RGB array.
 
@@ -98,7 +98,7 @@ def load_image(
 
 
 def _normalise_output(
-    output: Any, task: str, timestamp: Optional[float]
+    output: Any, task: str, timestamp: float | None
 ) -> SemanticResult:
     """Adapt common backend return values to SemanticResult."""
     if isinstance(output, SemanticResult):
@@ -166,13 +166,13 @@ class Yase:
     def __init__(
         self,
         task: str = "depth",
-        extractor: Optional[Any] = None,
+        extractor: Any | None = None,
         model: str = "custom",
         color_order: str = "RGB",
-        input_limits: Optional[InputLimits] = None,
-        registry: Optional[Any] = None,
-        metrics: Optional[RuntimeMetrics] = None,
-        tracer: Optional[Any] = None,
+        input_limits: InputLimits | None = None,
+        registry: Any | None = None,
+        metrics: RuntimeMetrics | None = None,
+        tracer: Any | None = None,
         **backend_options: Any,
     ) -> None:
         if task not in ("depth", "segmentation", "both", "semantic"):
@@ -232,7 +232,7 @@ class Yase:
         return self._extractor
 
     def extract(
-        self, image: ImageInput, timestamp: Optional[float] = None
+        self, image: ImageInput, timestamp: float | None = None
     ) -> SemanticResult:
         """Extract semantics from one image."""
         started = time.perf_counter()
@@ -280,11 +280,11 @@ class Yase:
     def extract_many(
         self,
         images: Iterable[ImageInput],
-        timestamps: Optional[Sequence[Optional[float]]] = None,
+        timestamps: Sequence[float | None] | None = None,
         error_policy: str = "raise",
-        on_error: Optional[Callable[[Exception, int], Optional[SemanticResult]]] = None,
+        on_error: Callable[[Exception, int], SemanticResult | None] | None = None,
         max_workers: int = 1,
-    ) -> list[Optional[SemanticResult]]:
+    ) -> list[SemanticResult | None]:
         """Extract an ordered batch of images.
 
         Backends exposing ``extract_batch`` receive one list of RGB arrays.
@@ -306,8 +306,8 @@ class Yase:
             raise ValueError("timestamps must have the same length as images")
 
         def recover(
-            index: int, image: ImageInput, timestamp: Optional[float]
-        ) -> Optional[SemanticResult]:
+            index: int, image: ImageInput, timestamp: float | None
+        ) -> SemanticResult | None:
             try:
                 return self.extract(image, timestamp=timestamp)
             except Exception as exc:
@@ -320,7 +320,7 @@ class Yase:
 
         backend = self.extractor
         if hasattr(backend, "extract_batch"):
-            results: list[Optional[SemanticResult]] = [None] * len(items)
+            results: list[SemanticResult | None] = [None] * len(items)
             arrays: list[np.ndarray] = []
             valid_indices: list[int] = []
 
@@ -397,7 +397,7 @@ class Yase:
             return [future.result() for future in futures]
 
     def run_inference(
-        self, input_data: ImageInput, timestamp: Optional[float] = None
+        self, input_data: ImageInput, timestamp: float | None = None
     ) -> SemanticResult:
         """Backward-compatible alias for extract."""
         return self.extract(input_data, timestamp=timestamp)
@@ -405,14 +405,14 @@ class Yase:
     def extract_bundle(
         self,
         image: ImageInput,
-        timestamp: Optional[float] = None,
+        timestamp: float | None = None,
         *,
         frame_id: int = 0,
         source_id: str = "default",
-        frame: Optional[Any] = None,
+        frame: Any | None = None,
         provenance: tuple = (),
-        uncertainty: Optional[Mapping[str, Any]] = None,
-        metadata: Optional[Mapping[str, Any]] = None,
+        uncertainty: Mapping[str, Any] | None = None,
+        metadata: Mapping[str, Any] | None = None,
     ) -> Any:
         """Extract one image and return a versioned observation bundle."""
         from .observation import FrameRef, ObservationBundle
@@ -439,7 +439,7 @@ class Yase:
         )
 
     def __call__(
-        self, image: ImageInput, timestamp: Optional[float] = None
+        self, image: ImageInput, timestamp: float | None = None
     ) -> SemanticResult:
         return self.extract(image, timestamp=timestamp)
 

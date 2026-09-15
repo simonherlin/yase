@@ -6,7 +6,7 @@ import platform
 import sys
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -19,7 +19,7 @@ class RuntimeInfo:
     platform: str
     machine: str
     numpy: str
-    cpu_count: Optional[int]
+    cpu_count: int | None
     optional_packages: Mapping[str, bool] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
@@ -40,7 +40,7 @@ class HealthReport:
     status: str
     checks: Mapping[str, bool]
     details: Mapping[str, str] = field(default_factory=dict)
-    runtime: Optional[RuntimeInfo] = None
+    runtime: RuntimeInfo | None = None
 
     def __post_init__(self) -> None:
         if self.status not in ("ok", "degraded", "unhealthy"):
@@ -87,7 +87,7 @@ def collect_runtime_info(
 
 
 def health_check(
-    extractor: Optional[Any] = None,
+    extractor: Any | None = None,
     *,
     required_packages: tuple[str, ...] = (),
 ) -> HealthReport:

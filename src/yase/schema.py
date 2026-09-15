@@ -8,7 +8,7 @@ particular framework or annotation format.
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -97,8 +97,8 @@ class Detection:
     label: str
     score: float
     box: BoundingBox
-    mask: Optional[np.ndarray] = None
-    track_id: Optional[int] = None
+    mask: np.ndarray | None = None
+    track_id: int | None = None
     attributes: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -120,7 +120,7 @@ class Keypoint:
     x: float
     y: float
     score: float = 1.0
-    visible: Optional[bool] = None
+    visible: bool | None = None
 
     def __post_init__(self) -> None:
         if not self.name:
@@ -137,8 +137,8 @@ class Pose:
 
     keypoints: tuple[Keypoint, ...]
     score: float = 1.0
-    track_id: Optional[int] = None
-    skeleton: Optional[str] = None
+    track_id: int | None = None
+    skeleton: str | None = None
 
     def __post_init__(self) -> None:
         if not self.keypoints:
@@ -156,7 +156,7 @@ class DepthMap:
     values: np.ndarray
     unit: str = "relative"
     scale: float = 1.0
-    invalid_value: Optional[float] = None
+    invalid_value: float | None = None
     camera: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -200,9 +200,9 @@ class TextRegion:
 
     text: str
     score: float = 1.0
-    box: Optional[BoundingBox] = None
-    polygon: Optional[np.ndarray] = None
-    language: Optional[str] = None
+    box: BoundingBox | None = None
+    polygon: np.ndarray | None = None
+    language: str | None = None
 
     def __post_init__(self) -> None:
         if not math.isfinite(float(self.score)) or not 0 <= self.score <= 1:
@@ -220,7 +220,7 @@ class SemanticEvent:
     label: str
     score: float
     start: float
-    end: Optional[float] = None
+    end: float | None = None
     track_ids: tuple[int, ...] = ()
     metadata: Mapping[str, Any] = field(default_factory=dict)
 

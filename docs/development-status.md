@@ -814,6 +814,23 @@ Result: version `0.63.0`, pending final validation.
 Result: version `0.63.0` release gates passed; provider-specific CI remains
 the next operational requirement.
 
+## Cycle 77 — Python runtime policy
+
+- [x] Audit the complete dependency/runtime intersection instead of selecting
+  Python from the base package alone.
+- [x] Set Python 3.12 as the repository development/reference interpreter via
+  `.python-version` and the CI matrix.
+- [x] Support the practical modern range Python 3.10–3.13 and reject Python
+  3.9/3.14 for the current release line until the optional ecosystem matrix
+  proves them safe.
+- [x] Align Ruff and RF-DETR metadata with the new package boundary.
+- [x] Record the hardware finding: the local Quadro M3000M is compute 5.2 and
+  cannot validate current TensorRT releases that require Turing-class or newer
+  GPUs; OpenVINO CPU and ONNX CPU remain valid local targets.
+
+Result: version `0.64.0`; Python 3.12 is the recommended Yase environment,
+pending runtime installation and provider smoke tests.
+
 ## Exit criteria
 
 The package is considered ready for a first public release when the core and

@@ -5,13 +5,13 @@ import os
 import tempfile
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 CHECKPOINT_VERSION = 1
 _COMPONENTS = ("tracker", "memory", "identity_store")
 
 
-def _state_for(name: str, component: Optional[Any]) -> Optional[dict[str, Any]]:
+def _state_for(name: str, component: Any | None) -> dict[str, Any] | None:
     if component is None:
         return None
     method = getattr(component, "state_dict", None)
@@ -25,10 +25,10 @@ def _state_for(name: str, component: Optional[Any]) -> Optional[dict[str, Any]]:
 
 def make_stream_checkpoint(
     *,
-    tracker: Optional[Any] = None,
-    memory: Optional[Any] = None,
-    identity_store: Optional[Any] = None,
-    metadata: Optional[Mapping[str, Any]] = None,
+    tracker: Any | None = None,
+    memory: Any | None = None,
+    identity_store: Any | None = None,
+    metadata: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a JSON-compatible checkpoint for stream state components."""
     if metadata is not None and not isinstance(metadata, Mapping):
@@ -70,10 +70,10 @@ def _validate_checkpoint(payload: Any) -> Mapping[str, Any]:
 def save_stream_checkpoint(
     destination: Any,
     *,
-    tracker: Optional[Any] = None,
-    memory: Optional[Any] = None,
-    identity_store: Optional[Any] = None,
-    metadata: Optional[Mapping[str, Any]] = None,
+    tracker: Any | None = None,
+    memory: Any | None = None,
+    identity_store: Any | None = None,
+    metadata: Mapping[str, Any] | None = None,
 ) -> Path:
     """Atomically write a stream checkpoint and return its path.
 
@@ -112,9 +112,9 @@ def save_stream_checkpoint(
 def load_stream_checkpoint(
     source: Any,
     *,
-    tracker: Optional[Any] = None,
-    memory: Optional[Any] = None,
-    identity_store: Optional[Any] = None,
+    tracker: Any | None = None,
+    memory: Any | None = None,
+    identity_store: Any | None = None,
 ) -> dict[str, Any]:
     """Load and optionally restore a stream checkpoint.
 
