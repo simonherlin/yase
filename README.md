@@ -75,7 +75,9 @@ yase extract image.jpg --model auto --model-path model.onnx --device auto
 Use `--preference openvino|onnx|torchscript|tensorrt` to constrain the
 selection, or `--device CPU` to prevent accelerator candidates. Automatic
 selection validates the backend by construction/inference; an advertised CUDA
-provider is not treated as usable when the actual hardware rejects it.
+provider is not treated as usable when the actual hardware rejects it. Use
+`--no-fallback` when a deployment must fail immediately instead of switching
+to the next compatible candidate.
 Use `yase diagnostics --providers` when deploying to inspect actual ONNX
 providers, OpenVINO devices, and optional CUDA/TensorRT availability. Run
 `uv run python tools/runtime_smoke.py --all-openvino-devices` to compile and

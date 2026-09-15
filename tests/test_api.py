@@ -3596,6 +3596,18 @@ def test_cli_processing_commands_parse_input_limits():
     assert adaptive_yase.model == "auto"
     assert adaptive_yase._backend_options["preference"] == "openvino"
     assert adaptive_yase._backend_options["device"] == "auto"
+    strict_adaptive = _parser().parse_args(
+        [
+            "extract",
+            "frame.jpg",
+            "--model",
+            "auto",
+            "--model-path",
+            "model.onnx",
+            "--no-fallback",
+        ]
+    )
+    assert _make_extractor(strict_adaptive)._backend_options["fallback"] is False
     video = _parser().parse_args(
         [
             "video",

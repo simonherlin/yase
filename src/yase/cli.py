@@ -107,6 +107,11 @@ def _add_model_options(parser: argparse.ArgumentParser) -> None:
         default="auto",
         help="preferred backend when --model auto is used",
     )
+    parser.add_argument(
+        "--no-fallback",
+        action="store_true",
+        help="disable adaptive fallback after a provider/backend failure",
+    )
 
 
 def _input_limits(args: argparse.Namespace) -> InputLimits | None:
@@ -287,6 +292,10 @@ def _make_extractor(args: argparse.Namespace) -> Yase:
         if args.model != "auto":
             raise ValueError("--preference requires --model auto")
         options["preference"] = args.preference
+    if args.no_fallback:
+        if args.model != "auto":
+            raise ValueError("--no-fallback requires --model auto")
+        options["fallback"] = False
     if args.model in _LOCAL_ARTIFACT_MODELS:
         if not args.model_path:
             raise ValueError(f"--model-path is required for {args.model}")
