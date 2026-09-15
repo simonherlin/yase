@@ -77,6 +77,11 @@ def _add_model_options(parser: argparse.ArgumentParser) -> None:
         nargs="+",
         help="concept labels for Grounding DINO (space-separated)",
     )
+    parser.add_argument(
+        "--io-binding",
+        action="store_true",
+        help="use ONNX Runtime I/O binding for accelerator inference",
+    )
 
 
 def _input_limits(args: argparse.Namespace) -> Optional[InputLimits]:
@@ -219,6 +224,10 @@ def _make_extractor(args: argparse.Namespace) -> Yase:
         if not args.model_path:
             raise ValueError(f"--model-path is required for {args.model}")
         options["model_path"] = args.model_path
+        if args.model == "onnx" and args.io_binding:
+            options["use_io_binding"] = True
+        elif args.io_binding:
+            raise ValueError("--io-binding is only supported with --model onnx")
     elif args.model in _MODEL_ID_MODELS:
         if not args.model_path:
             raise ValueError(f"--model-path is required for {args.model}")
@@ -234,10 +243,14 @@ def _make_extractor(args: argparse.Namespace) -> Yase:
     elif args.model == "rf-detr":
         if args.prompt:
             raise ValueError("--prompt is not supported by rf-detr")
+        if args.io_binding:
+            raise ValueError("--io-binding is only supported with --model onnx")
     elif args.model == "tesseract" and args.prompt:
         raise ValueError("--prompt is not supported by tesseract")
     elif args.model == "paddleocr" and args.prompt:
         raise ValueError("--prompt is not supported by paddleocr")
+    elif args.io_binding:
+        raise ValueError("--io-binding is only supported with --model onnx")
     return Yase(
         task=args.task,
         model=args.model,

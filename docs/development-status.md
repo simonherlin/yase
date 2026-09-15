@@ -586,6 +586,16 @@ Result: version 0.49.0, pending final validation.
 
 Result: version 0.50.0, pending final validation.
 
+## Cycle 60 — ONNX accelerator I/O binding
+
+- [x] Add opt-in `OnnxRuntimeExtractor(use_io_binding=True)` execution.
+- [x] Bind CPU inputs and named outputs through `run_with_iobinding()`.
+- [x] Fail clearly when an injected/runtime session lacks the binding contract.
+- [x] Expose the feature as `--io-binding` in all model-processing CLI commands.
+- [x] Add deterministic session and parser coverage.
+
+Result: version 0.51.0, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

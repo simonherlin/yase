@@ -134,6 +134,9 @@ custom `runner` exposing `infer(array)` for Polygraphy/CuPy/Triton integration.
 `CompositeExtractor.extract_batch()` invokes each batch-capable child once and
 merges outputs by input position; non-batch children retain the compatible
 per-image fallback.
+`OnnxRuntimeExtractor(use_io_binding=True)` uses the runtime I/O binding
+contract when available and binds outputs on CPU for portable post-processing;
+the CLI exposes this as `--io-binding`.
 
 `normalise_detections()` converts common detector mappings, columnar outputs,
 numeric ``(x1, y1, x2, y2, score, class_id)`` rows, and normalized coordinates

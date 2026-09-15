@@ -37,6 +37,8 @@ The same commands also accept registered semantic backends such as `vlm`,
 `--model-path` for a local/Hugging Face model identifier, `--prompt` for VLM
 or SAM3, and `--labels` for Grounding DINO. Optional dependencies remain
 lazy.
+For ONNX accelerator sessions, add `--io-binding` to reduce host/device copy
+overhead when the installed execution provider supports it.
 The same interface supports `yase video input.mp4 --model onnx
 --model-path model.onnx --output results.jsonl` and `--realtime` for a live
 source. File processing can use `--batch-size 8` when the selected backend

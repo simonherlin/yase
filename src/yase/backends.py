@@ -169,6 +169,7 @@ class OnnxRuntimeExtractor:
         input_layout: str = "NCHW",
         graph_optimization_level: Optional[Any] = None,
         enable_profiling: bool = False,
+        use_io_binding: bool = False,
         input_limits: Optional[InputLimits] = None,
     ) -> None:
         if task not in ("depth", "segmentation", "both"):
@@ -177,6 +178,8 @@ class OnnxRuntimeExtractor:
             raise ValueError("size must be a positive (width, height) pair")
         if input_layout not in ("NCHW", "NHWC"):
             raise ValueError("input_layout must be NCHW or NHWC")
+        if not isinstance(use_io_binding, bool):
+            raise TypeError("use_io_binding must be a boolean")
         if provider_options is not None and providers is None:
             raise ValueError("provider_options requires providers")
         if provider_options is not None and any(
@@ -217,6 +220,7 @@ class OnnxRuntimeExtractor:
         self.task = task
         self.size = size
         self.input_limits = input_limits
+        self.use_io_binding = use_io_binding
         inputs = session.get_inputs()
         if not inputs:
             raise ValueError("ONNX session has no inputs")
@@ -285,6 +289,7 @@ class OnnxRuntimeExtractor:
             "backend": "onnxruntime",
             "model_path": self.model_path,
             "task": self.task,
+            "io_binding": self.use_io_binding,
             "providers": list(
                 self.session.get_providers()
                 if hasattr(self.session, "get_providers")
@@ -307,13 +312,39 @@ class OnnxRuntimeExtractor:
                 )
         return results
 
+    def _run(self, tensor: np.ndarray) -> Any:
+        if not self.use_io_binding:
+            return self.session.run(self.output_names, {self.input_name: tensor})
+        io_binding_factory = getattr(self.session, "io_binding", None)
+        run_with_binding = getattr(self.session, "run_with_iobinding", None)
+        if not callable(io_binding_factory) or not callable(run_with_binding):
+            raise RuntimeError(
+                "ONNX session does not support io_binding/run_with_iobinding"
+            )
+        binding = io_binding_factory()
+        bind_cpu_input = getattr(binding, "bind_cpu_input", None)
+        bind_output = getattr(binding, "bind_output", None)
+        copy_outputs = getattr(binding, "copy_outputs_to_cpu", None)
+        if not all(
+            callable(item) for item in (bind_cpu_input, bind_output, copy_outputs)
+        ):
+            raise RuntimeError("ONNX I/O binding object is incomplete")
+        bind_cpu_input(self.input_name, tensor)
+        output_names = self.output_names
+        if output_names is None:
+            output_names = [output.name for output in self.session.get_outputs()]
+        for output_name in output_names:
+            bind_output(output_name, "cpu")
+        run_with_binding(binding)
+        return copy_outputs()
+
     def extract(self, image: Any) -> SemanticResult:
         return self.extract_batch([image])[0]
 
     def extract_batch(self, images: Sequence[Any]) -> list[SemanticResult]:
         """Run one ONNX session call for an ordered batch of images."""
         tensor = self._prepare_batch(images)
-        outputs = self.session.run(self.output_names, {self.input_name: tensor})
+        outputs = self._run(tensor)
         return self._results_from_outputs(outputs)
 
 

@@ -1852,6 +1852,66 @@ def test_onnx_supports_nhwc_and_provider_configuration():
         )
 
 
+def test_onnx_optional_io_binding_uses_bound_outputs():
+    class Output:
+        def __init__(self, name):
+            self.name = name
+
+    class Binding:
+        def __init__(self):
+            self.input = None
+            self.outputs = []
+            self.bound_outputs = []
+
+        def bind_cpu_input(self, name, tensor):
+            self.input = (name, tensor)
+
+        def bind_output(self, name, device_type):
+            self.bound_outputs.append((name, device_type))
+
+        def copy_outputs_to_cpu(self):
+            return self.outputs
+
+    class Session:
+        def __init__(self):
+            self.binding = Binding()
+            self.outputs = [np.ones((1, 2, 2), dtype=np.float32)]
+
+        def get_inputs(self):
+            return [FakeOnnxIO("pixels")]
+
+        def get_outputs(self):
+            return [Output("depth")]
+
+        def io_binding(self):
+            return self.binding
+
+        def run_with_iobinding(self, binding):
+            binding.outputs = self.outputs
+
+        def get_providers(self):
+            return ["CUDAExecutionProvider"]
+
+    session = Session()
+    result = OnnxRuntimeExtractor(
+        "unused.onnx", session=session, use_io_binding=True
+    ).extract(np.zeros((2, 2, 3), dtype=np.uint8))
+    assert result.depth.shape == (2, 2)
+    assert session.binding.input[0] == "pixels"
+    assert session.binding.bound_outputs == [("depth", "cpu")]
+    assert result.metadata["io_binding"] is True
+    with pytest.raises(RuntimeError, match="io_binding"):
+        OnnxRuntimeExtractor(
+            "unused.onnx",
+            session=FakeOnnxSession([np.ones((1, 1, 1))]),
+            use_io_binding=True,
+        ).extract(np.zeros((1, 1, 3), dtype=np.uint8))
+    with pytest.raises(TypeError, match="boolean"):
+        OnnxRuntimeExtractor(
+            "unused.onnx", session=FakeOnnxSession([]), use_io_binding=1
+        )
+
+
 def test_detection_normalisation_handles_columnar_rows_and_normalized_boxes():
     detections = normalise_detections(
         {
@@ -2406,6 +2466,18 @@ def test_cli_processing_commands_parse_input_limits():
     )
     assert modern.model == "vlm"
     assert modern.prompt == "describe the scene"
+    onnx = _parser().parse_args(
+        [
+            "extract",
+            "frame.jpg",
+            "--model",
+            "onnx",
+            "--model-path",
+            "model.onnx",
+            "--io-binding",
+        ]
+    )
+    assert onnx.io_binding is True
     video = _parser().parse_args(
         [
             "video",
