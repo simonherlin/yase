@@ -202,6 +202,9 @@ search for small or offline embedding collections; `add_record()` and
 `search_record()` bind provenance-aware `EmbeddingRecord` values to an
 embedding space and persist that namespace. Production deployments can
 implement the same boundary with a vector database adapter.
+`SemanticPipeline.extract_many()` accepts the same `error_policy="skip"`
+approach as `Yase.extract_many()` and invokes `on_error(exception, index, stage)`
+for malformed inputs or recoverable stage failures while preserving alignment.
 `QdrantVectorIndex` exposes the same record methods; it stores the space,
 model ID, and optional revision in each point payload and rejects cross-space
 queries before they reach the collection.

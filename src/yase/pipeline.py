@@ -3,7 +3,7 @@
 import time
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 from .backends import CompositeExtractor
 from .core import ImageInput, SemanticResult, load_image
@@ -89,13 +89,17 @@ class SemanticPipeline:
         self,
         images: Iterable[ImageInput],
         timestamps: Optional[Iterable[Optional[float]]] = None,
-    ) -> list[SemanticResult]:
+        error_policy: str = "raise",
+        on_error: Optional[Callable[[Exception, int, str], Optional[Any]]] = None,
+    ) -> list[Optional[SemanticResult]]:
         """Run all active stages while preserving input order.
 
         Each stage uses ``extract_batch`` when it implements it, which avoids
         repeatedly preprocessing the same batch for embedding and detector
         backends.
         """
+        if error_policy not in ("raise", "skip"):
+            raise ValueError("error_policy must be raise or skip")
         items = list(images)
         stamps = [None] * len(items) if timestamps is None else list(timestamps)
         if len(stamps) != len(items):
@@ -107,30 +111,75 @@ class SemanticPipeline:
         timings = {}
         for stage in active:
             started = time.perf_counter()
-            if stage.spec is not None and hasattr(stage.backend, "run"):
-                values = [
-                    stage.backend.run(load_image(item), StageContext())
-                    for item in items
-                ]
-            elif hasattr(stage.backend, "extract_batch"):
-                values = list(
-                    stage.backend.extract_batch([load_image(item) for item in items])
-                )
+            stage_values: list[Any] = [None] * len(items)
+
+            def recover(index: int) -> Optional[Any]:
+                try:
+                    return self._invoke_stage(stage, items[index])
+                except Exception as exc:
+                    if on_error is not None:
+                        return on_error(exc, index, stage.name)
+                    if error_policy == "skip":
+                        return None
+                    raise
+
+            if hasattr(stage.backend, "extract_batch"):
+                arrays = []
+                valid_indices = []
+                for index, item in enumerate(items):
+                    try:
+                        arrays.append(load_image(item))
+                        valid_indices.append(index)
+                    except Exception as exc:
+                        if on_error is not None:
+                            stage_values[index] = on_error(exc, index, stage.name)
+                        elif error_policy == "raise":
+                            raise
+                if arrays:
+                    try:
+                        values = list(stage.backend.extract_batch(arrays))
+                        if len(values) != len(valid_indices):
+                            raise ValueError(
+                                f"stage '{stage.name}' must return one result per "
+                                "valid input image"
+                            )
+                        for index, value in zip(valid_indices, values):
+                            stage_values[index] = value
+                    except Exception:
+                        if error_policy == "raise":
+                            raise
+                        for index in valid_indices:
+                            stage_values[index] = recover(index)
             else:
-                values = [
-                    CompositeExtractor._invoke(stage.backend, item) for item in items
-                ]
+                for index in range(len(items)):
+                    stage_values[index] = recover(index)
             timings[stage.name] = time.perf_counter() - started
-            if len(values) != len(items):
-                raise ValueError(
-                    f"stage '{stage.name}' must return one result per input image"
-                )
-            for index, value in enumerate(values):
-                rows[index].append(
-                    (stage.name, CompositeExtractor._coerce(value, stage.name))
-                )
-        results = []
+            for index, value in enumerate(stage_values):
+                if value is None:
+                    continue
+                try:
+                    rows[index].append(
+                        (stage.name, CompositeExtractor._coerce(value, stage.name))
+                    )
+                except Exception as exc:
+                    if on_error is not None:
+                        replacement = on_error(exc, index, stage.name)
+                    elif error_policy == "skip":
+                        replacement = None
+                    else:
+                        raise
+                    if replacement is not None:
+                        rows[index].append(
+                            (
+                                stage.name,
+                                CompositeExtractor._coerce(replacement, stage.name),
+                            )
+                        )
+        results: list[Optional[SemanticResult]] = []
         for row, timestamp in zip(rows, stamps):
+            if not row:
+                results.append(None)
+                continue
             result = self._merge(row).with_timestamp(timestamp)
             if self.record_timings:
                 result = self._with_pipeline_metadata(result, timings)

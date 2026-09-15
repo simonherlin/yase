@@ -666,6 +666,30 @@ def test_rich_schema_and_pipeline_preserve_semantic_fields():
     assert [item.tags for item in batch] == [[0], [1]]
 
 
+def test_pipeline_batch_skip_isolates_invalid_inputs_and_reports_stage():
+    class BatchStage:
+        def extract_batch(self, images):
+            return [{"tags": [int(image[0, 0, 0])]} for image in images]
+
+    pipeline = SemanticPipeline({"tags": BatchStage()})
+    seen = []
+    results = pipeline.extract_many(
+        [
+            np.zeros((1, 1, 3), dtype=np.uint8),
+            np.zeros((1,), dtype=np.uint8),
+            np.ones((1, 1, 3), dtype=np.uint8),
+        ],
+        error_policy="skip",
+        on_error=lambda error, index, stage: (
+            seen.append((type(error), index, stage)) or None
+        ),
+    )
+    assert results[0].tags == [0]
+    assert results[1] is None
+    assert results[2].tags == [1]
+    assert seen == [(ValueError, 1, "tags")]
+
+
 def test_numpy_vector_index_search_and_result_ingestion():
     index = NumpyVectorIndex()
     index.add_result("a", SemanticResult(embeddings=np.array([1.0, 0.0])))

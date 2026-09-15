@@ -682,6 +682,20 @@ Result: version `0.56.0`, pending final validation.
 
 Result: version `0.57.0`, pending final validation.
 
+## Cycle 68 — resilient semantic pipeline batches
+
+- [x] Add `error_policy="raise|skip"` and a stage-aware `on_error` callback to
+  `SemanticPipeline.extract_many()`.
+- [x] Preprocess batch members independently so malformed inputs do not cancel
+  valid stage outputs.
+- [x] Preserve aligned result positions and retry valid members individually
+  after a provider-level batch failure in skip mode.
+- [x] Keep dependency-ordered stages and timing metadata compatible with the
+  existing scheduler path.
+- [x] Add regression coverage for invalid inputs and callback context.
+
+Result: version `0.58.0`, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full
