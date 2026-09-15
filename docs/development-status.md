@@ -932,6 +932,17 @@ not itself a `Yase` facade.
 Result: durable observation JSON can now be consumed by a separate worker or
 resume process without bypassing the typed contract.
 
+## Cycle 86 — native build portability
+
+- [x] Detect Python development headers from the active interpreter first.
+- [x] Fall back to the matching system `/usr/include/pythonX.Y` headers when
+  `uv` manages the interpreter separately.
+- [x] Keep an explicit environment override for custom header layouts.
+- [x] Validate the resulting ABI-specific extension locally with C++17.
+
+Result: the Linux native CI job now installs and discovers the headers it needs
+instead of relying on an implicit system/interpreter configuration match.
+
 ## Exit criteria
 
 The package is considered ready for a first public release when the core and

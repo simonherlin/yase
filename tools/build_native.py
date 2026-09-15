@@ -9,10 +9,21 @@ from pathlib import Path
 
 def _python_include_dirs() -> list[Path]:
     configured = os.environ.get("YASE_PYTHON_INCLUDE_DIR")
-    include = Path(configured) if configured else Path(sysconfig.get_path("include"))
-    candidates = [include, include.parent]
+    candidates = (
+        [Path(configured)]
+        if configured
+        else [
+            Path(sysconfig.get_path("include")),
+            Path(f"/usr/include/python{sysconfig.get_python_version()}"),
+        ]
+    )
+    include = next(
+        (candidate for candidate in candidates if (candidate / "Python.h").is_file()),
+        candidates[0],
+    )
+    include_candidates = [include, include.parent]
     unique: list[Path] = []
-    for candidate in candidates:
+    for candidate in include_candidates:
         candidate = candidate.resolve()
         if candidate not in unique:
             unique.append(candidate)
