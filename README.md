@@ -39,7 +39,8 @@ or SAM3, and `--labels` for Grounding DINO. Optional dependencies remain
 lazy.
 The same interface supports `yase video input.mp4 --model onnx
 --model-path model.onnx --output results.jsonl` and `--realtime` for a live
-source.
+source. File processing can use `--batch-size 8` when the selected backend
+implements `extract_batch`.
 For repeatable local measurements, `yase benchmark image-*.jpg --model onnx
 --model-path model.onnx --warmup 2` reports p50/p95/p99 latency and throughput.
 Use `yase models` to inspect supported model families and license notes without

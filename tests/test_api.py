@@ -2257,6 +2257,19 @@ def test_cli_processing_commands_parse_input_limits():
     )
     assert modern.model == "vlm"
     assert modern.prompt == "describe the scene"
+    video = _parser().parse_args(
+        [
+            "video",
+            "input.mp4",
+            "--model",
+            "onnx",
+            "--model-path",
+            "model.onnx",
+            "--batch-size",
+            "8",
+        ]
+    )
+    assert video.batch_size == 8
     with pytest.raises(SystemExit):
         _parser().parse_args(
             [

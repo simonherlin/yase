@@ -550,6 +550,14 @@ Result: version 0.45.0, pending final validation.
 
 Result: version 0.46.0, pending final validation.
 
+## Cycle 56 — batched video CLI
+
+- [x] Expose `VideoStream(batch_size=...)` as `yase video --batch-size`.
+- [x] Keep realtime latest-frame semantics explicit and separate.
+- [x] Validate the option as a positive integer and document backend behavior.
+
+Result: version 0.47.0, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

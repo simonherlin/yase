@@ -164,6 +164,7 @@ def _parser() -> argparse.ArgumentParser:
     video.add_argument("--stride", type=int, default=1)
     video.add_argument("--max-fps", type=float)
     video.add_argument("--max-frames", type=int)
+    video.add_argument("--batch-size", type=_positive_int, default=1)
     video.add_argument("--realtime", action="store_true")
     video.add_argument("--output", type=Path)
     video.add_argument("--include-arrays", action="store_true")
@@ -304,7 +305,9 @@ def _video(args: argparse.Namespace) -> int:
     stream_type = RealtimeVideoStream if args.realtime else VideoStream
     stream_options = {"max_frames": args.max_frames}
     if not args.realtime:
-        stream_options.update(stride=args.stride, max_fps=args.max_fps)
+        stream_options.update(
+            stride=args.stride, max_fps=args.max_fps, batch_size=args.batch_size
+        )
     stream = stream_type(source, extractor, **stream_options)
     results = []
     for item in stream:
