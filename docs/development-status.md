@@ -437,6 +437,14 @@ Result: version 0.35.1, pending final validation.
 
 Result: version 0.35.2, pending final validation.
 
+## Cycle 43 — native box geometry validation
+
+- [x] Reject reversed raw box coordinates before dispatching to C++.
+- [x] Match the invariants enforced by the public `BoundingBox` schema.
+- [x] Add a regression test for malformed geometry.
+
+Result: version 0.35.3, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

@@ -22,6 +22,8 @@ def _box_values(box: Any) -> tuple[float, float, float, float]:
     normalized = tuple(float(value) for value in values[:4])
     if not all(math.isfinite(value) for value in normalized):
         raise ValueError("box coordinates must be finite")
+    if normalized[2] < normalized[0] or normalized[3] < normalized[1]:
+        raise ValueError("box maximum coordinates must be >= minimum coordinates")
     return normalized  # type: ignore[return-value]
 
 
