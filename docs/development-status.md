@@ -778,6 +778,18 @@ Result: version `0.62.0`, pending final validation.
 
 Result: architecture roadmap synchronized; pending final 0.62.0 validation.
 
+## Cycle 74 — 0.62.0 release validation
+
+- [x] Run 142 tests and lint/format checks on Python 3.12.
+- [x] Run the coverage gate on Python 3.9: 82.38% total coverage.
+- [x] Build and inspect exact 0.62.0 wheel and sdist artifacts.
+- [x] Install the wheel in a fresh Python 3.9 environment with only base
+  dependencies and run an extraction plus serialization smoke test.
+- [x] Record provider and hardware limitations in the release report.
+
+Result: version `0.62.0` release gates passed; provider-specific CI remains the
+next operational requirement.
+
 ## Exit criteria
 
 The package is considered ready for a first public release when the core and
