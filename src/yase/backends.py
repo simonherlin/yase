@@ -11,21 +11,28 @@ import numpy as np
 
 from .core import SemanticResult, _normalise_output, load_image
 from .errors import BackendError
+from .limits import InputLimits
 
 
 class CallableExtractor:
     """Turn a callable into a documented extractor backend."""
 
-    def __init__(self, function: Any, task: str = "depth") -> None:
+    def __init__(
+        self,
+        function: Any,
+        task: str = "depth",
+        input_limits: Optional[InputLimits] = None,
+    ) -> None:
         if not callable(function):
             raise TypeError("function must be callable")
         if task not in ("depth", "segmentation", "both", "semantic"):
             raise ValueError("task must be depth, segmentation, both, or semantic")
         self.function = function
         self.task = task
+        self.input_limits = input_limits
 
     def extract(self, image: Any) -> SemanticResult:
-        output = self.function(load_image(image))
+        output = self.function(load_image(image, limits=self.input_limits))
         if isinstance(output, SemanticResult):
             return output
         if self.task == "depth":
@@ -56,6 +63,7 @@ class TorchScriptExtractor:
         device: Optional[str] = None,
         task: str = "depth",
         size: Optional[tuple] = None,
+        input_limits: Optional[InputLimits] = None,
     ) -> None:
         if task not in ("depth", "segmentation", "both"):
             raise ValueError("task must be depth, segmentation, or both")
@@ -75,10 +83,14 @@ class TorchScriptExtractor:
         self.model = torch.jit.load(model_path, map_location=self.device).eval()
         self.task = task
         self.size = size
+        self.input_limits = input_limits
 
     def _prepare_batch(self, images: Sequence[Any]) -> Any:
         torch = self._torch
-        arrays = [load_image(image).astype(np.float32) / 255.0 for image in images]
+        arrays = [
+            load_image(image, limits=self.input_limits).astype(np.float32) / 255.0
+            for image in images
+        ]
         if not arrays:
             raise ValueError("extract_batch requires at least one image")
         if self.size is None and len({array.shape for array in arrays}) != 1:
@@ -157,6 +169,7 @@ class OnnxRuntimeExtractor:
         input_layout: str = "NCHW",
         graph_optimization_level: Optional[Any] = None,
         enable_profiling: bool = False,
+        input_limits: Optional[InputLimits] = None,
     ) -> None:
         if task not in ("depth", "segmentation", "both"):
             raise ValueError("task must be depth, segmentation, or both")
@@ -203,6 +216,7 @@ class OnnxRuntimeExtractor:
         self.input_layout = input_layout
         self.task = task
         self.size = size
+        self.input_limits = input_limits
         inputs = session.get_inputs()
         if not inputs:
             raise ValueError("ONNX session has no inputs")
@@ -221,7 +235,7 @@ class OnnxRuntimeExtractor:
         return tuple(ort.get_available_providers())
 
     def _prepare_image(self, image: Any) -> np.ndarray:
-        array = load_image(image).astype(np.float32)
+        array = load_image(image, limits=self.input_limits).astype(np.float32)
         if self.size is not None:
             from PIL import Image
 

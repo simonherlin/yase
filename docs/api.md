@@ -100,6 +100,8 @@ frames, and video latency summaries. Pass the same collector as `metrics=` to
 `VideoStream` or `RealtimeVideoStream` to record stream statistics.
 Pass the same collector as `metrics=` to `Yase` to record direct image
 extraction attempts, failures, and latency summaries.
+Direct `CallableExtractor`, TorchScript, ONNX Runtime, OpenVINO, and TensorRT
+adapters also accept `input_limits=InputLimits(...)`.
 
 `BackendRegistry.discover_entry_points()` explicitly loads third-party
 factories from the `yase.backends` entry-point group. Use

@@ -12,10 +12,15 @@ from typing import Any, Optional
 import numpy as np
 
 from .core import SemanticResult, load_image
+from .limits import InputLimits
 
 
-def _prepare_image(image: Any, size: Optional[tuple[int, int]]) -> np.ndarray:
-    array = load_image(image).astype(np.float32, copy=False)
+def _prepare_image(
+    image: Any,
+    size: Optional[tuple[int, int]],
+    limits: Optional[InputLimits] = None,
+) -> np.ndarray:
+    array = load_image(image, limits=limits).astype(np.float32, copy=False)
     if size is not None:
         from PIL import Image
 
@@ -29,9 +34,11 @@ def _prepare_image(image: Any, size: Optional[tuple[int, int]]) -> np.ndarray:
 
 
 def _prepare_batch(
-    images: Sequence[Any], size: Optional[tuple[int, int]]
+    images: Sequence[Any],
+    size: Optional[tuple[int, int]],
+    limits: Optional[InputLimits] = None,
 ) -> np.ndarray:
-    arrays = [_prepare_image(image, size) for image in images]
+    arrays = [_prepare_image(image, size, limits) for image in images]
     if not arrays:
         raise ValueError("extract_batch requires at least one image")
     if size is None and len({array.shape for array in arrays}) != 1:
@@ -88,6 +95,7 @@ class OpenVINOExtractor:
         output_names: Optional[Sequence[str]] = None,
         compiled_model: Any = None,
         core: Any = None,
+        input_limits: Optional[InputLimits] = None,
     ) -> None:
         _validate_options(task, size)
         if compiled_model is None and model_path is None:
@@ -96,6 +104,7 @@ class OpenVINOExtractor:
         self.device = device
         self.task = task
         self.size = size
+        self.input_limits = input_limits
         self.output_names = tuple(output_names) if output_names is not None else None
         if compiled_model is None:
             try:
@@ -162,7 +171,7 @@ class OpenVINOExtractor:
         return self.extract_batch([image])[0]
 
     def extract_batch(self, images: Sequence[Any]) -> list[SemanticResult]:
-        tensor = _prepare_batch(images, self.size)
+        tensor = _prepare_batch(images, self.size, self.input_limits)
         outputs = self._ordered_outputs(self._run(tensor))
         if not outputs:
             raise ValueError("OpenVINO model returned no outputs")
@@ -262,6 +271,7 @@ class TensorRTExtractor:
         task: str = "depth",
         size: Optional[tuple[int, int]] = None,
         device: str = "cuda",
+        input_limits: Optional[InputLimits] = None,
     ) -> None:
         _validate_options(task, size)
         if runner is None:
@@ -275,12 +285,13 @@ class TensorRTExtractor:
         self.task = task
         self.size = size
         self.device = device
+        self.input_limits = input_limits
 
     def extract(self, image: Any) -> SemanticResult:
         return self.extract_batch([image])[0]
 
     def extract_batch(self, images: Sequence[Any]) -> list[SemanticResult]:
-        tensor = _prepare_batch(images, self.size)
+        tensor = _prepare_batch(images, self.size, self.input_limits)
         outputs = (
             self.runner.infer(tensor)
             if hasattr(self.runner, "infer")

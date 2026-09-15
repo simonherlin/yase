@@ -362,6 +362,15 @@ Result: version 0.27.0, 106 deterministic tests passing before final validation.
 
 Result: version 0.28.0, 107 deterministic tests passing before final validation.
 
+## Cycle 34 — backend-level input safety
+
+- [x] Apply `InputLimits` to the five core direct backend families.
+- [x] Preserve resizing and batching behavior after validation.
+- [x] Keep optional runtime dependencies lazy and unchanged.
+- [x] Add direct callable regression coverage.
+
+Result: version 0.29.0, 108 deterministic tests passing before final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

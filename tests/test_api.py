@@ -243,6 +243,16 @@ def test_callable_extractor_supports_both_outputs():
     assert result.depth.shape == result.segmentation.shape
 
 
+def test_direct_callable_backend_enforces_input_limits():
+    backend = CallableExtractor(
+        lambda image: image[..., 0],
+        input_limits=InputLimits(max_pixels=4),
+    )
+    assert backend.extract(np.zeros((2, 2, 3), dtype=np.uint8)).depth.shape == (2, 2)
+    with pytest.raises(InputError, match="pixel limit"):
+        backend.extract(np.zeros((3, 2, 3), dtype=np.uint8))
+
+
 def test_video_stats_count_skipped_frames():
     capture = FakeCapture(5)
     stream = VideoStream(capture, lambda image: np.zeros(image.shape[:2]), stride=2)
