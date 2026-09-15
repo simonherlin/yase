@@ -65,6 +65,8 @@ providers, OpenVINO devices, and optional CUDA/TensorRT availability. Run
 execute the deterministic smoke graph on every discovered OpenVINO device;
 for ONNX GPU validation, add `--onnx-provider CUDAExecutionProvider` so a CPU
 fallback fails loudly.
+The extraction CLI exposes the same control with repeated
+`--provider CUDAExecutionProvider --strict-providers` flags.
 The same commands also accept registered semantic backends such as `vlm`,
 `image-embedding`, `sam3`, `rf-detr`, `tesseract`, and `paddleocr`; use
 `--model-path` for a local/Hugging Face model identifier, `--prompt` for VLM

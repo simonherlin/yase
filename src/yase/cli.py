@@ -81,6 +81,18 @@ def _add_model_options(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="use ONNX Runtime I/O binding for accelerator inference",
     )
+    parser.add_argument(
+        "--provider",
+        action="append",
+        default=[],
+        metavar="PROVIDER",
+        help="ONNX Runtime provider (repeatable, e.g. CUDAExecutionProvider)",
+    )
+    parser.add_argument(
+        "--strict-providers",
+        action="store_true",
+        help="fail if requested ONNX providers are not active instead of falling back",
+    )
 
 
 def _input_limits(args: argparse.Namespace) -> InputLimits | None:
@@ -226,6 +238,13 @@ def _models(args: argparse.Namespace) -> int:
 def _make_extractor(args: argparse.Namespace) -> Yase:
     """Build a CLI extractor while keeping optional dependencies lazy."""
     options = {"input_limits": _input_limits(args)}
+    if args.provider or args.strict_providers:
+        if args.model != "onnx":
+            raise ValueError("--provider/--strict-providers require --model onnx")
+        if args.strict_providers and not args.provider:
+            raise ValueError("--strict-providers requires at least one --provider")
+        options["providers"] = args.provider
+        options["strict_providers"] = args.strict_providers
     if args.model in _LOCAL_ARTIFACT_MODELS:
         if not args.model_path:
             raise ValueError(f"--model-path is required for {args.model}")

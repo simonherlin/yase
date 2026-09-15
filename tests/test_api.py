@@ -3402,7 +3402,7 @@ def test_cli_diagnostics_reports_readiness(capsys):
 
 
 def test_cli_processing_commands_parse_input_limits():
-    from yase.cli import _input_limits, _parser
+    from yase.cli import _input_limits, _make_extractor, _parser
 
     args = _parser().parse_args(
         [
@@ -3438,6 +3438,8 @@ def test_cli_processing_commands_parse_input_limits():
             "Qwen/Qwen3-VL-2B-Instruct",
             "--prompt",
             "describe the scene",
+            "--provider",
+            "CPUExecutionProvider",
         ]
     )
     assert modern.model == "vlm"
@@ -3451,9 +3453,17 @@ def test_cli_processing_commands_parse_input_limits():
             "--model-path",
             "model.onnx",
             "--io-binding",
+            "--provider",
+            "CUDAExecutionProvider",
+            "--strict-providers",
         ]
     )
     assert onnx.io_binding is True
+    assert onnx.provider == ["CUDAExecutionProvider"]
+    assert onnx.strict_providers is True
+    configured = _make_extractor(onnx)
+    assert configured._backend_options["providers"] == ["CUDAExecutionProvider"]
+    assert configured._backend_options["strict_providers"] is True
     video = _parser().parse_args(
         [
             "video",
@@ -3467,6 +3477,8 @@ def test_cli_processing_commands_parse_input_limits():
         ]
     )
     assert video.batch_size == 8
+    with pytest.raises(ValueError, match="require --model onnx"):
+        _make_extractor(modern)
     with pytest.raises(SystemExit):
         _parser().parse_args(
             [

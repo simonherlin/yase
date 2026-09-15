@@ -69,6 +69,10 @@ versions instead of only booleans.
 Scores are normalized to `[0, 1]` by typed primitives, but their calibration is
 model-specific and should be documented in backend metadata.
 
+The `extract`, `video`, and `benchmark` commands accept repeated
+`--provider NAME` flags for ONNX Runtime. Combine them with
+`--strict-providers` when a CPU fallback must be treated as a deployment error.
+
 ## ObservationBundle and stage contracts
 
 `ObservationBundle` is the versioned transport contract for durable pipelines.
