@@ -532,6 +532,15 @@ Result: version 0.43.0, pending final validation.
 
 Result: version 0.44.0, pending final validation.
 
+## Cycle 54 — retrieval API parity
+
+- [x] Add Qdrant `min_score`/score-threshold support.
+- [x] Apply the bound embedding-space payload filter to every Qdrant search.
+- [x] Reject conflicting caller-provided space filters and non-finite thresholds.
+- [x] Extend injected-client coverage while keeping Qdrant lazy and optional.
+
+Result: version 0.45.0, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

@@ -115,24 +115,32 @@ class QdrantVectorIndex:
         self,
         vector: Any,
         limit: int = 10,
+        min_score: Optional[float] = None,
         where: Optional[Mapping[str, Any]] = None,
     ) -> list[SearchHit]:
         if limit < 1:
             raise ValueError("limit must be >= 1")
+        if min_score is not None and not np.isfinite(min_score):
+            raise ValueError("min_score must be finite")
         value = np.asarray(vector, dtype=np.float32)
         if value.ndim != 1 or value.size != self.dimension:
             raise ValueError(f"expected a vector with dimension {self.dimension}")
         norm = float(np.linalg.norm(value))
         if norm == 0 or not np.isfinite(norm):
             raise ValueError("query vector must be finite and non-zero")
+        filters = dict(where or {})
+        if self.space is not None:
+            if "space" in filters and filters["space"] != self.space:
+                raise ValueError(f"expected embeddings from space {self.space}")
+            filters["space"] = self.space
         query_filter = None
-        if where:
+        if filters:
             query_filter = self.models.Filter(
                 must=[
                     self.models.FieldCondition(
                         key=key, match=self.models.MatchValue(value=match)
                     )
-                    for key, match in where.items()
+                    for key, match in filters.items()
                 ]
             )
         query = (value / norm).tolist()
@@ -142,6 +150,7 @@ class QdrantVectorIndex:
                 query=query,
                 query_filter=query_filter,
                 limit=limit,
+                score_threshold=min_score,
                 with_payload=True,
             )
             points = getattr(response, "points", response)
@@ -151,6 +160,7 @@ class QdrantVectorIndex:
                 query_vector=query,
                 query_filter=query_filter,
                 limit=limit,
+                score_threshold=min_score,
                 with_payload=True,
             )
         return [
@@ -166,6 +176,7 @@ class QdrantVectorIndex:
         self,
         record: EmbeddingRecord,
         limit: int = 10,
+        min_score: Optional[float] = None,
         where: Optional[Mapping[str, Any]] = None,
     ) -> list[SearchHit]:
         """Search with a provenance-aware query embedding."""
@@ -173,7 +184,7 @@ class QdrantVectorIndex:
             raise TypeError("record must be an EmbeddingRecord")
         if self.space is not None and record.space != self.space:
             raise ValueError(f"expected embeddings from space {self.space}")
-        return self.search(record.vector, limit=limit, where=where)
+        return self.search(record.vector, limit=limit, min_score=min_score, where=where)
 
 
 __all__ = ["QdrantVectorIndex"]

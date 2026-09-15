@@ -779,6 +779,9 @@ def test_qdrant_adapter_works_with_injected_client_and_models():
     )
     index.add("a", [1.0, 0.0], {"kind": "test"})
     assert index.search([1.0, 0.0])[0].item_id == "a"
+    assert index.search([1.0, 0.0], min_score=0.9)[0].item_id == "a"
+    with pytest.raises(ValueError, match="min_score"):
+        index.search([1.0, 0.0], min_score=float("nan"))
 
 
 def test_qdrant_adapter_enforces_embedding_spaces():
@@ -790,10 +793,14 @@ def test_qdrant_adapter_enforces_embedding_spaces():
 
         VectorParams = staticmethod(lambda **kwargs: kwargs)
         PointStruct = staticmethod(lambda **kwargs: SimpleNamespace(**kwargs))
+        Filter = staticmethod(lambda **kwargs: kwargs)
+        FieldCondition = staticmethod(lambda **kwargs: kwargs)
+        MatchValue = staticmethod(lambda **kwargs: kwargs)
 
     class FakeClient:
         def __init__(self):
             self.points = []
+            self.query = None
 
         def collection_exists(self, _name):
             return False
@@ -804,6 +811,12 @@ def test_qdrant_adapter_enforces_embedding_spaces():
         def upsert(self, points, **_kwargs):
             self.points.extend(points)
 
+        def query_points(self, **kwargs):
+            self.query = kwargs
+            return SimpleNamespace(
+                points=[SimpleNamespace(id="a", score=0.99, payload={"space": "clip"})]
+            )
+
     client = FakeClient()
     index = QdrantVectorIndex(
         "embeddings", dimension=2, client=client, models=FakeModels, space="clip"
@@ -813,6 +826,8 @@ def test_qdrant_adapter_enforces_embedding_spaces():
     )
     index.add_record("a", record)
     assert client.points[0].payload == {"space": "clip", "model_id": "model-a"}
+    assert index.search_record(record, min_score=0.9)[0].item_id == "a"
+    assert client.query["score_threshold"] == 0.9
     with pytest.raises(ValueError, match="space clip"):
         index.add_record(
             "b",

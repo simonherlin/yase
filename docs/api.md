@@ -184,6 +184,9 @@ implement the same boundary with a vector database adapter.
 `QdrantVectorIndex` exposes the same record methods; it stores the space,
 model ID, and optional revision in each point payload and rejects cross-space
 queries before they reach the collection.
+Its `search()` and `search_record()` methods also support `min_score`; when a
+space is bound, all searches automatically add the corresponding payload
+filter.
 
 `make_stream_checkpoint()`, `save_stream_checkpoint()`, and
 `load_stream_checkpoint()` provide one versioned JSON checkpoint for the
