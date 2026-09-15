@@ -119,6 +119,7 @@ from yase import (
     nms_indices,
     non_maximum_suppression,
     normalise_detections,
+    observation_from_dict,
     observation_to_json,
     parse_structured_output,
     result_from_dict,
@@ -2836,6 +2837,29 @@ def test_observation_json_and_jsonl_are_stable_and_array_safe():
     output = StringIO()
     assert write_observation_jsonl([bundle, bundle], output) == 2
     assert len(output.getvalue().splitlines()) == 2
+
+
+def test_observation_from_dict_reconstructs_full_bundle_and_rejects_summary():
+    original = ObservationBundle.from_result(
+        SemanticResult(depth=np.ones((1, 2), dtype=np.float32), caption="scene"),
+        frame_id=4,
+        source_id="camera-a",
+        width=2,
+        height=1,
+        provenance=(ModelProvenance(model_id="depth", revision="v1"),),
+        uncertainty={"depth": Uncertainty(0.9)},
+        metadata={"request": "abc"},
+    )
+    restored = observation_from_dict(original.to_dict(include_arrays=True))
+    assert restored.frame == original.frame
+    assert np.array_equal(restored.result.depth, original.result.depth)
+    assert restored.provenance == original.provenance
+    assert restored.uncertainty == original.uncertainty
+    assert restored.metadata == original.metadata
+    with pytest.raises(ValueError, match="shape/dtype"):
+        observation_from_dict(original.to_dict())
+    with pytest.raises(ValueError, match="unsupported observation schema"):
+        observation_from_dict({"schema_version": "2.0"})
 
 
 def test_observation_sinks_support_archive_callback_fanout_and_bounded_queue():

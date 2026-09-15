@@ -95,6 +95,7 @@ from .observation import (
     ModelProvenance,
     ObservationBundle,
     Uncertainty,
+    observation_from_dict,
     observation_to_json,
     write_observation_jsonl,
 )
@@ -239,6 +240,7 @@ __all__ = [
     "ModelProvenance",
     "MemorySink",
     "ObservationBundle",
+    "observation_from_dict",
     "ObservationSink",
     "OrientedBoundingBox",
     "Pose",

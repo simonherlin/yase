@@ -17,7 +17,7 @@ from typing import Any, TextIO
 import numpy as np
 
 from .core import SemanticResult
-from .serialization import _json_value, result_to_dict
+from .serialization import _json_value, result_from_dict, result_to_dict
 
 
 def _copy_mapping(value: Mapping[str, Any] | None) -> Mapping[str, Any]:
@@ -257,6 +257,53 @@ def observation_to_json(
     )
 
 
+def observation_from_dict(payload: Mapping[str, Any]) -> ObservationBundle:
+    """Reconstruct an observation bundle from a JSON-compatible mapping.
+
+    Array summaries remain intentionally non-reconstructable. Callers that
+    need tensor values must provide a payload produced with
+    ``include_arrays=True`` or restore the arrays from an external archive.
+    """
+    if not isinstance(payload, Mapping):
+        raise TypeError("payload must be a mapping")
+    version = payload.get("schema_version", "1.0")
+    if version != "1.0":
+        raise ValueError(f"unsupported observation schema version: {version}")
+    frame_payload = payload.get("frame")
+    result_payload = payload.get("result")
+    if not isinstance(frame_payload, Mapping):
+        raise TypeError("observation frame must be a mapping")
+    if not isinstance(result_payload, Mapping):
+        raise TypeError("observation result must be a mapping")
+    provenance_payload = payload.get("provenance", [])
+    if not isinstance(provenance_payload, (list, tuple)):
+        raise TypeError("observation provenance must be a list")
+    uncertainty_payload = payload.get("uncertainty", {})
+    if not isinstance(uncertainty_payload, Mapping):
+        raise TypeError("observation uncertainty must be a mapping")
+    metadata = payload.get("metadata", {})
+    if not isinstance(metadata, Mapping):
+        raise TypeError("observation metadata must be a mapping")
+    provenance = []
+    for item in provenance_payload:
+        if not isinstance(item, Mapping):
+            raise TypeError("provenance entries must be mappings")
+        provenance.append(ModelProvenance(**dict(item)))
+    uncertainty = {}
+    for key, value in uncertainty_payload.items():
+        if not isinstance(value, Mapping):
+            raise TypeError("uncertainty entries must be mappings")
+        uncertainty[str(key)] = Uncertainty(**dict(value))
+    return ObservationBundle(
+        frame=FrameRef(**dict(frame_payload)),
+        result=result_from_dict(result_payload),
+        schema_version=str(version),
+        provenance=tuple(provenance),
+        uncertainty=uncertainty,
+        metadata=dict(metadata),
+    )
+
+
 def write_observation_jsonl(
     observations: Any,
     destination: str | Path | TextIO,
@@ -289,6 +336,7 @@ __all__ = [
     "ModelProvenance",
     "ObservationBundle",
     "Uncertainty",
+    "observation_from_dict",
     "observation_to_json",
     "write_observation_jsonl",
 ]

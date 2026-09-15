@@ -921,6 +921,17 @@ single-image extraction and DAG stages.
 Result: the service boundary remains safe even when it wraps a backend that is
 not itself a `Yase` facade.
 
+## Cycle 85 — observation deserialization
+
+- [x] Add `observation_from_dict()` for versioned bundle reconstruction.
+- [x] Reconstruct frame references, model provenance, uncertainty, metadata,
+  and real serialized result arrays.
+- [x] Reject future schema versions and shape/dtype-only tensor summaries.
+- [x] Add archive round-trip and invalid-payload coverage.
+
+Result: durable observation JSON can now be consumed by a separate worker or
+resume process without bypassing the typed contract.
+
 ## Exit criteria
 
 The package is considered ready for a first public release when the core and
