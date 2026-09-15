@@ -81,7 +81,7 @@ from .metrics import (
 from .models import ModelCard, ModelCatalog, default_model_catalog
 from .native import nms_indices
 from .normalization import non_maximum_suppression, normalise_detections
-from .observability import RuntimeMetrics
+from .observability import OpenTelemetryTracer, RuntimeMetrics
 from .observation import (
     EmbeddingRecord,
     FrameRef,
@@ -139,7 +139,7 @@ from .video import (
     process_video,
 )
 
-__version__ = "0.54.0"
+__version__ = "0.55.0"
 
 __all__ = [
     "CallableExtractor",
@@ -199,6 +199,7 @@ __all__ = [
     "Relation",
     "RuntimeInfo",
     "RuntimeMetrics",
+    "OpenTelemetryTracer",
     "RFDETRExtractor",
     "SearchHit",
     "SemanticEvent",

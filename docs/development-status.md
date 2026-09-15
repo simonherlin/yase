@@ -642,6 +642,18 @@ Result: version `0.53.0`, pending final validation.
 
 Result: version `0.54.0`, pending final validation.
 
+## Cycle 65 — optional OpenTelemetry tracing
+
+- [x] Add a lazy `OpenTelemetryTracer` bridge that keeps the base install
+  dependency-free.
+- [x] Support injection of an application's configured OpenTelemetry tracer for
+  deterministic tests and custom providers.
+- [x] Instrument `Yase.extract()` with task/model attributes and exception
+  recording while preserving existing metrics and error semantics.
+- [x] Export the bridge from the top-level package and document its usage.
+
+Result: version `0.55.0`, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full

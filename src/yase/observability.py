@@ -1,9 +1,10 @@
-"""Dependency-free runtime metrics for semantic pipelines."""
+"""Dependency-free metrics and optional OpenTelemetry tracing."""
 
 from collections import defaultdict
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from threading import Lock
-from typing import Any
+from typing import Any, Optional
 
 
 def _label_value(value: Any) -> str:
@@ -15,6 +16,67 @@ def _labels(values: Mapping[str, Any]) -> str:
         return ""
     pairs = [f'{key}="{_label_value(values[key])}"' for key in sorted(values)]
     return "{" + ",".join(pairs) + "}"
+
+
+class OpenTelemetryTracer:
+    """Small optional bridge for OpenTelemetry spans.
+
+    OpenTelemetry is imported only when this class is instantiated. A custom
+    tracer object can be injected for tests or an application's configured
+    provider; it must expose ``start_as_current_span``.
+    """
+
+    def __init__(self, tracer: Any = None, instrumentation_scope: str = "yase"):
+        if not isinstance(instrumentation_scope, str) or not instrumentation_scope:
+            raise ValueError("instrumentation_scope must be a non-empty string")
+        self._status = None
+        self._status_code = None
+        if tracer is None:
+            try:
+                from opentelemetry import trace
+                from opentelemetry.trace import Status, StatusCode
+            except ImportError as exc:
+                raise ImportError(
+                    "install the observability extra to use OpenTelemetryTracer"
+                ) from exc
+            tracer = trace.get_tracer(instrumentation_scope)
+            self._status = Status
+            self._status_code = StatusCode
+        if not hasattr(tracer, "start_as_current_span"):
+            raise TypeError("tracer must expose start_as_current_span")
+        self.tracer = tracer
+        self.instrumentation_scope = instrumentation_scope
+
+    @contextmanager
+    def span(
+        self,
+        name: str,
+        attributes: Optional[Mapping[str, Any]] = None,
+    ) -> Iterator[Any]:
+        """Create a current span and annotate failures before re-raising."""
+        if not isinstance(name, str) or not name:
+            raise ValueError("span name must be a non-empty string")
+        with self.tracer.start_as_current_span(name) as span:
+            for key, value in (attributes or {}).items():
+                setter = getattr(span, "set_attribute", None)
+                if callable(setter):
+                    setter(
+                        str(key),
+                        value
+                        if isinstance(value, (str, int, float, bool))
+                        else str(value),
+                    )
+            try:
+                yield span
+            except Exception as exc:
+                recorder = getattr(span, "record_exception", None)
+                if callable(recorder):
+                    recorder(exc)
+                if self._status is not None and self._status_code is not None:
+                    set_status = getattr(span, "set_status", None)
+                    if callable(set_status):
+                        set_status(self._status(self._status_code.ERROR, str(exc)))
+                raise
 
 
 class RuntimeMetrics:
@@ -168,4 +230,4 @@ class RuntimeMetrics:
             return "\n".join(lines) + "\n"
 
 
-__all__ = ["RuntimeMetrics"]
+__all__ = ["OpenTelemetryTracer", "RuntimeMetrics"]

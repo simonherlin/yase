@@ -124,6 +124,14 @@ results = OpenVINOExtractor("model.xml", async_jobs=4).extract_batch_async(image
 Install accelerator runtimes separately; Yase never downloads weights or
 imports these frameworks unless their adapters are instantiated.
 
+Tracing is optional and lazy:
+
+~~~python
+from yase import OpenTelemetryTracer, Yase
+
+model = Yase(extractor=my_backend, tracer=OpenTelemetryTracer())
+~~~
+
 ## Batch extraction
 
 `extract_many` preserves input order and timestamps. Backends that implement

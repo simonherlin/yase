@@ -7,6 +7,7 @@ weights or requires PyTorch.
 import time
 from collections.abc import Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import nullcontext
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable, Optional, Protocol, Union
@@ -171,6 +172,7 @@ class Yase:
         input_limits: Optional[InputLimits] = None,
         registry: Optional[Any] = None,
         metrics: Optional[RuntimeMetrics] = None,
+        tracer: Optional[Any] = None,
         **backend_options: Any,
     ) -> None:
         if task not in ("depth", "segmentation", "both", "semantic"):
@@ -187,6 +189,14 @@ class Yase:
             raise TypeError("registry must expose create(name, **options)")
         self.registry = registry
         self.metrics = metrics
+        if tracer is not None and not (
+            hasattr(tracer, "span") or hasattr(tracer, "start_as_current_span")
+        ):
+            raise TypeError(
+                "tracer must expose span(name, attributes) or "
+                "start_as_current_span(name)"
+            )
+        self.tracer = tracer
         self._extractor = extractor
         self._backend_options = backend_options
 
@@ -226,31 +236,46 @@ class Yase:
     ) -> SemanticResult:
         """Extract semantics from one image."""
         started = time.perf_counter()
-        try:
-            rgb = load_image(
-                image, color_order=self.color_order, limits=self.input_limits
-            )
-            backend = self.extractor
-            if hasattr(backend, "extract"):
-                output = backend.extract(rgb)
-            elif hasattr(backend, "predict"):
-                output = backend.predict(rgb)
-            elif self.task == "depth" and hasattr(backend, "predict_depth"):
-                output = backend.predict_depth(rgb)
-            elif callable(backend):
-                output = backend(rgb)
+        span = nullcontext()
+        if self.tracer is not None:
+            attributes = {
+                "yase.task": self.task,
+                "yase.model": self.model,
+            }
+            if hasattr(self.tracer, "span"):
+                span = self.tracer.span("yase.extract", attributes)
             else:
-                raise TypeError("extractor must be callable or expose extract/predict")
-            result = _normalise_output(output, self.task, timestamp)
-        except Exception:
+                span = self.tracer.start_as_current_span("yase.extract")
+        with span:
+            try:
+                rgb = load_image(
+                    image, color_order=self.color_order, limits=self.input_limits
+                )
+                backend = self.extractor
+                if hasattr(backend, "extract"):
+                    output = backend.extract(rgb)
+                elif hasattr(backend, "predict"):
+                    output = backend.predict(rgb)
+                elif self.task == "depth" and hasattr(backend, "predict_depth"):
+                    output = backend.predict_depth(rgb)
+                elif callable(backend):
+                    output = backend(rgb)
+                else:
+                    raise TypeError(
+                        "extractor must be callable or expose extract/predict"
+                    )
+                result = _normalise_output(output, self.task, timestamp)
+            except Exception:
+                if self.metrics is not None:
+                    self.metrics.record_extraction(
+                        time.perf_counter() - started, success=False
+                    )
+                raise
             if self.metrics is not None:
                 self.metrics.record_extraction(
-                    time.perf_counter() - started, success=False
+                    time.perf_counter() - started, success=True
                 )
-            raise
-        if self.metrics is not None:
-            self.metrics.record_extraction(time.perf_counter() - started, success=True)
-        return result
+            return result
 
     def extract_many(
         self,

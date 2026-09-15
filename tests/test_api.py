@@ -51,6 +51,7 @@ from yase import (
     ObservationBundle,
     ObservationScheduler,
     OnnxRuntimeExtractor,
+    OpenTelemetryTracer,
     OpenVINOExtractor,
     OrientedBoundingBox,
     PipelineStage,
@@ -429,6 +430,53 @@ def test_yase_records_direct_extraction_metrics_on_success_and_failure():
     assert extraction["attempts"] == 2
     assert extraction["failures"] == 1
     assert "image_test_extraction_attempts_total 2" in metrics.prometheus_text()
+
+
+def test_opentelemetry_tracer_instruments_yase_and_records_errors():
+    class Span:
+        def __init__(self):
+            self.attributes = {}
+            self.exceptions = []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def set_attribute(self, key, value):
+            self.attributes[key] = value
+
+        def record_exception(self, error):
+            self.exceptions.append(error)
+
+    class Tracer:
+        def __init__(self):
+            self.spans = []
+
+        def start_as_current_span(self, name):
+            span = Span()
+            self.spans.append((name, span))
+            return span
+
+    tracer = Tracer()
+    bridge = OpenTelemetryTracer(tracer=tracer)
+    api = Yase(extractor=lambda image: image[..., 0], tracer=bridge)
+    result = api.extract(np.ones((1, 1, 3), dtype=np.uint8))
+    assert result.depth.shape == (1, 1)
+    assert tracer.spans[0][0] == "yase.extract"
+    assert tracer.spans[0][1].attributes == {
+        "yase.task": "depth",
+        "yase.model": "custom",
+    }
+
+    failing = Yase(
+        extractor=lambda image: (_ for _ in ()).throw(RuntimeError("bad")),
+        tracer=bridge,
+    )
+    with pytest.raises(RuntimeError, match="bad"):
+        failing.extract(np.ones((1, 1, 3), dtype=np.uint8))
+    assert isinstance(tracer.spans[-1][1].exceptions[0], RuntimeError)
 
 
 def test_normalise_tuple_and_result_timestamp():

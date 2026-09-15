@@ -100,7 +100,10 @@ per-stage status counts, duration summaries, processed video frames, dropped
 frames, and video latency summaries. Pass the same collector as `metrics=` to
 `VideoStream` or `RealtimeVideoStream` to record stream statistics.
 Pass the same collector as `metrics=` to `Yase` to record direct image
-extraction attempts, failures, and latency summaries.
+extraction attempts, failures, and latency summaries. Install the optional
+`observability` extra and pass `tracer=OpenTelemetryTracer()` to emit a
+`yase.extract` span with task/model attributes; the bridge records exceptions
+and re-raises them without changing extraction semantics.
 Direct `CallableExtractor`, TorchScript, ONNX Runtime, OpenVINO, and TensorRT
 adapters also accept `input_limits=InputLimits(...)`.
 
