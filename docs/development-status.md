@@ -694,7 +694,9 @@ Result: version `0.57.0`, pending final validation.
   existing scheduler path.
 - [x] Add regression coverage for invalid inputs and callback context.
 
-Result: version `0.58.0`, pending final validation.
+Result: version `0.58.0`, validated with 139 tests, 82.52% coverage, wheel /
+sdist builds, and an isolated Python 3.9 wheel smoke test. See the [release
+readiness report](research/release-readiness-0.58.md).
 
 ## Final gap analysis
 
@@ -703,6 +705,12 @@ Paddle runtime integration remain optional follow-on adapters because they
 require separate repositories, hardware, model weights, or licensing decisions.
 TensorRT and OpenVINO now have explicit runtime adapters, while the public
 contracts remain open for further model integrations.
+
+The 0.58.0 release boundary also includes resilient native batches, OpenVINO
+queue execution, optional OpenTelemetry, named-vector Qdrant retrieval, a
+dependency-free ASGI surface, and package-level artifact validation. Live
+provider CI remains the next operational investment because this CPU-only
+environment cannot exercise accelerator hardware.
 
 ## Exit criteria
 
