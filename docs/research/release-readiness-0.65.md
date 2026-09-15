@@ -12,7 +12,7 @@ Validation date: 2026-09-15. Reference environment: Python 3.12.3 on Ubuntu
 | Dependencies | pass: `uv pip check` |
 | Ruff | pass: lint and format checks |
 | Core suite | pass: 147 tests |
-| Coverage | pass: above the configured 80% threshold |
+| Coverage | pass: 82.44%, above the configured 80% threshold |
 | Runtime smoke | pass: OpenVINO CPU sync/async and ONNX CPU/I/O binding |
 | Native extension | pass: C++17 IoU/NMS build and import |
 | Distribution | pass: wheel and sdist build |
