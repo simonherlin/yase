@@ -44,6 +44,7 @@ Le contrat public est donc :
 | Wheel natif | `cp313-cp313-linux_x86_64`, `_native` inclus |
 | Installation wheel natif | import, IoU et NMS pass |
 | Wheel portable Python | 3.10, 3.11, 3.12 et 3.13 pass |
+| Micro-benchmark C++ | 64 boîtes : IoU ~28×, NMS ~33× contre fallback local |
 | Lockfile | `uv lock --check` pass |
 
 Le poste courant ne possède pas les headers de développement Python 3.12 ni
@@ -78,8 +79,8 @@ des choix de déploiement visibles dans `yase diagnostics --providers`.
 1. Les wheels natifs multi-OS ne sont pas encore publiés ; un environnement de
    release dédié doit lancer cibuildwheel avant une publication PyPI avec
    accélération. GitHub Actions reste volontairement désactivé.
-2. Les performances C++ doivent être benchmarkées contre les fallbacks sur des
-   lots représentatifs ; la présence du binaire ne garantit pas un gain pour
-   de très petites listes.
+2. Le micro-benchmark C++/fallback est validé sur les kernels ; il reste à
+   mesurer l’impact end-to-end avec des lots, résolutions et modèles réels.
+   La présence du binaire ne garantit pas un gain pour de très petites listes.
 3. Les providers CUDA/TensorRT/OpenVINO GPU restent hardware-gated et ne sont
    pas simulés par les tests CPU.
