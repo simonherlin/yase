@@ -4,7 +4,8 @@ version = "0.65.0"
 description = "Dependency-light semantic extraction for images and real-time video."
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE", "NOTICE.md"]
 authors = [{ name = "Yase contributors" }]
 dependencies = [
   "numpy>=1.23",
@@ -45,23 +46,18 @@ all = [
 yase = "yase.cli:main"
 
 [build-system]
-requires = ["hatchling>=1.25"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=77.0.3", "wheel>=0.45"]
+build-backend = "setuptools.build_meta"
 
-[tool.hatch.build]
-exclude = [
-  "/src/yase/data_load.py",
-  "/src/yase/features.py",
-  "/src/yase/models/**",
-  "/src/yase/preprocess.py",
-  "/src/yase/tests/**",
-  "/src/yase/utils/**",
-  "/src/yase/visualize.py",
-  "/src/yase/weights/**",
-]
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/yase"]
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+yase = ["py.typed"]
 
 [dependency-groups]
 dev = [
@@ -110,3 +106,9 @@ show_missing = true
 
 [tool.uv]
 default-groups = ["dev"]
+
+[tool.cibuildwheel]
+# Native wheels are the optimized distribution profile. The regular `build`
+# target deliberately remains a portable py3-none-any wheel.
+environment = { YASE_BUILD_NATIVE = "1" }
+test-command = "python -c \"import yase; from yase.native import NATIVE_AVAILABLE; assert NATIVE_AVAILABLE\""
