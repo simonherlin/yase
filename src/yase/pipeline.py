@@ -258,14 +258,18 @@ class SemanticPipeline:
             depth_map=result.depth_map,
         )
 
-    def as_scheduler(self, config: Any = None, on_stage: Any = None) -> Any:
+    def as_scheduler(
+        self, config: Any = None, on_stage: Any = None, tracer: Any = None
+    ) -> Any:
         """Return a dependency-aware scheduler for contracted active stages."""
         from .scheduler import ObservationScheduler
 
         active = self.active_stages
         if any(stage.spec is None for stage in active):
             raise ValueError("all active stages need StageSpec for scheduler execution")
-        return ObservationScheduler(active, config=config, on_stage=on_stage)
+        return ObservationScheduler(
+            active, config=config, on_stage=on_stage, tracer=tracer
+        )
 
     def extract_scheduled(
         self,
@@ -273,9 +277,10 @@ class SemanticPipeline:
         timestamp: Optional[float] = None,
         *,
         config: Any = None,
+        tracer: Any = None,
     ) -> SemanticResult:
         """Execute contracted stages as a DAG and return a SemanticResult."""
-        report = self.as_scheduler(config=config).run(image)
+        report = self.as_scheduler(config=config, tracer=tracer).run(image)
         return self._result_from_scheduler_report(report, timestamp)
 
     async def extract_scheduled_async(
@@ -284,9 +289,10 @@ class SemanticPipeline:
         timestamp: Optional[float] = None,
         *,
         config: Any = None,
+        tracer: Any = None,
     ) -> SemanticResult:
         """Async counterpart of :meth:`extract_scheduled`."""
-        report = await self.as_scheduler(config=config).arun(image)
+        report = await self.as_scheduler(config=config, tracer=tracer).arun(image)
         return self._result_from_scheduler_report(report, timestamp)
 
     def extract_bundle_scheduled(

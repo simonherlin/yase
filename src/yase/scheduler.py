@@ -12,6 +12,7 @@ import time
 from collections import OrderedDict
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from dataclasses import dataclass
 from threading import Event
 from typing import Any, Optional
@@ -118,6 +119,7 @@ class ObservationScheduler:
         config: Optional[SchedulerConfig] = None,
         on_stage: Optional[Callable[[StageExecution], None]] = None,
         metrics: Optional[RuntimeMetrics] = None,
+        tracer: Optional[Any] = None,
         initial_fields: Sequence[str] = ("image", "frame"),
     ) -> None:
         items = list(stages)
@@ -127,6 +129,14 @@ class ObservationScheduler:
         self.config = config or SchedulerConfig()
         self.on_stage = on_stage
         self.metrics = metrics
+        if tracer is not None and not (
+            hasattr(tracer, "span") or hasattr(tracer, "start_as_current_span")
+        ):
+            raise TypeError(
+                "tracer must expose span(name, attributes) or "
+                "start_as_current_span(name)"
+            )
+        self.tracer = tracer
         self.initial_fields = frozenset(("image", "frame", *initial_fields))
         self._cache: OrderedDict[tuple, Any] = OrderedDict()
         self._plan = self._build_plan()
@@ -139,6 +149,25 @@ class ObservationScheduler:
     def clear_cache(self) -> None:
         """Drop all persistent stage results."""
         self._cache.clear()
+
+    @contextmanager
+    def _stage_span(self, stage: Any) -> Any:
+        if self.tracer is None:
+            yield None
+            return
+        attributes = {"yase.stage": stage.name}
+        if hasattr(self.tracer, "span"):
+            with self.tracer.span(f"yase.stage.{stage.name}", attributes):
+                yield None
+        else:
+            with self.tracer.start_as_current_span(f"yase.stage.{stage.name}"):
+                yield None
+
+    def _invoke_traced(
+        self, stage: Any, normalized: np.ndarray, context: StageContext
+    ) -> Any:
+        with self._stage_span(stage):
+            return self._invoke(stage, normalized, context)
 
     def cache_info(self) -> dict[str, int]:
         """Return bounded-cache occupancy without exposing mutable internals."""
@@ -229,7 +258,7 @@ class ObservationScheduler:
 
             stage_started = time.perf_counter()
             try:
-                output = self._invoke(stage, normalized, context)
+                output = self._invoke_traced(stage, normalized, context)
                 duration = time.perf_counter() - stage_started
                 if (
                     self.config.max_stage_latency_ms is not None
@@ -380,7 +409,9 @@ class ObservationScheduler:
                     futures[stage.name] = (
                         stage,
                         time.perf_counter(),
-                        executor.submit(self._invoke, stage, normalized, context),
+                        executor.submit(
+                            self._invoke_traced, stage, normalized, context
+                        ),
                     )
 
                 for stage in batch:

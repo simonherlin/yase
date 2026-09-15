@@ -264,6 +264,9 @@ ever accepting a server-side path. POST `/extract/batch` accepts
 `{ "images_base64": [...], "timestamps": [...], "error_policy": "skip" }`
 and returns aligned results; the body limit defaults to 16 MiB and the batch
 limit defaults to 64 images.
+Pass the same `OpenTelemetryTracer` to `SemanticPipeline.as_scheduler()` or
+`extract_scheduled(..., tracer=...)` to emit `yase.stage.<name>` spans in
+addition to the facade-level extraction span.
 
 Optional adapters include `TesseractExtractor`, `PaddleOCRExtractor`,
 `TransformersImageEmbeddingExtractor`, and `TransformersVLMExtractor`. They

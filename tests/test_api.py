@@ -2992,6 +2992,45 @@ def test_scheduler_supports_async_execution_and_callbacks():
     assert events[0].status == "completed"
 
 
+def test_scheduler_emits_opentelemetry_span_for_each_stage():
+    class Span:
+        def __init__(self):
+            self.attributes = {}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def set_attribute(self, key, value):
+            self.attributes[key] = value
+
+    class Tracer:
+        def __init__(self):
+            self.spans = []
+
+        def start_as_current_span(self, name):
+            span = Span()
+            self.spans.append((name, span))
+            return span
+
+    raw = Tracer()
+    scheduler = ObservationScheduler(
+        [
+            PipelineStage(
+                "tags",
+                lambda image: {"tags": ["outdoor"]},
+                spec=StageSpec("tags", provides=("tags",)),
+            )
+        ],
+        tracer=OpenTelemetryTracer(tracer=raw),
+    )
+    scheduler.run(np.zeros((1, 1, 3), dtype=np.uint8))
+    assert raw.spans[0][0] == "yase.stage.tags"
+    assert raw.spans[0][1].attributes == {"yase.stage": "tags"}
+
+
 def test_scheduler_runs_independent_stages_in_parallel_with_stable_report_order():
     barrier = Barrier(2)
 

@@ -790,6 +790,18 @@ Result: architecture roadmap synchronized; pending final 0.62.0 validation.
 Result: version `0.62.0` release gates passed; provider-specific CI remains the
 next operational requirement.
 
+## Cycle 75 — scheduler trace propagation
+
+- [x] Accept the same optional tracer bridge on `ObservationScheduler` and
+  `SemanticPipeline.as_scheduler()`.
+- [x] Emit one `yase.stage.<name>` span per executed stage, including stages
+  dispatched through the parallel worker pool.
+- [x] Preserve cache, error, cancellation, timing, and callback semantics.
+- [x] Add deterministic span-attribute coverage without OpenTelemetry
+  installed.
+
+Result: version `0.63.0`, pending final validation.
+
 ## Exit criteria
 
 The package is considered ready for a first public release when the core and

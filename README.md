@@ -156,6 +156,8 @@ configuration using `load_config("yase.toml")`; only names registered in
 Serialized `SemanticResult` payloads include a `schema_version` and can be
 restored with `result_from_dict()` when arrays were exported explicitly.
 The ASGI service also exposes `/extract/batch` for ordered base64 image lots.
+Scheduler-based pipelines accept the same optional tracer to correlate each
+named stage with the parent extraction span.
 
 ## Batch extraction
 
