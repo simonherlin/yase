@@ -20,6 +20,11 @@ def main() -> None:
         action="store_true",
         help="build only the source distribution",
     )
+    parser.add_argument(
+        "--no-isolation",
+        action="store_true",
+        help="reuse the current environment instead of creating a build venv",
+    )
     args = parser.parse_args()
 
     environment = os.environ.copy()
@@ -28,6 +33,8 @@ def main() -> None:
     command = [sys.executable, "-m", "build", "--sdist"]
     if not args.sdist_only:
         command.append("--wheel")
+    if args.no_isolation:
+        command.append("--no-isolation")
     subprocess.run(command, check=True, env=environment)
 
 

@@ -126,5 +126,6 @@ default-groups = ["dev"]
 [tool.cibuildwheel]
 # Native wheels are the optimized distribution profile. The regular `build`
 # target deliberately remains a portable py3-none-any wheel.
+build = "cp310-* cp311-* cp312-* cp313-*"
 environment = { YASE_BUILD_NATIVE = "1" }
 test-command = "python -c \"import yase; from yase.native import NATIVE_AVAILABLE; assert NATIVE_AVAILABLE\""

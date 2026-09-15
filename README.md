@@ -37,7 +37,9 @@ make native
 The package can also be installed from a built wheel with
 `uv pip install dist/yase-*.whl`. Python 3.10–3.13 are supported; Python 3.12
 is the recommended development and deployment baseline. `make build` produces
-the portable `py3-none-any` wheel. `make build-native` produces an
+the portable `py3-none-any` wheel using the current `uv` environment;
+`make build-isolated` performs the strict PEP 517 isolated build. The
+`make build-native` target produces an
 OS/Python-ABI-specific wheel containing the optional C++ extension; it requires
 the matching Python development headers and a C++17 compiler. For a complete
 multi-platform native wheel matrix, run cibuildwheel from a dedicated release

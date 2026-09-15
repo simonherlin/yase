@@ -40,9 +40,11 @@ réel sur les petites listes.
 
 ## Tâches P0 — nécessaires avant une publication générale
 
-1. Produire les wheels natifs Linux/macOS/Windows et Python 3.10–3.13 dans un
-   environnement de release dédié via cibuildwheel. Le dépôt contient déjà la
-   configuration ; GitHub Actions ne doit pas être réactivé pour cela.
+1. [outillage livré, validation externe requise] Produire les wheels natifs
+   Linux/macOS/Windows et Python 3.10–3.13 dans un environnement de release
+   dédié via cibuildwheel. `make wheels`, `tools/build_wheels.py` et le profil
+   explicite `cp310`–`cp313` sont maintenant fournis ; chaque OS/toolchain doit
+   encore exécuter la matrice sur sa machine correspondante.
 2. [partiellement livré] Ajouter un benchmark reproductible séparant
    preprocessing, inférence, post-processing et latence bout-en-bout pour
    ONNX/OpenVINO/TensorRT/TorchScript. `record_timings=True` et
