@@ -1,5 +1,7 @@
 """Dependency-free global identity matching for multiple camera streams."""
 
+import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any, Optional
 
@@ -60,6 +62,86 @@ class GlobalIdentityStore:
 
     def reset(self) -> None:
         self._identities.clear()
+
+    def state_dict(self) -> dict[str, Any]:
+        """Return a JSON-compatible checkpoint of global identities."""
+        return {
+            "version": 1,
+            "next_id": self._next_id,
+            "identities": [
+                {
+                    "global_id": identity.global_id,
+                    "embedding": identity.embedding.tolist(),
+                    "first_seen": identity.first_seen,
+                    "last_seen": identity.last_seen,
+                    "camera_ids": list(identity.camera_ids),
+                    "observations": identity.observations,
+                }
+                for identity in sorted(
+                    self._identities.values(), key=lambda value: value.global_id
+                )
+            ],
+        }
+
+    def load_state_dict(self, state: Mapping[str, Any]) -> None:
+        """Restore a checkpoint produced by :meth:`state_dict`."""
+        if not isinstance(state, Mapping) or state.get("version") != 1:
+            raise ValueError("unsupported GlobalIdentityStore state version")
+        next_id = state.get("next_id")
+        if isinstance(next_id, bool) or not isinstance(next_id, int) or next_id < 0:
+            raise ValueError("identity state next_id must be a non-negative integer")
+        values = state.get("identities", ())
+        if not isinstance(values, Sequence) or isinstance(values, (str, bytes)):
+            raise TypeError("identity state identities must be a sequence")
+        restored: dict[int, GlobalIdentity] = {}
+        for item in values:
+            if not isinstance(item, Mapping):
+                raise TypeError("each identity state entry must be a mapping")
+            global_id = item.get("global_id")
+            if (
+                isinstance(global_id, bool)
+                or not isinstance(global_id, int)
+                or global_id < 0
+                or global_id in restored
+            ):
+                raise ValueError(
+                    "identity state contains an invalid or duplicate global_id"
+                )
+            embedding = np.asarray(item.get("embedding", ()), dtype=np.float32).reshape(
+                -1
+            )
+            if not embedding.size or not np.isfinite(embedding).all():
+                raise ValueError(
+                    "identity state embedding must be finite and non-empty"
+                )
+            first_seen = float(item.get("first_seen", 0.0))
+            last_seen = float(item.get("last_seen", first_seen))
+            if not math.isfinite(first_seen) or not math.isfinite(last_seen):
+                raise ValueError("identity state timestamps must be finite")
+            camera_ids = item.get("camera_ids", ())
+            if not isinstance(camera_ids, Sequence) or isinstance(
+                camera_ids, (str, bytes)
+            ):
+                raise TypeError("identity state camera_ids must be a sequence")
+            observations = item.get("observations", 1)
+            if (
+                isinstance(observations, bool)
+                or not isinstance(observations, int)
+                or observations < 1
+            ):
+                raise ValueError("identity state observations must be positive")
+            restored[global_id] = GlobalIdentity(
+                global_id=global_id,
+                embedding=embedding.copy(),
+                first_seen=first_seen,
+                last_seen=last_seen,
+                camera_ids=tuple(str(camera_id) for camera_id in camera_ids),
+                observations=observations,
+            )
+        if restored and next_id <= max(restored):
+            raise ValueError("identity state next_id must exceed global IDs")
+        self._next_id = next_id
+        self._identities = restored
 
     def update(
         self,

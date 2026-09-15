@@ -162,6 +162,8 @@ adds stable IDs, while `SemanticTrackMemory` enriches detections with lifetime,
 label-history, and exponentially smoothed confidence metadata.
 `identity_store` and `camera_id` add optional cross-camera `global_id` matching
 from appearance embeddings stored in detection attributes.
+`GlobalIdentityStore.state_dict()` and `load_state_dict()` make those
+cross-camera identities resumable across worker restarts.
 
 See examples/image.py, examples/batch.py, examples/composite.py,
 examples/onnx.py, and examples/video.py for runnable adapters.

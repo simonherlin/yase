@@ -1122,6 +1122,29 @@ def test_global_identity_store_matches_embeddings_across_cameras():
     )
 
 
+def test_global_identity_store_round_trips_json_checkpoint():
+    store = GlobalIdentityStore(start_id=10)
+    detection = Detection(
+        "person", 0.9, (0, 0, 2, 2), attributes={"embedding": [1.0, 0.0]}
+    )
+    store.update([detection], camera_id="cam-a", timestamp=1.0)
+    restored = GlobalIdentityStore(start_id=1)
+    restored.load_state_dict(json.loads(json.dumps(store.state_dict())))
+    matched = restored.update(
+        [
+            Detection(
+                "person", 0.8, (0, 0, 2, 2), attributes={"embedding": [0.99, 0.01]}
+            )
+        ],
+        camera_id="cam-b",
+        timestamp=2.0,
+    )
+    assert matched[0].attributes["global_id"] == 10
+    assert restored.identities[10].camera_ids == ("cam-a", "cam-b")
+    with pytest.raises(ValueError, match="state version"):
+        restored.load_state_dict({"version": 2})
+
+
 def test_tracking_metrics_detect_identity_switches():
     truth = [
         [Detection("person", 1.0, (0, 0, 10, 10), track_id=4)],

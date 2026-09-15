@@ -478,6 +478,14 @@ Result: version 0.38.0, pending final validation.
 
 Result: version 0.38.1, pending final validation.
 
+## Cycle 48 — resumable cross-camera identity
+
+- [x] Add versioned JSON-compatible checkpoints to `GlobalIdentityStore`.
+- [x] Validate identity IDs, embeddings, timestamps, camera history, and counts.
+- [x] Add a restart simulation preserving cross-camera matching.
+
+Result: version 0.39.0, pending final validation.
+
 ## Final gap analysis
 
 The first release boundary is complete. Official ByteTrack, BoT-SORT, and full
