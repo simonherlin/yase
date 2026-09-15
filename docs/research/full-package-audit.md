@@ -1,7 +1,7 @@
 # Yase — audit complet du package et plan de production
 
 Date de l'audit : 2026-09-15  
-État inspecté : `0.52.0`
+État inspecté : `0.58.0`
 
 Ce document est la référence de pilotage technique. Il distingue ce qui est
 déjà livré, ce qui est contractuellement couvert mais non testé sur matériel,
@@ -35,7 +35,7 @@ polluer `SemanticResult`, `ObservationBundle` ni les contrats de tracking.
 | Entrées image/Pillow/NumPy | `load_image`, limites pixels/bytes/canaux | livré | formats vidéo et métadonnées EXIF à formaliser |
 | Résultat sémantique | profondeur, segmentation, détections, OCR, VLM, embeddings, relations, événements | livré | version majeure et champs multimodaux à stabiliser |
 | Extraction unitaire | `Yase.extract`, callable, mapping, array | livré | métriques par backend à enrichir |
-| Batch image | `Yase.extract_many`, backends natifs, fallback parallèle | livré | erreurs partielles des batches à normaliser partout |
+| Batch image | `Yase.extract_many`, backends natifs, fallback parallèle, skip partiel | livré | erreurs de provider à mesurer par runtime |
 | Pipeline composite | fusion de champs, conflits, `extract_batch` | livré | fusion probabiliste et calibration avancée |
 | Scheduler DAG | dépendances, cache borné, async, deadline, cancellation | livré | exécution durable/distribuée absente |
 | Vidéo fichier | stride, FPS, batch, ordre causal, sinks | livré | seek/reprise de capture non persistée |
@@ -46,15 +46,16 @@ polluer `SemanticResult`, `ObservationBundle` ni les contrats de tracking.
 | OCR | Tesseract, PaddleOCR lazy | livré | batch réel et document layout avancé |
 | VLM | Transformers, JSON schema subset, batch | livré | streaming tokens, vidéo native, contraintes JSON avancées |
 | Runtime ONNX | batch, providers, graph options, I/O binding optionnel | livré | vraie validation GPU/EP en CI |
-| Runtime OpenVINO | sync CPU/GPU/NPU/AUTO | livré | `AsyncInferQueue` non intégré |
+| Runtime OpenVINO | sync CPU/GPU/NPU/AUTO, `AsyncInferQueue` ordonné | livré | vraie validation hardware en CI |
 | Runtime TensorRT | plan et runner custom | livré | buffers CUDA réutilisables, context pools, shapes dynamiques |
 | Retrieval local | index NumPy, NPZ, namespace d'embedding | livré | HNSW/FAISS local optionnel |
-| Retrieval Qdrant | upsert/query, filtres, namespace, score threshold | livré | vecteurs nommés et payload indexes |
-| Observabilité | métriques thread-safe, JSON, Prometheus text | livré | OpenTelemetry traces/metrics et corrélation de requêtes |
+| Retrieval Qdrant | upsert/query, filtres, namespace, named vectors, payload indexes | livré | migration de schémas multi-vecteurs |
+| Observabilité | métriques thread-safe, JSON, Prometheus text, OpenTelemetry spans | livré | propagation de trace dans tous les stages |
 | Packaging | wheel pure portable, sdist C++/builder, extras lazy | livré | matrice OS/Python/accélérateur à publier |
 | Native C++ | IoU/NMS hot paths, fallback Python | livré | ABI/build wheels spécialisés non distribués |
-| CLI | image, vidéo, benchmark, diagnostics, catalogues, évaluations | livré | service HTTP/gRPC et config déclarative |
-| Documentation | README/API/architecture/recherche/status | partiel | guide développeur référencé mais absent, corrigé à la prochaine tâche |
+| CLI | image, vidéo, benchmark, diagnostics, catalogues, évaluations | livré | config déclarative et gRPC éventuels |
+| Service | ASGI borné, health/readiness, métriques, extraction base64 | livré | auth/rate-limit laissés à l'infrastructure |
+| Documentation | README/API/architecture/recherche/status/release readiness | livré | guides d'intégration runtime à enrichir |
 
 ## 3. Recherche technologique vérifiée
 
@@ -80,7 +81,7 @@ Pour les providers non CPU, la documentation recommande I/O binding afin de
 placer les entrées/sorties sur le device et d'éviter les copies implicites.
 [I/O Binding](https://onnxruntime.ai/docs/performance/tune-performance/iobinding.html)
 
-Yase expose maintenant `use_io_binding=True`, mais la prochaine étape doit
+Yase expose maintenant `use_io_binding=True`; la prochaine étape doit
 ajouter des tests hardware-gated avec CUDA/TensorRT Execution Provider et
 mesurer séparément preprocessing, copie, kernel et postprocessing.
 
@@ -90,9 +91,9 @@ OpenVINO fournit `AsyncInferQueue`, un pool de requêtes avec
 `start_async`, callbacks et `wait_all`.
 [AsyncInferQueue officiel](https://docs.openvino.ai/2026/api/ie_python_api/_autosummary/openvino.AsyncInferQueue.html)
 
-La prochaine implémentation doit être un adaptateur optionnel qui conserve
-l'ordre des résultats par `userdata` et n'expose jamais les objets de requête
-OpenVINO dans le contrat public.
+L'adaptateur Yase conserve l'ordre des résultats par `userdata` et n'expose
+jamais les objets de requête OpenVINO dans le contrat public. Il reste à
+ajouter un smoke test sur une vraie cible CPU/GPU/NPU.
 
 ### TensorRT
 
@@ -112,10 +113,11 @@ dans un même point, et les payload indexes pour accélérer les filtres.
 [Collections et named vectors](https://qdrant.tech/documentation/manage-data/collections/)
 [Payload filtering et indexes](https://qdrant.tech/documentation/search/filtering/)
 
-Yase lie déjà un index à un espace logique. La prochaine évolution de retrieval
-doit choisir explicitement entre `collection-per-space` et `named-vector`; elle
-ne doit pas faire croire que le champ `space` dans le payload remplace une
-validation de schéma vectoriel côté serveur.
+Yase lie déjà un index à un espace logique et supporte explicitement les deux
+stratégies : collection historique mono-vecteur ou `vector_name` Qdrant nommé.
+`payload_indexes` rend les champs filtrés indexables. Le champ `space` dans le
+payload reste une provenance applicative et ne remplace pas une validation de
+schéma vectoriel côté serveur.
 
 ### Détection temps réel
 
@@ -141,16 +143,11 @@ et leurs performances doivent être mesurées sur le matériel cible.
 
 ### P1 — fonctionnalités de plateforme
 
-1. Ajouter `OpenVINOAsyncExtractor` fondé sur `AsyncInferQueue`.
-2. Étendre TensorRT avec pool de contexts, buffers réutilisables et streams.
-3. Ajouter named vectors et payload indexes Qdrant de façon explicite.
-4. Fournir une intégration OpenTelemetry optionnelle avec trace/span par
-   extraction, stage, batch et backend.
-5. Ajouter un serveur optionnel ASGI avec upload borné, streaming JSONL,
-   health/readiness, métriques et arrêt propre.
-6. Ajouter un format de configuration déclaratif (TOML/YAML optionnel) qui
+1. Étendre TensorRT avec pool de contexts, buffers réutilisables et streams.
+2. Propager les contextes OpenTelemetry dans les stages, batches et backends.
+3. Ajouter un format de configuration déclaratif (TOML/YAML optionnel) qui
    instancie registry, pipeline, limites, sinks et checkpoints.
-7. Ajouter une stratégie keyframe/VLM pour éviter d'appeler un VLM lourd à
+4. Ajouter une stratégie keyframe/VLM pour éviter d'appeler un VLM lourd à
    chaque frame vidéo.
 
 ### P2 — extension mondiale
@@ -171,6 +168,10 @@ et leurs performances doivent être mesurées sur le matériel cible.
 - CLI complète pour les backends du registry.
 - ONNX I/O binding optionnel.
 - Comptage correct des pertes en temps réel.
+- OpenVINO `AsyncInferQueue` et résultat ordonné.
+- OpenTelemetry optionnel et service ASGI borné.
+- Qdrant named vectors et indexes payload explicites.
+- Pipeline batch tolérant aux erreurs partielles.
 - Wheel pure portable et sources natives conservées dans le sdist.
 
 ## 6. Critères de sortie d'une release 1.x
@@ -193,11 +194,12 @@ Une release production doit satisfaire simultanément :
 Les tâches suivantes sont les plus rentables et doivent être implémentées dans
 cet ordre :
 
-1. corriger les petites incohérences de documentation et de contrats ;
-2. ajouter l'async OpenVINO et un pool TensorRT sans modifier le cœur ;
-3. renforcer retrieval Qdrant avec named vectors/indexes ;
-4. ajouter OpenTelemetry et un serveur ASGI optionnel ;
-5. produire une matrice de compatibilité et des benchmarks réels.
+1. tester les extras sur les runtimes et matériels réellement supportés ;
+2. ajouter un pool TensorRT de contexts et buffers réutilisables ;
+3. versionner/migrer explicitement les schémas `SemanticResult` et checkpoints ;
+4. produire une configuration déclarative et une stratégie keyframe/VLM ;
+5. publier des benchmarks séparant preprocessing, transferts, kernels et
+   post-traitement.
 
 Le projet ne doit pas intégrer de framework obligatoire supplémentaire tant que
 ces frontières de production ne sont pas stabilisées.
