@@ -13,6 +13,7 @@ from io import BytesIO
 from typing import Any
 
 from .diagnostics import health_check
+from .limits import InputLimits
 from .serialization import result_to_dict
 
 
@@ -25,6 +26,7 @@ class YaseASGI:
         *,
         max_body_bytes: int = 16 * 1024 * 1024,
         max_batch_size: int = 64,
+        input_limits: InputLimits | None = None,
     ):
         if not hasattr(extractor, "extract"):
             raise TypeError("extractor must expose the Yase extract(image) API")
@@ -40,12 +42,14 @@ class YaseASGI:
             or max_batch_size < 1
         ):
             raise ValueError("max_batch_size must be a positive integer")
+        if input_limits is not None and not isinstance(input_limits, InputLimits):
+            raise TypeError("input_limits must be an InputLimits instance")
         self.extractor = extractor
         self.max_body_bytes = max_body_bytes
         self.max_batch_size = max_batch_size
+        self.input_limits = input_limits
 
-    @staticmethod
-    def _decode_image(encoded: Any) -> Any:
+    def _decode_image(self, encoded: Any) -> Any:
         if not isinstance(encoded, str) or not encoded:
             raise ValueError("image_base64 must be a non-empty string")
         image_bytes = base64.b64decode(encoded, validate=True)
@@ -53,7 +57,16 @@ class YaseASGI:
             raise ValueError("image_base64 decoded to empty bytes")
         from PIL import Image
 
-        return Image.open(BytesIO(image_bytes))
+        image = Image.open(BytesIO(image_bytes))
+        if self.input_limits is not None:
+            width, height = image.size
+            self.input_limits.validate_shape(
+                width=width,
+                height=height,
+                channels=3,
+                byte_count=width * height * 3,
+            )
+        return image
 
     @staticmethod
     async def _read_body(receive: Any, limit: int) -> bytes:

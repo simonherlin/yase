@@ -610,6 +610,16 @@ def test_asgi_service_exposes_health_metrics_and_safe_image_extraction():
         request(create_asgi_app(api, max_body_bytes=2), "POST", "/extract", b"123")
     )
     assert too_large[0]["status"] == 413
+    limited = asyncio.run(
+        request(
+            create_asgi_app(api, input_limits=InputLimits(max_bytes=2)),
+            "POST",
+            "/extract",
+            json.dumps({"image_base64": encoded}).encode("utf-8"),
+        )
+    )
+    assert limited[0]["status"] == 400
+    assert json.loads(limited[1]["body"])["error"]["type"] == "invalid_request"
     too_many = asyncio.run(
         request(
             create_asgi_app(api, max_batch_size=1),

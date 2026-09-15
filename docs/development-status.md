@@ -911,6 +911,16 @@ instead of failing later during model construction.
 Result: batch inference now has the same minimum observability contract as
 single-image extraction and DAG stages.
 
+## Cycle 84 — ASGI decoded-input limits
+
+- [x] Add an optional `InputLimits` contract directly to `YaseASGI`.
+- [x] Validate image dimensions and decoded RGB byte estimates before custom
+  backends receive a request.
+- [x] Preserve body-size and batch-size limits and add an HTTP regression test.
+
+Result: the service boundary remains safe even when it wraps a backend that is
+not itself a `Yase` facade.
+
 ## Exit criteria
 
 The package is considered ready for a first public release when the core and
