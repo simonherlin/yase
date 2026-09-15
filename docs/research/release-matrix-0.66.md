@@ -57,9 +57,17 @@ modèle. Avant d’annoncer une compatibilité GPU, le poste cible doit produire
 ```bash
 yase diagnostics --providers
 uv run python tools/runtime_smoke.py
+uv run python tools/runtime_smoke.py --all-openvino-devices
 nvidia-smi                 # NVIDIA uniquement
 nvcc --version             # si le toolkit CUDA est installé
 trtexec --help             # installation TensorRT non-pip uniquement
+```
+
+Pour une cible ONNX GPU, ajouter le provider attendu ; le smoke test active
+alors `strict_providers=True` et échoue si le runtime retombe sur CPU :
+
+```bash
+uv run python tools/runtime_smoke.py --onnx-provider CUDAExecutionProvider
 ```
 
 ONNX Runtime GPU doit être installé avec un couple CUDA/cuDNN compatible avec

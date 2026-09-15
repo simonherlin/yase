@@ -60,7 +60,11 @@ The CLI reports available local adapters with `yase info`. Extraction from a
 local ONNX model is available with `yase extract image.jpg --model onnx
 --model-path model.onnx`.
 Use `yase diagnostics --providers` when deploying to inspect actual ONNX
-providers, OpenVINO devices, and optional CUDA/TensorRT availability.
+providers, OpenVINO devices, and optional CUDA/TensorRT availability. Run
+`uv run python tools/runtime_smoke.py --all-openvino-devices` to compile and
+execute the deterministic smoke graph on every discovered OpenVINO device;
+for ONNX GPU validation, add `--onnx-provider CUDAExecutionProvider` so a CPU
+fallback fails loudly.
 The same commands also accept registered semantic backends such as `vlm`,
 `image-embedding`, `sam3`, `rf-detr`, `tesseract`, and `paddleocr`; use
 `--model-path` for a local/Hugging Face model identifier, `--prompt` for VLM
